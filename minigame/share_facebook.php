@@ -175,12 +175,38 @@ $sharePost = str_replace('{url}', $shareUrl, $share['post']);
         // Facebook fills the link and hashtag; the post text is not sent because a long link can break Facebook's login redirect.
         const link = 'https://www.facebook.com/sharer/sharer.php?u=' + encodeURIComponent(box.dataset.url)
             + '&hashtag=' + encodeURIComponent('#HongTraTuoiTho');
+        // Unofficial Facebook app address: the share page opens in the app, where the customer is already logged in.
+        const appLink = 'fb://facewebmodal/f?href=' + encodeURIComponent(link);
+        const mobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+        let appDone = null;
+        let appTimer = null;
         sheet.querySelector('[data-fb-share-link]').href = link;
         // The share block sits in a hidden wrapper, so the fallback sheet must live under body to be visible.
         document.body.append(sheet);
         sheet.addEventListener('click', function(event) {
-            const leaving = event.target.closest('[data-fb-share-link], [data-fb-share-close]');
-            if (event.target === sheet || leaving) sheet.close();
+            const opening = event.target.closest('[data-fb-share-link]');
+            const leaving = opening || event.target.closest('[data-fb-share-close]');
+            if (event.target !== sheet && !leaving) return;
+            const done = appDone;
+            appDone = null;
+            sheet.close();
+            if (!done) return;
+            if (opening && sdkReady) {
+                // This tap is a new click, so the SDK dialog is allowed and can still confirm the share.
+                event.preventDefault();
+                shareOnWeb(done);
+                return;
+            }
+            done(false);
+        });
+        // The page going to the background means the app opened; the app never reports the share back.
+        document.addEventListener('visibilitychange', function() {
+            if (!document.hidden || !appDone) return;
+            clearTimeout(appTimer);
+            if (sheet.open) sheet.close();
+            const done = appDone;
+            appDone = null;
+            done(false);
         });
         const copy = async function() {
             try {
@@ -208,9 +234,17 @@ $sharePost = str_replace('{url}', $shareUrl, $share['post']);
         sdk.async = true;
         sdk.src = 'https://connect.facebook.net/' + box.dataset.fbLocale + '/sdk.js';
         document.body.append(sdk);
+        // A page cannot ask whether the app is installed: if this page is still showing after the attempt, there is no app.
+        const shareInApp = function(done) {
+            appDone = done || function() {};
+            appTimer = setTimeout(function() {
+                // The pop-up permission from the click is gone by now, so the customer taps a real link in the sheet.
+                if (!document.hidden) sheet.showModal();
+            }, 1500);
+            location.href = appLink;
+        };
         // Must run inside a click so the browser allows the pop-up. done(true) only when Facebook reports a share.
-        window.kyucFbShare = function(done) {
-            copy();
+        const shareOnWeb = function(done) {
             if (!sdkReady) {
                 // Without the SDK (blocked or still loading) the customer can still share, but nothing confirms it.
                 const win = window.open(link, 'fbshare', 'width=640,height=600');
@@ -229,6 +263,14 @@ $sharePost = str_replace('{url}', $shareUrl, $share['post']);
                 const shared = !!response && !response.error_code && !response.error_message;
                 if (done) done(shared);
             });
+        };
+        window.kyucFbShare = function(done) {
+            copy();
+            if (mobile) {
+                shareInApp(done);
+                return;
+            }
+            shareOnWeb(done);
         };
         box.querySelector('[data-fb-share-open]').addEventListener('click', function() {
             window.kyucFbShare();
