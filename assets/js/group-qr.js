@@ -130,10 +130,11 @@
     return legacyCopy(text);
   }
 
-  async function copyLink(section, url, focusTarget) {
+  async function copyLink(section, url, focusTarget, copiedMessage) {
     if (await copyText(url)) {
-      feedback(section, config.copy || 'Copied');
-      toast(config.copy || 'Copied');
+      const message = copiedMessage || config.copy || 'Copied';
+      feedback(section, message);
+      toast(message);
       return;
     }
     const input = focusTarget || section.querySelector('#hyg-invite');
@@ -146,7 +147,7 @@
     toast(config.manual || 'Select the link to copy it.');
   }
 
-  // Fallback share panel for browsers without navigator.share (HTTP pages, Zalo/Facebook in-app browsers, Firefox desktop).
+  // Own share panel: the OS share sheet lists different apps per device, so Zalo/Messenger/Telegram are offered here on every device.
   let sheet = null;
   function closeSheet() {
     if (!sheet) return;
@@ -156,6 +157,20 @@
   }
   function onSheetKey(event) {
     if (event.key === 'Escape') closeSheet();
+  }
+  // Browsers cannot list installed apps: if zalo:// took no focus from the page, assume Zalo PC is missing and open Zalo Web.
+  function openZaloWebIfNoApp() {
+    let appOpened = false;
+    const markOpened = () => {
+      appOpened = true;
+    };
+    window.addEventListener('blur', markOpened, {once:true});
+    document.addEventListener('visibilitychange', markOpened, {once:true});
+    setTimeout(() => {
+      window.removeEventListener('blur', markOpened);
+      document.removeEventListener('visibilitychange', markOpened);
+      if (!appOpened) window.open('https://chat.zalo.me/', '_blank', 'noopener');
+    }, 1500);
   }
   function openSheet(section, url, title) {
     closeSheet();
@@ -169,9 +184,11 @@
         '<p class="hyg-sheet-hint"></p>' +
         '<input class="hyg-sheet-link" readonly autocomplete="off" spellcheck="false">' +
         '<div class="hyg-sheet-actions">' +
+          '<a class="btn" data-sheet-zalo></a>' +
+          '<a class="btn" data-sheet-messenger></a>' +
+          '<a class="btn" data-sheet-telegram target="_blank" rel="noopener"></a>' +
           '<button class="btn primary" type="button" data-sheet-copy></button>' +
-          '<a class="btn" data-sheet-facebook target="_blank" rel="noopener"></a>' +
-          (mobile ? '<a class="btn" data-sheet-messenger></a>' : '') +
+          (navigator.share ? '<button class="btn" type="button" data-sheet-more></button>' : '') +
         '</div>' +
         '<button class="hyg-sheet-close" type="button" data-sheet-close></button>' +
       '</div>';
@@ -181,44 +198,52 @@
     input.value = url;
     input.setAttribute('aria-label', title || url);
     sheet.querySelector('[data-sheet-copy]').textContent = config.copyLabel || 'Copy link';
-    const facebook = sheet.querySelector('[data-sheet-facebook]');
-    facebook.textContent = config.facebook || 'Facebook';
-    facebook.href = 'https://www.facebook.com/sharer/sharer.php?u=' + encoded;
+    // Zalo has no share URL without an OA ID: copy the link, then open Zalo so the customer can paste it.
+    const zalo = sheet.querySelector('[data-sheet-zalo]');
+    zalo.textContent = config.zalo || 'Zalo';
+    zalo.href = 'zalo://';
     const messenger = sheet.querySelector('[data-sheet-messenger]');
-    if (messenger) {
-      messenger.textContent = config.messenger || 'Messenger';
-      messenger.href = 'fb-messenger://share/?link=' + encoded;
+    messenger.textContent = config.messenger || 'Messenger';
+    messenger.href = mobile
+      ? 'fb-messenger://share/?link=' + encoded
+      : 'https://www.facebook.com/sharer/sharer.php?u=' + encoded;
+    if (!mobile) {
+      messenger.target = '_blank';
+      messenger.rel = 'noopener';
     }
+    const telegram = sheet.querySelector('[data-sheet-telegram]');
+    telegram.textContent = config.telegram || 'Telegram';
+    telegram.href = 'https://t.me/share/url?url=' + encoded + '&text=' + encodeURIComponent(title);
+    const more = sheet.querySelector('[data-sheet-more]');
+    if (more) more.textContent = config.more || 'More...';
     sheet.querySelector('[data-sheet-close]').textContent = config.close || 'Close';
     sheet.addEventListener('click', async event => {
       if (event.target === sheet || event.target.closest('[data-sheet-close]')) {
         closeSheet();
         return;
       }
-      if (event.target.closest('[data-sheet-copy]')) await copyLink(section, url, input);
+      if (event.target.closest('[data-sheet-copy]')) {
+        await copyLink(section, url, input);
+        return;
+      }
+      // No preventDefault: the link still opens Zalo while the copy runs inside the same click.
+      if (event.target.closest('[data-sheet-zalo]')) {
+        if (!mobile) openZaloWebIfNoApp();
+        await copyLink(section, url, input, config.zaloCopied);
+        return;
+      }
+      if (event.target.closest('[data-sheet-more]')) {
+        closeSheet();
+        await nativeShare(section, url, title);
+      }
     });
     document.addEventListener('keydown', onSheetKey);
     document.body.append(sheet);
     input.focus();
     input.select();
   }
-  document.addEventListener('click', async event => {
-    const control = event.target.closest('[data-group-share-button], [data-qr-download], [data-group-share] [data-copy-url]');
-    if (!control) return;
-    const section = control.closest('[data-group-share]');
-    if (!active(section)) { event.preventDefault(); return; }
-    if (control.matches('[data-qr-download]')) {
-      if (control.getAttribute('aria-disabled') === 'true' || !control.href) event.preventDefault();
-      return;
-    }
-    event.preventDefault();
-    const url = section.querySelector('#hyg-invite')?.value || '';
-    if (control.matches('[data-copy-url]')) { await copyLink(section, url); return; }
-    const title = control.dataset.shareTitle || '';
-    if (!navigator.share) {
-      openSheet(section, url, title);
-      return;
-    }
+
+  async function nativeShare(section, url, title) {
     let payload = {title, text:title, url};
     const prepared = previews.get(section);
     // The QR image is optional; the link always travels with it because some apps drop the text when a file is attached.
@@ -238,6 +263,21 @@
         if (retryError.name !== 'AbortError') openSheet(section, url, title);
       }
     }
+  }
+
+  document.addEventListener('click', async event => {
+    const control = event.target.closest('[data-group-share-button], [data-qr-download], [data-group-share] [data-copy-url]');
+    if (!control) return;
+    const section = control.closest('[data-group-share]');
+    if (!active(section)) { event.preventDefault(); return; }
+    if (control.matches('[data-qr-download]')) {
+      if (control.getAttribute('aria-disabled') === 'true' || !control.href) event.preventDefault();
+      return;
+    }
+    event.preventDefault();
+    const url = section.querySelector('#hyg-invite')?.value || '';
+    if (control.matches('[data-copy-url]')) { await copyLink(section, url); return; }
+    openSheet(section, url, control.dataset.shareTitle || '');
   });
   function checkExpiry() { document.querySelectorAll('[data-group-share]').forEach(active); }
   function startTimer() { clearInterval(expiryTimer); expiryTimer = setInterval(checkExpiry, 1000); }

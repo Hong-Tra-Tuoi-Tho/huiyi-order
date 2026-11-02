@@ -47,9 +47,9 @@
   const appliedNow = { vi: 'Quà đã được áp dụng trực tiếp vào đơn hàng hiện tại.', zh: '獎品已直接套用於目前這筆訂單。', en: 'This prize has been applied to your current order.' }[language];
   // A 0đ prize offers one replay for sharing the website on Facebook; that replay always wins 52.000đ.
   Object.assign(t, {
-    vi: { zero: 'Tiếc quá, lượt này trúng 0đ!', share_offer: 'Rất tiếc bạn đã không may mắn, xin hãy chia sẻ chúng tôi lên Facebook để nhận được một lượt chơi miễn phí với tỉ lệ trúng 100%.', share_button: 'Chia sẻ & nhận lượt chơi', share_bonus: 'Cảm ơn bạn đã chia sẻ! Bạn nhận được 1 lượt chơi miễn phí, lượt này chắc chắn trúng quà.' },
-    zh: { zero: '可惜，這次抽到 0đ！', share_offer: '很遺憾這次沒有中獎，請把我們分享到 Facebook，即可獲得 1 次免費遊戲機會，中獎率 100%。', share_button: '分享並領取機會', share_bonus: '感謝分享！您獲得 1 次免費遊戲機會，這次保證中獎。' },
-    en: { zero: 'So close — this play won 0đ!', share_offer: 'Sorry, you were not lucky this time. Share us on Facebook to get 1 free play with a 100% chance to win.', share_button: 'Share & get a play', share_bonus: 'Thanks for sharing! You got 1 free play, and it is guaranteed to win a prize.' }
+    vi: { zero: 'Tiếc quá, lượt này trúng 0đ!', share_offer: '<strong>Chia sẻ chúng tôi</strong> lên Facebook để nhận được một lượt chơi miễn phí với tỉ lệ trúng 100%.', share_button: 'Chia sẻ', share_bonus: 'Cảm ơn bạn đã chia sẻ! Bạn nhận được 1 lượt chơi miễn phí, lượt này chắc chắn trúng quà.', share_failed: 'Chưa nhận được xác nhận chia sẻ nên chưa cộng lượt. Hãy đăng nhập Facebook, bấm Đăng rồi thử lại.' },
+    zh: { zero: '可惜，這次抽到 0đ！', share_offer: '<strong>把我們分享</strong>到 Facebook，即可獲得 1 次免費遊戲機會，中獎率 100%。', share_button: '分享', share_bonus: '感謝分享！您獲得 1 次免費遊戲機會，這次保證中獎。', share_failed: '尚未收到分享確認，因此未增加遊戲次數。請登入 Facebook，按「發佈」後再試一次。' },
+    en: { zero: 'So close — this play won 0đ!', share_offer: '<strong>Share us</strong> on Facebook to get 1 free play with a 100% chance to win.', share_button: 'Share', share_bonus: 'Thanks for sharing! You got 1 free play, and it is guaranteed to win a prize.', share_failed: 'We could not confirm your share, so no play was added. Log in to Facebook, tap Post, then try again.' }
   }[language]);
   if (inCheckout) t.saved = { vi: 'Hoàn thành! Quà đã được áp dụng vào đơn hàng này.', zh: '配對完成！獎品已套用於這筆訂單。', en: 'Complete! Your prize has been applied to this order.' }[language];
   const paths = [
@@ -67,15 +67,20 @@
   const next = root.querySelector('[data-game-next]');
   const rewardElement = root.querySelector('[data-game-reward]');
   const shareBox = root.querySelector('[data-game-share-bonus]');
+  // Shown inside the share box too, because the reward popup covers the page notice.
+  const shareNote = document.createElement('p');
+  shareNote.hidden = true;
+  shareNote.textContent = t.share_failed;
+  shareBox?.querySelector('p').after(shareNote);
   // Checkout dialog: the reward is shown in a popup; the standalone page keeps it inline.
   const popup = root.querySelector('[data-game-reward-popup]');
   const reopen = root.querySelector('[data-game-reward-reopen]');
   const outsideNext = root.querySelector('[data-game-next-outside]');
   const outsideShare = root.querySelector('[data-game-share-outside]');
   const popupText = {
-    vi: { win: 'Chúc mừng bạn!', lose: 'Tiếc quá!', luck: 'Chúc bạn may mắn lần sau!', close: 'Đóng', view: 'Xem phần thưởng', next: 'Chơi tiếp' },
-    zh: { win: '恭喜你！', lose: '可惜！', luck: '祝你下次好運！', close: '關閉', view: '查看獎品', next: '繼續遊戲' },
-    en: { win: 'Congratulations!', lose: 'So close!', luck: 'Better luck next time!', close: 'Close', view: 'View prize', next: 'Play next' }
+    vi: { win: 'Chúc mừng bạn!', lose: 'Tiếc quá!', luck: 'Chúc bạn may mắn lần sau!', view: 'Xem phần thưởng', next: 'Chơi tiếp' },
+    zh: { win: '恭喜你！', lose: '可惜！', luck: '祝你下次好運！', view: '查看獎品', next: '繼續遊戲' },
+    en: { win: 'Congratulations!', lose: 'So close!', luck: 'Better luck next time!', view: 'View prize', next: 'Play next' }
   }[language];
   // The popup opens once per prize; after "Đóng" the reopen button brings it back.
   let popupShownFor = '';
@@ -508,6 +513,7 @@
   // A new play starts from a clean board: the previous prize, completion banner and stats are cleared at once.
   function resetRound() {
     reward = null; board = null; freshMatches = []; shareBonus = false;
+    shareNote.hidden = true;
     ['name', 'terms', 'code', 'amount', 'expiry'].forEach(key => {
       const element = root.querySelector(`[data-game-reward-${key}]`);
       if (element) element.textContent = '';
@@ -524,21 +530,29 @@
     run('next', false, { board_id: id });
   });
   if (shareBox) {
-    shareBox.querySelector('p').textContent = t.share_offer;
+    shareBox.querySelector('p').innerHTML = t.share_offer;
     const shareLabel = shareBox.querySelector('button span') || shareBox.querySelector('button');
     shareLabel.textContent = t.share_button;
     shareBox.querySelector('button').addEventListener('click', () => {
       if (busy || !reward || !shareBonus || !board) return;
-      // Open the Facebook share inside this click so the pop-up is allowed, then claim the 52.000đ replay.
-      document.querySelector('[data-fb-share-open]')?.click();
+      shareNote.hidden = true;
       const id = board.id;
-      resetRound();
-      run('share_bonus', false, { board_id: id });
+      // Open the Facebook share inside this click so the pop-up is allowed; the 52.000đ replay waits for Facebook's answer.
+      window.kyucFbShare?.(shared => {
+        // The customer may have moved on while the Facebook window was open.
+        if (busy || !shareBonus || board?.id !== id) return;
+        if (!shared) {
+          shareNote.hidden = false;
+          message(t.share_failed, true);
+          return;
+        }
+        resetRound();
+        run('share_bonus', false, { board_id: id });
+      });
     });
   }
   if (popup) {
     root.querySelectorAll('[data-game-reward-close]').forEach(button => {
-      if (button.classList.contains('kyuc-reward-done')) button.textContent = popupText.close;
       button.addEventListener('click', () => {
         popup.close();
         // Out of plays at checkout: close the game too, so the customer lands back on the checkout page.
