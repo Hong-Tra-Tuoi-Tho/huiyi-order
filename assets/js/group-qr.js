@@ -175,6 +175,7 @@
   function openSheet(section, url, title) {
     closeSheet();
     const mobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+    const insideZalo = /Zalo/i.test(navigator.userAgent);
     const encoded = encodeURIComponent(url);
     sheet = document.createElement('div');
     sheet.className = 'hyg-sheet';
@@ -202,6 +203,10 @@
     const zalo = sheet.querySelector('[data-sheet-zalo]');
     zalo.textContent = config.zalo || 'Zalo';
     zalo.href = 'zalo://';
+    // Zalo's Android browser has no navigator.share and zalo:// goes nowhere there: ask Android to send the link to Zalo.
+    if (insideZalo && /Android/i.test(navigator.userAgent)) {
+      zalo.href = 'intent:#Intent;action=android.intent.action.SEND;type=text/plain;package=com.zing.zalo;S.android.intent.extra.TEXT=' + encoded + ';end';
+    }
     const messenger = sheet.querySelector('[data-sheet-messenger]');
     messenger.textContent = config.messenger || 'Messenger';
     messenger.href = mobile
@@ -229,14 +234,14 @@
       // No preventDefault: the link still opens Zalo while the copy runs inside the same click.
       if (event.target.closest('[data-sheet-zalo]')) {
         // Already inside Zalo: zalo:// goes nowhere, but the phone's share panel lists Zalo chats.
-        if (/Zalo/i.test(navigator.userAgent) && navigator.share) {
+        if (insideZalo && navigator.share) {
           event.preventDefault();
           closeSheet();
           await nativeShare(section, url, title);
           return;
         }
         if (!mobile) openZaloWebIfNoApp();
-        await copyLink(section, url, input, config.zaloCopied);
+        await copyLink(section, url, input, insideZalo ? config.zaloInsideCopied : config.zaloCopied);
         return;
       }
       if (event.target.closest('[data-sheet-more]')) {
