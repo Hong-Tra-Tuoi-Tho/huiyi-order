@@ -173,8 +173,8 @@ $sharePost = str_replace('{url}', $shareUrl, $share['post']);
         const status = box.querySelector('[data-fb-share-status]');
         const sheet = box.previousElementSibling;
         // Facebook fills the link and hashtag; the post text is not sent because a long link can break Facebook's login redirect.
-        const link = 'https://www.facebook.com/sharer/sharer.php?u=' + encodeURIComponent(box.dataset.url)
-            + '&hashtag=' + encodeURIComponent('#HongTraTuoiTho');
+        const link = 'https://www.facebook.com/sharer/sharer.php?u=' + encodeURIComponent(box.dataset.url) +
+            '&hashtag=' + encodeURIComponent('#HongTraTuoiTho');
         const mobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
         const sheetLink = sheet.querySelector('[data-fb-share-link]');
         sheetLink.href = link;
@@ -183,8 +183,29 @@ $sharePost = str_replace('{url}', $shareUrl, $share['post']);
         // The share block sits in a hidden wrapper, so the fallback sheet must live under body to be visible.
         document.body.append(sheet);
         sheet.addEventListener('click', function(event) {
-            const leaving = event.target.closest('[data-fb-share-link], [data-fb-share-close]');
-            if (event.target === sheet || leaving) sheet.close();
+            const opening = event.target.closest('[data-fb-share-link]');
+            const leaving = opening || event.target.closest('[data-fb-share-close]');
+            if (event.target !== sheet && !leaving) return;
+            const done = appDone;
+            appDone = null;
+            sheet.close();
+            if (!done) return;
+            if (opening && sdkReady) {
+                // This tap is a new click, so the SDK dialog is allowed and can still confirm the share.
+                event.preventDefault();
+                shareOnWeb(done);
+                return;
+            }
+            done(false);
+        });
+        // The page going to the background means the app opened; the app never reports the share back.
+        document.addEventListener('visibilitychange', function() {
+            if (!document.hidden || !appDone) return;
+            clearTimeout(appTimer);
+            if (sheet.open) sheet.close();
+            const done = appDone;
+            appDone = null;
+            done(false);
         });
         const copy = async function() {
             try {
@@ -252,6 +273,14 @@ $sharePost = str_replace('{url}', $shareUrl, $share['post']);
                 const shared = !!response && !response.error_code && !response.error_message;
                 if (done) done(shared);
             });
+        };
+        window.kyucFbShare = function(done) {
+            copy();
+            if (mobile) {
+                shareInApp(done);
+                return;
+            }
+            shareOnWeb(done);
         };
         box.querySelector('[data-fb-share-open]').addEventListener('click', function() {
             window.kyucFbShare();
