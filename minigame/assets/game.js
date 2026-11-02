@@ -538,9 +538,14 @@
       shareNote.hidden = true;
       const id = board.id;
       // Open the Facebook share inside this click so the pop-up is allowed; the 52.000đ replay waits for Facebook's answer.
-      window.kyucFbShare?.(shared => {
+      window.kyucFbShare?.(function claim(shared) {
+        // Coming back from Facebook refreshes the game state; wait for it so the share is not dropped.
+        if (busy) {
+          window.setTimeout(() => claim(shared), 200);
+          return;
+        }
         // The customer may have moved on while the Facebook window was open.
-        if (busy || !shareBonus || board?.id !== id) return;
+        if (!shareBonus || board?.id !== id) return;
         if (!shared) {
           shareNote.hidden = false;
           message(t.share_failed, true);
