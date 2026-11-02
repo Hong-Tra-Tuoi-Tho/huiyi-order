@@ -121,42 +121,29 @@ $sharePost = str_replace('{url}', $shareUrl, $share['post']);
         if (!box || !box.matches('[data-fb-share]')) return;
         const text = box.querySelector('[data-fb-share-text]');
         const status = box.querySelector('[data-fb-share-status]');
-
-        function fallbackCopy() {
-            if (!text) return;
+        const copy = async function() {
             try {
+                await navigator.clipboard.writeText(text.value);
+            } catch (e) {
                 text.focus();
                 text.select();
-                document.execCommand('copy');
-            } catch (ignored) {}
-        }
-
-        const copy = function() {
-            if (!text) return;
-            try {
-                if (navigator.clipboard && navigator.clipboard.writeText) {
-                    navigator.clipboard.writeText(text.value).catch(fallbackCopy);
-                } else {
-                    fallbackCopy();
-                }
-            } catch (e) {
-                fallbackCopy();
+                try {
+                    document.execCommand('copy');
+                } catch (ignored) {}
             }
-            if (status) status.hidden = false;
+            status.hidden = false;
         };
-
-        const openShare = function() {
+        box.querySelector('[data-fb-share-copy]').addEventListener('click', copy);
+        box.querySelector('[data-fb-share-open]').addEventListener('click', function() {
+            // Copy and open inside the click so the browser allows both; a blocked pop-up falls back to this tab.
             copy();
-            const url = box.dataset.url || 'https://order.huiyitea.vn/';
-            const shareContent = text ? text.value : '';
-            const link = 'https://www.facebook.com/sharer/sharer.php?u=' + encodeURIComponent(url)
-                + '&quote=' + encodeURIComponent(shareContent) + '&hashtag=' + encodeURIComponent('#HongTraTuoiTho');
-            // Mở trang chia sẻ trên tab mới (_blank), tuyệt đối không đè tab hiện tại (không dùng location.href)
-            window.open(link, '_blank', 'noopener,noreferrer');
-        };
-
-        window.openHuiYiFacebookShare = openShare;
-        box.querySelector('[data-fb-share-copy]')?.addEventListener('click', copy);
-        box.querySelector('[data-fb-share-open]')?.addEventListener('click', openShare);
+            // Facebook fills the hashtag; the quote is filled where Facebook still allows it, otherwise the copied text is pasted.
+            const link = 'https://www.facebook.com/sharer/sharer.php?u=' + encodeURIComponent(box.dataset.url)
+                + '&quote=' + encodeURIComponent(text.value) + '&hashtag=' + encodeURIComponent('#HongTraTuoiTho');
+            const win = window.open(link, 'fbshare', 'width=640,height=600');
+            if (!win) setTimeout(function() {
+                location.href = link;
+            }, 300);
+        });
     })();
 </script>
