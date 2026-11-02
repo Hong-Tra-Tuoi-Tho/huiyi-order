@@ -344,10 +344,10 @@ function hyg_render_room(array $r): string
             </div>
           </div><?php endforeach; ?>
 
-        <?php if ($open): ?><div class="hyg-join-actions"><a class="btn primary" href="<?= e(base_url('index.php?group=' . $r['public_id'])) ?>"><?= e(gt('choose')) ?></a>
+        <?php if ($open): ?><div class="hyg-join-actions<?= $drinks > 0 ? ' has-drinks' : '' ?>"><a class="btn primary" href="<?= e(base_url('index.php?group=' . $r['public_id'])) ?>"><?= e(gt('choose')) ?></a>
             <?php if ($host): ?>
               <!-- Button chốt món: gửi form ưu đãi ở cột tổng tiền qua thuộc tính form -->
-              <button class="btn primary block" id="hyg-lock-btn" type="submit" form="group-promotion-selector" name="lock_after" value="1" data-confirm=" <?= e(gt('lock_confirm')) ?>" <?= !$cart || $hasInvalid || $drinks < hyg_min_lock_cups() ? 'disabled' : '' ?>>
+              <button class="btn primary block" id="hyg-lock-btn" type="submit" form="group-promotion-selector" name="lock_after" value="1" <?= !$cart || $hasInvalid || $drinks < hyg_min_lock_cups() ? 'disabled' : '' ?>>
                 <?= e(gt('lock')) ?>
               </button>
             <?php endif; ?>

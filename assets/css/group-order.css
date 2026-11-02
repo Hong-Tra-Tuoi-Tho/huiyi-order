@@ -451,9 +451,11 @@ body.theme-deep-red .hyg-page,body.theme-deep-red .hyg-mode,body.theme-deep-red 
     }
 }
 
-/* Nút Chia sẻ nhóm + Chọn đồ uống + Chốt món: tông đỏ #B32424 (cùng màu nút giỏ hàng). */
+/* Nút Chia sẻ nhóm + Chọn đồ uống + Chốt món + Tạo nhóm/Tham gia + Đã hiểu: tông đỏ #B32424 (cùng màu nút giỏ hàng). */
 .hyg-page .hyg-share-actions [data-group-share-button],
 .hyg-page .hyg-join-actions .btn.primary,
+.hyg-page .hyg-welcome .hyg-form .btn.primary,
+.hyg-page .order-success-card .btn.primary,
 .hyg-page .btn.primary[name="lock_after"] {
     background: #B32424;
     border-color: #B32424;
@@ -461,6 +463,8 @@ body.theme-deep-red .hyg-page,body.theme-deep-red .hyg-mode,body.theme-deep-red 
 }
 .hyg-page .hyg-share-actions [data-group-share-button]:hover,
 .hyg-page .hyg-join-actions .btn.primary:hover,
+.hyg-page .hyg-welcome .hyg-form .btn.primary:hover,
+.hyg-page .order-success-card .btn.primary:hover,
 .hyg-page .btn.primary[name="lock_after"]:not(:disabled):hover {
     background: #8F1D1D;
     border-color: #8F1D1D;
@@ -468,6 +472,7 @@ body.theme-deep-red .hyg-page,body.theme-deep-red .hyg-mode,body.theme-deep-red 
 }
 .hyg-page .hyg-share-actions [data-group-share-button]:focus-visible,
 .hyg-page .hyg-join-actions .btn.primary:focus-visible,
+.hyg-page .hyg-welcome .hyg-form .btn.primary:focus-visible,
 .hyg-page .btn.primary[name="lock_after"]:focus-visible {
     outline: 3px solid #B32424;
     outline-offset: 3px;
@@ -512,20 +517,29 @@ body.theme-deep-red .hyg-page,body.theme-deep-red .hyg-mode,body.theme-deep-red 
 }
 .hyg-sheet-actions {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 8px;
     margin-top: 12px;
 }
 .hyg-sheet-actions .btn {
     min-height: 44px;
+    padding-inline: 2px;
+    font-size: 14px;
     text-align: center;
     text-decoration: none;
+}
+.hyg-sheet-actions [data-sheet-more] {
+    grid-column: 1 / -1;
 }
 .hyg-sheet-actions [data-sheet-copy] {
     grid-column: 1 / -1;
     background: #B32424;
     border-color: #B32424;
     color: #fff;
+}
+/* Toast sao chép phải nổi trên popup chia sẻ (.hyg-sheet z-index 60). */
+.cart-toast.hyg-share-toast {
+    z-index: 70;
 }
 .hyg-sheet-close {
     display: block;
@@ -557,6 +571,10 @@ body.theme-deep-red .hyg-page,body.theme-deep-red .hyg-mode,body.theme-deep-red 
     flex-direction: column;
     align-items: stretch;
     flex-wrap: nowrap;
+}
+/* Đã có ly nước: đưa nút "Chốt món" lên trên nút "Chọn đồ uống". */
+.hyg-page .hyg-join-actions.has-drinks #hyg-lock-btn {
+    order: -1;
 }
 .hyg-page .hyg-join-actions .btn.primary {
     min-width: 0;

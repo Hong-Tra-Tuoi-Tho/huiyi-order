@@ -18,7 +18,7 @@ $prizeHeading = ['zh' => '獎項與使用條件', 'vi' => 'Quà và điều ki�
 if (!$canPlay && !$hasReward) http_response_code(403);
 front_header(hgr_text('title'));
 ?>
-<link rel="stylesheet" href="<?= e(base_url('minigame/assets/style.css?v=19.9.14')) ?>">
+<link rel="stylesheet" href="<?= e(base_url('minigame/assets/style.css?v=19.9.20')) ?>">
 <style>
   .kyuc-reward-actions {
     display: flex;
@@ -128,12 +128,11 @@ front_header(hgr_text('title'));
 
               <div class="kyuc-reward-actions">
                 <button class="btn primary" type="button" data-game-next hidden><?= e(hgr_text('next')) ?> (còn <b data-game-balance>0</b> lượt)</button>
-                <button class="btn kyuc-reward-done" type="button" data-game-reward-close></button>
               </div>
             </section>
           </dialog>
         </section>
-        <script defer src="<?= e(base_url('minigame/assets/game.js?v=19.9.28')) ?>"></script>
+        <script defer src="<?= e(base_url('minigame/assets/game.js?v=19.9.33')) ?>"></script>
       <?php endif; ?>
     </div>
     <?php /* TODO: Tạm ẩn khối quy tắc / tỉ lệ quà (giống hộp Mini Game checkout; bỏ if (false) để hiện lại). */ ?>
@@ -144,7 +143,7 @@ front_header(hgr_text('title'));
         <p><?= e(pt(hym_current_member() ? 'member_saved' : 'guest_saved')) ?></p>
       </section>
     <?php endif; ?>
-    <?php /* Khối chia sẻ Facebook ẩn khỏi màn hình nhưng vẫn nằm trong trang: nút "Chia sẻ & nhận lượt chơi" ở popup bấm hộ nút bên trong. */ ?>
+    <?php /* Khối chia sẻ Facebook ẩn khỏi màn hình nhưng vẫn nằm trong trang: nút "Chia sẻ" ở popup bấm hộ nút bên trong. */ ?>
     <div hidden>
       <?php require __DIR__ . '/share_facebook.php'; ?>
     </div>

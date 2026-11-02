@@ -23,8 +23,8 @@ $prizeHeading = ['zh' => '獎項與使用條件', 'vi' => 'Quà và điều ki�
 ?>
 
 <!-- File CSS của Minigame -->
-<link rel="stylesheet" href="<?= e(base_url('minigame/assets/style.css?v=19.9.14')) ?>">
-<link rel="stylesheet" href="<?= e(base_url('minigame/assets/style.css?v=19.9.14')) ?>">
+<link rel="stylesheet" href="<?= e(base_url('minigame/assets/style.css?v=19.9.20')) ?>">
+<link rel="stylesheet" href="<?= e(base_url('minigame/assets/style.css?v=19.9.20')) ?>">
 
 <style>
     /* Style tùy chỉnh cơ bản cho Dialog */
@@ -35,7 +35,18 @@ $prizeHeading = ['zh' => '獎項與使用條件', 'vi' => 'Quà và điều ki�
         max-width: 850px;
         width: 92vw;
         box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
-        position: relative;
+        /* Giữ popup đứng yên giữa màn hình, cao không vượt quá 1 màn hình */
+        position: fixed;
+        inset: 0;
+        margin: auto;
+        max-height: calc(100vh - 16px);
+        max-height: calc(100dvh - 16px);
+        overflow-y: auto;
+    }
+
+    /* Khóa cuộn trang checkout phía sau khi popup đang mở */
+    html:has(.kyuc-dialog[open]) {
+        overflow: hidden;
     }
 
     .kyuc-dialog::backdrop {
@@ -60,6 +71,171 @@ $prizeHeading = ['zh' => '獎項與使用條件', 'vi' => 'Quà và điều ki�
 
     .kyuc-dialog-close:hover {
         color: #000;
+    }
+
+    /* Đưa dòng "HỒNG TRÀ TUỔI THƠ · LITTLE MEMORIES" sát mép trên popup, cách 5px */
+    .kyuc-dialog {
+        padding-top: 10px;
+        padding-bottom: 10px;
+    }
+
+    .kyuc-dialog .kyuc-game {
+        margin-top: 0;
+        margin-bottom: 0;
+        padding-top: 5px;
+        padding-bottom: 10px;
+    }
+
+    /* Thu nhỏ khoảng trống dưới đáy box game */
+    .kyuc-dialog .kyuc-game .kyuc-board {
+        padding-bottom: 6px;
+    }
+
+    .kyuc-dialog .kyuc-game .kyuc-actions {
+        margin: 0;
+    }
+
+    .kyuc-dialog .kyuc-game .kyuc-layout {
+        align-items: start;
+    }
+
+    .kyuc-dialog .kyuc-game .kyuc-hero {
+        padding-top: 0;
+    }
+
+    .kyuc-dialog .kyuc-game .kyuc-eyebrow {
+        display: block;
+        line-height: 1.2;
+    }
+
+    /* Chiều cao thẻ co theo màn hình để cả bàn chơi nằm gọn, không phải cuộn */
+    .kyuc-dialog .kyuc-game .kyuc-card {
+        height: clamp(72px, calc((100vh - 300px) / 3), 124px);
+        height: clamp(72px, calc((100dvh - 300px) / 3), 124px);
+    }
+
+    /* Điện thoại: tiêu đề nhỏ lại trên 1 hàng, hình 2 bé nằm dưới */
+    @media(max-width:760px) {
+        .kyuc-dialog {
+            --kyuc-mascot-height: clamp(56px, 16vh, 130px);
+            padding-top: 8px;
+            padding-bottom: 8px;
+        }
+
+        .kyuc-dialog .kyuc-game .kyuc-layout {
+            gap: 6px;
+        }
+
+        .kyuc-dialog .kyuc-game .kyuc-card {
+            height: clamp(60px, calc((100vh - 290px - var(--kyuc-mascot-height)) / 3), 113px);
+            height: clamp(60px, calc((100dvh - 290px - var(--kyuc-mascot-height)) / 3), 113px);
+        }
+
+        .kyuc-dialog .kyuc-game .kyuc-card-back,
+        .kyuc-dialog .kyuc-game .kyuc-card-face {
+            padding: 4px;
+        }
+
+        .kyuc-dialog .kyuc-game .kyuc-card-mark {
+            margin: 0 0 2px;
+            font-size: 18px;
+        }
+
+        .kyuc-dialog .kyuc-game .kyuc-card .kyuc-card-brand {
+            margin-top: 2px;
+            font-size: 6px;
+            line-height: 1;
+            white-space: nowrap;
+        }
+
+        .kyuc-dialog .kyuc-game .kyuc-card-face svg {
+            width: 28px;
+            height: 28px;
+        }
+
+        .kyuc-dialog .kyuc-game [data-game-progress] {
+            margin-bottom: 6px;
+        }
+
+        .kyuc-dialog .kyuc-game .kyuc-notice {
+            min-height: 40px;
+            margin: 6px 0 0;
+            padding: 5px 8px;
+        }
+
+        .kyuc-dialog .kyuc-game .kyuc-hero {
+            min-height: 0;
+        }
+
+        .kyuc-dialog .kyuc-game .kyuc-eyebrow {
+            max-width: none;
+            padding-right: 16px;
+            letter-spacing: 1px;
+            margin-bottom: 4px;
+        }
+
+        .kyuc-dialog .kyuc-game .kyuc-hero h1 {
+            max-width: none;
+            font-size: 24px;
+            letter-spacing: -.5px;
+            white-space: nowrap;
+            margin-bottom: 0;
+        }
+
+        .kyuc-dialog .kyuc-game .kyuc-mascots {
+            position: relative;
+            top: auto;
+            right: auto;
+            width: 100%;
+            height: var(--kyuc-mascot-height);
+            margin: 6px auto 0;
+            justify-content: center;
+        }
+
+        .kyuc-dialog .kyuc-game .kyuc-mascots:before {
+            left: 50%;
+            right: auto;
+            height: 100%;
+            transform: translateX(-50%);
+        }
+
+        .kyuc-dialog .kyuc-game .kyuc-mascots .kyuc-boy,
+        .kyuc-dialog .kyuc-game .kyuc-mascots .kyuc-girl {
+            height: 100%;
+            max-width: none;
+        }
+    }
+
+    /* Kéo tiêu đề sát mép trên box, cách khung thống kê 5px */
+    .kyuc-dialog .kyuc-game .kyuc-board {
+        padding-top: 5px;
+    }
+
+    .kyuc-dialog .kyuc-game .kyuc-board-heading {
+        margin-bottom: 5px;
+    }
+
+    .kyuc-dialog .kyuc-game .kyuc-board-heading h2 {
+        margin: 0;
+    }
+
+    /* Thu nhỏ khung thống kê (Cặp hình / Lượt lật / Thời gian) trong popup */
+    .kyuc-dialog .kyuc-game .kyuc-stats {
+        padding: 5px 9px;
+        border-radius: 10px;
+        margin-bottom: 8px;
+    }
+
+    .kyuc-dialog .kyuc-game .kyuc-stats .kyuc-stat {
+        gap: 1px;
+    }
+
+    .kyuc-dialog .kyuc-game .kyuc-stat>span {
+        font-size: 9px;
+    }
+
+    .kyuc-dialog .kyuc-game .kyuc-stats .kyuc-stat strong {
+        font-size: 14px;
     }
 
     .kyuc-reward-actions {
@@ -240,7 +416,6 @@ $prizeHeading = ['zh' => '獎項與使用條件', 'vi' => 'Quà và điều ki�
 
                             <div class="kyuc-reward-actions">
                                 <button class="btn primary" type="button" data-game-next hidden><?= e(hgr_text('next')) ?> (còn <b data-game-balance>0</b> lượt)</button>
-                                <button class="btn kyuc-reward-done" type="button" data-game-reward-close></button>
                             </div>
                         </section>
                     </dialog>
@@ -282,7 +457,7 @@ $prizeHeading = ['zh' => '獎項與使用條件', 'vi' => 'Quà và điều ki�
         <?php endif; ?>
 
         <?php /* Khối "Chia sẻ để bạn bè cùng nhận quà" ẩn khỏi màn hình nhưng vẫn nằm trong trang:
-        nút "Chia sẻ & nhận lượt chơi" ở popup bấm hộ nút Facebook bên trong (game.js, [data-fb-share-open]). */ ?>
+        nút "Chia sẻ" ở popup gọi hàm chia sẻ trong khối này (game.js, window.kyucFbShare). */ ?>
         <div hidden>
             <?php require __DIR__ . '/share_facebook.php'; ?>
         </div>
@@ -319,7 +494,7 @@ $prizeHeading = ['zh' => '獎項與使用條件', 'vi' => 'Quà và điều ki�
 </dialog>
 
 <!-- Chỉ nạp game.js một lần, nạp 2 lần sẽ gửi trùng mỗi lần lật thẻ -->
-<script defer src="<?= e(base_url('minigame/assets/game.js?v=19.9.28')) ?>"></script>
+<script defer src="<?= e(base_url('minigame/assets/game.js?v=19.9.33')) ?>"></script>
 
 <script>
     document.addEventListener('DOMContentLoaded', function() {

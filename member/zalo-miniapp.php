@@ -14,7 +14,7 @@ try{
     if(!is_array($data))hym_fail('member_zalo_failed');
     hym_schema();
     $memberId=hym_zalo_miniapp_member(is_string($data['access_token']??null)?$data['access_token']:'',is_string($data['phone_token']??null)?$data['phone_token']:'');
-    echo json_encode(['ok'=>true,'login_url'=>base_url('member/zalo-login.php?t='.hym_login_token_issue($memberId))]);
+    echo json_encode(['ok'=>true,'login_url'=>base_url('member/zalo-open.php?t='.hym_login_token_issue($memberId))]);
 }catch(HymMemberError $e){
     http_response_code($e->getMessage()==='member_rate_limited'?429:400);
     echo json_encode(['ok'=>false,'error'=>$e->getMessage(),'message'=>mt($e->getMessage())]);
