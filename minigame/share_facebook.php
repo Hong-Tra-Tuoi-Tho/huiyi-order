@@ -177,7 +177,7 @@ $sharePost = str_replace('{url}', $shareUrl, $share['post']);
             '&hashtag=' + encodeURIComponent('#HongTraTuoiTho');
         const mobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
         // The shortest stay on Facebook that counts as a share; a page can never see whether a post was really made.
-        const shareMinMs = 10000;
+        const shareMinMs = 3000;
         window.kyucShareMinMs = shareMinMs;
         let sheetDone = null;
         sheet.querySelector('[data-fb-share-link]').href = link;

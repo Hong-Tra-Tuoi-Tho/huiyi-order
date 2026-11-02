@@ -1,3 +1,15 @@
+// After a Facebook share the customer can land on another page: return once to the page that shared (game.js).
+(function () {
+  try {
+    const saved = JSON.parse(sessionStorage.getItem('kyucPendingShare') || 'null');
+    if (!saved?.back || saved.back === location.href || Date.now() - saved.at > 600000) return;
+    const back = saved.back;
+    delete saved.back;
+    sessionStorage.setItem('kyucPendingShare', JSON.stringify(saved));
+    location.replace(back);
+  } catch (_) {}
+})();
+
 // Keep the root service worker fresh even when this script is loaded from /admin/.
 if ('serviceWorker' in navigator && !document.body.classList.contains('admin-body')) {
   window.addEventListener('load', () => {

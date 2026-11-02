@@ -533,9 +533,11 @@
   // Zalo opens Facebook over this page, so Back reloads it: the share in progress must outlive the page.
   function rememberShare(id) {
     try {
-      sessionStorage.setItem(shareKey, JSON.stringify({ id, at: Date.now() }));
+      sessionStorage.setItem(shareKey, JSON.stringify({ id, at: Date.now(), back: location.href }));
     } catch (_) {}
   }
+  // Sending the order ends the visit to this page, so app.js must not bring the customer back to it.
+  document.addEventListener('submit', takeShare);
   function takeShare() {
     try {
       const saved = JSON.parse(sessionStorage.getItem(shareKey) || 'null');

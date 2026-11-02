@@ -228,6 +228,13 @@
       }
       // No preventDefault: the link still opens Zalo while the copy runs inside the same click.
       if (event.target.closest('[data-sheet-zalo]')) {
+        // Already inside Zalo: zalo:// goes nowhere, but the phone's share panel lists Zalo chats.
+        if (/Zalo/i.test(navigator.userAgent) && navigator.share) {
+          event.preventDefault();
+          closeSheet();
+          await nativeShare(section, url, title);
+          return;
+        }
         if (!mobile) openZaloWebIfNoApp();
         await copyLink(section, url, input, config.zaloCopied);
         return;
