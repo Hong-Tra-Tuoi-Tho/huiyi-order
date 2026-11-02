@@ -176,15 +176,25 @@ $sharePost = str_replace('{url}', $shareUrl, $share['post']);
         const link = 'https://www.facebook.com/sharer/sharer.php?u=' + encodeURIComponent(box.dataset.url) +
             '&hashtag=' + encodeURIComponent('#HongTraTuoiTho');
         const mobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-        const sheetLink = sheet.querySelector('[data-fb-share-link]');
-        sheetLink.href = link;
-        // Zalo's browser has no Facebook login, and moving to Safari loses the cart, so the copied text is pasted in the app.
-        sheetLink.hidden = /Zalo/i.test(navigator.userAgent);
+        // The shortest stay on Facebook that counts as a share; a page can never see whether a post was really made.
+        const shareMinMs = 10000;
+        let sheetDone = null;
+        sheet.querySelector('[data-fb-share-link]').href = link;
         // The share block sits in a hidden wrapper, so the fallback sheet must live under body to be visible.
         document.body.append(sheet);
         sheet.addEventListener('click', function(event) {
-            const leaving = event.target.closest('[data-fb-share-link], [data-fb-share-close]');
-            if (event.target === sheet || leaving) sheet.close();
+            const opening = event.target.closest('[data-fb-share-link]');
+            const leaving = opening || event.target.closest('[data-fb-share-close]');
+            if (event.target !== sheet && !leaving) return;
+            sheet.close();
+            const done = sheetDone;
+            sheetDone = null;
+            if (!done) return;
+            if (opening) {
+                waitForReturn(done);
+                return;
+            }
+            done(false);
         });
         const copy = async function() {
             try {
@@ -212,19 +222,28 @@ $sharePost = str_replace('{url}', $shareUrl, $share['post']);
         sdk.async = true;
         sdk.src = 'https://connect.facebook.net/' + box.dataset.fbLocale + '/sdk.js';
         document.body.append(sdk);
-        // The phone's share panel lists the Facebook app, where the customer is already logged in.
-        // Apps never report the post back, so a share from here is not confirmed.
-        const shareOnMobile = async function(done) {
-            if (done) done(false);
-            if (navigator.share) {
-                try {
-                    await navigator.share({
-                        url: box.dataset.url
-                    });
-                    return;
-                } catch (e) {}
+        // Coming back to this page after a real stay on Facebook is the only signal a phone gives.
+        const waitForReturn = function(done) {
+            const openedAt = Date.now();
+            const onReturn = function() {
+                if (document.hidden || Date.now() - openedAt < shareMinMs) return;
+                document.removeEventListener('visibilitychange', onReturn);
+                window.removeEventListener('focus', onReturn);
+                done(true);
+            };
+            document.addEventListener('visibilitychange', onReturn);
+            window.addEventListener('focus', onReturn);
+        };
+        // Facebook's own page shows its login form when needed; a new tab keeps this checkout page and its cart.
+        const shareOnMobile = function(done) {
+            const claim = done || function() {};
+            const win = window.open(link, '_blank');
+            if (win) {
+                waitForReturn(claim);
+                return;
             }
-            // No share panel, or it was cancelled (no Facebook app to pick): offer the link, which opens in a new tab.
+            // A blocked pop-up becomes a real link the customer taps.
+            sheetDone = claim;
             sheet.showModal();
         };
         // Must run inside a click so the browser allows the pop-up. done(true) only when Facebook reports a share.
