@@ -319,7 +319,7 @@ $prizeHeading = ['zh' => '獎項與使用條件', 'vi' => 'Quà và điều ki�
 </dialog>
 
 <!-- Chỉ nạp game.js một lần, nạp 2 lần sẽ gửi trùng mỗi lần lật thẻ -->
-<script defer src="<?= e(base_url('minigame/assets/game.js?v=19.9.28')) ?>"></script>
+<script defer src="<?= e(base_url('minigame/assets/game.js?v=19.9.29')) ?>"></script>
 
 <script>
     document.addEventListener('DOMContentLoaded', function() {

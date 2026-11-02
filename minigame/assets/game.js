@@ -523,18 +523,23 @@
     resetRound();
     run('next', false, { board_id: id });
   });
+  function handleShareBonus() {
+    if (busy || !reward || !shareBonus || !board) return;
+    // Mở trang chia sẻ Facebook ở tab mới (_blank) và sao chép nội dung ưu đãi
+    if (typeof window.openHuiYiFacebookShare === 'function') {
+      window.openHuiYiFacebookShare();
+    } else {
+      document.querySelector('[data-fb-share-open]')?.click();
+    }
+    const id = board.id;
+    resetRound();
+    run('share_bonus', false, { board_id: id });
+  }
   if (shareBox) {
     shareBox.querySelector('p').textContent = t.share_offer;
     const shareLabel = shareBox.querySelector('button span') || shareBox.querySelector('button');
     shareLabel.textContent = t.share_button;
-    shareBox.querySelector('button').addEventListener('click', () => {
-      if (busy || !reward || !shareBonus || !board) return;
-      // Open the Facebook share inside this click so the pop-up is allowed, then claim the 52.000đ replay.
-      document.querySelector('[data-fb-share-open]')?.click();
-      const id = board.id;
-      resetRound();
-      run('share_bonus', false, { board_id: id });
-    });
+    shareBox.querySelector('button').addEventListener('click', handleShareBonus);
   }
   if (popup) {
     root.querySelectorAll('[data-game-reward-close]').forEach(button => {
@@ -552,7 +557,7 @@
     outsideNext?.addEventListener('click', () => next?.click());
     if (outsideShare) {
       outsideShare.querySelector('span').textContent = t.share_button;
-      outsideShare.addEventListener('click', () => shareBox?.querySelector('button')?.click());
+      outsideShare.addEventListener('click', handleShareBonus);
     }
     if (reopen) {
       reopen.textContent = '🎁 ' + popupText.view;
