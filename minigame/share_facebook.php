@@ -178,6 +178,7 @@ $sharePost = str_replace('{url}', $shareUrl, $share['post']);
         const mobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
         // The shortest stay on Facebook that counts as a share; a page can never see whether a post was really made.
         const shareMinMs = 10000;
+        window.kyucShareMinMs = shareMinMs;
         let sheetDone = null;
         sheet.querySelector('[data-fb-share-link]').href = link;
         // The share block sits in a hidden wrapper, so the fallback sheet must live under body to be visible.

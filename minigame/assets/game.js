@@ -85,6 +85,7 @@
   // The popup opens once per prize; after "Đóng" the reopen button brings it back.
   let popupShownFor = '';
   const popupHost = popup?.parentElement?.closest('dialog') || null;
+  const shareKey = 'kyucPendingShare';
   let board = null, reward = null, busy = false, blocked = true, balance = 0, shareBonus = false;
   let appearance = { faces: [] }, appearanceKey = '';
   let elapsedAt = Date.now(), waitUntil = 0, retryAt = 0, hideTimer = null, finishTimer = null, freshTimer = null, rateTimer = null;
@@ -529,6 +530,29 @@
     resetRound();
     run('next', false, { board_id: id });
   });
+  // Zalo opens Facebook over this page, so Back reloads it: the share in progress must outlive the page.
+  function rememberShare(id) {
+    try {
+      sessionStorage.setItem(shareKey, JSON.stringify({ id, at: Date.now() }));
+    } catch (_) {}
+  }
+  function takeShare() {
+    try {
+      const saved = JSON.parse(sessionStorage.getItem(shareKey) || 'null');
+      sessionStorage.removeItem(shareKey);
+      return saved;
+    } catch (_) {
+      return null;
+    }
+  }
+  function resumeShare() {
+    const saved = takeShare();
+    if (!saved || !shareBonus || saved.id !== board?.id) return;
+    window.openMinigameModal?.();
+    if (Date.now() - saved.at < (window.kyucShareMinMs || 0)) return;
+    resetRound();
+    run('share_bonus', false, { board_id: saved.id });
+  }
   if (shareBox) {
     shareBox.querySelector('p').innerHTML = t.share_offer;
     const shareLabel = shareBox.querySelector('button span') || shareBox.querySelector('button');
@@ -537,6 +561,7 @@
       if (busy || !reward || !shareBonus || !board) return;
       shareNote.hidden = true;
       const id = board.id;
+      rememberShare(id);
       // Open the Facebook share inside this click so the pop-up is allowed; the 52.000đ replay waits for Facebook's answer.
       window.kyucFbShare?.(function claim(shared) {
         // Coming back from Facebook refreshes the game state; wait for it so the share is not dropped.
@@ -544,6 +569,7 @@
           window.setTimeout(() => claim(shared), 200);
           return;
         }
+        takeShare();
         // The customer may have moved on while the Facebook window was open.
         if (!shareBonus || board?.id !== id) return;
         if (!shared) {
@@ -601,8 +627,8 @@
   if (notice) { notice.setAttribute('role', 'status'); notice.setAttribute('aria-live', 'polite'); }
   if (retry) retry.textContent = t.retry;
   window.setInterval(updateClock, 1000);
-  window.addEventListener('pageshow', event => { if (event.persisted && !busy) run('state'); });
+  window.addEventListener('pageshow', event => { if (event.persisted && !busy) run('state').then(resumeShare); });
   document.addEventListener('visibilitychange', () => { if (!document.hidden && !busy) run('state'); });
   render();
-  run('state');
+  run('state').then(resumeShare);
 })();

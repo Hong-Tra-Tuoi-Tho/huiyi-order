@@ -132,7 +132,7 @@ front_header(hgr_text('title'));
             </section>
           </dialog>
         </section>
-        <script defer src="<?= e(base_url('minigame/assets/game.js?v=19.9.33')) ?>"></script>
+        <script defer src="<?= e(base_url('minigame/assets/game.js?v=19.9.34')) ?>"></script>
       <?php endif; ?>
     </div>
     <?php /* TODO: Tạm ẩn khối quy tắc / tỉ lệ quà (giống hộp Mini Game checkout; bỏ if (false) để hiện lại). */ ?>
