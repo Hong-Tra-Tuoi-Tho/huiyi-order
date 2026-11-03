@@ -129,7 +129,9 @@ function hgr_revenue_panel(): void
     ?>
 <section class="panel" id="game-revenue">
   <style>
-    #game-revenue tfoot th{font-size:14px;font-weight:800;color:var(--ui-accent,#bc1e2c)}
+    #game-revenue table{font-size:19px}
+    #game-revenue thead th{font-size:17px}
+    #game-revenue tfoot th{font-size:19px;font-weight:800;color:var(--ui-accent,#bc1e2c)}
     #game-revenue tbody td:first-child{font-weight:700}
   </style>
   <h2><?=e(has_label('小遊戲營收統計', 'Thống kê doanh thu mini-game', 'Mini Game revenue report'))?></h2>
