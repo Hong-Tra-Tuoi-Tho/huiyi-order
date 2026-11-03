@@ -7,9 +7,6 @@ if (realpath($_SERVER['SCRIPT_FILENAME'] ?? '') === __FILE__) {
 }
 // Facebook's share dialog only takes a link, so the post text is copied first for the customer to paste.
 $shareUrl = 'https://order.huiyitea.vn/';
-// Public id of the Facebook app: only this lets Facebook report the share result back to the page.
-$fbAppId = '2081819922528804';
-$fbLocale = ['vi' => 'vi_VN', 'zh' => 'zh_TW', 'en' => 'en_US'][current_lang()] ?? 'vi_VN';
 $shareText = [
     'vi' => [
         'title' => 'Chia sẻ để bạn bè cùng nhận quà',
@@ -56,7 +53,7 @@ $sharePost = str_replace('{url}', $shareUrl, $share['post']);
         <button type="button" class="kyuc-share-copy" data-fb-share-close><?= e($share['sheet_close']) ?></button>
     </div>
 </dialog>
-<section class="kyuc-share" data-fb-share data-url="<?= e($shareUrl) ?>" data-fb-app-id="<?= e($fbAppId) ?>" data-fb-locale="<?= e($fbLocale) ?>">
+<section class="kyuc-share" data-fb-share data-url="<?= e($shareUrl) ?>">
     <h4>📣 <?= e($share['title']) ?></h4>
     <p><?= e($share['hint']) ?></p>
     <textarea readonly rows="7" data-fb-share-text><?= e($sharePost) ?></textarea>
@@ -210,20 +207,7 @@ $sharePost = str_replace('{url}', $shareUrl, $share['post']);
             status.hidden = false;
         };
         box.querySelector('[data-fb-share-copy]').addEventListener('click', copy);
-        let sdkReady = false;
-        window.fbAsyncInit = function() {
-            FB.init({
-                appId: box.dataset.fbAppId,
-                xfbml: false,
-                version: 'v26.0'
-            });
-            sdkReady = true;
-        };
-        const sdk = document.createElement('script');
-        sdk.async = true;
-        sdk.src = 'https://connect.facebook.net/' + box.dataset.fbLocale + '/sdk.js';
-        document.body.append(sdk);
-        // Coming back to this page after a real stay on Facebook is the only signal a phone gives.
+        // Coming back to this page after a real stay on Facebook is the only signal a browser gives.
         const waitForReturn = function(done) {
             const openedAt = Date.now();
             const onReturn = function() {
@@ -235,10 +219,14 @@ $sharePost = str_replace('{url}', $shareUrl, $share['post']);
             document.addEventListener('visibilitychange', onReturn);
             window.addEventListener('focus', onReturn);
         };
-        // Facebook's own page shows its login form when needed; a new tab keeps this checkout page and its cart.
-        const shareOnMobile = function(done) {
+        // Facebook's own page shows its login form when needed; a new tab (phone) or pop-up (computer) keeps this checkout page and its cart.
+        // Must run inside a click so the browser allows the pop-up. done(true) once the customer comes back after shareMinMs.
+        window.kyucFbShare = function(done) {
+            copy();
             const claim = done || function() {};
-            const win = window.open(link, '_blank');
+            const win = mobile
+                ? window.open(link, '_blank')
+                : window.open(link, 'fbshare', 'width=640,height=600');
             if (win) {
                 waitForReturn(claim);
                 return;
@@ -246,32 +234,6 @@ $sharePost = str_replace('{url}', $shareUrl, $share['post']);
             // A blocked pop-up becomes a real link the customer taps.
             sheetDone = claim;
             sheet.showModal();
-        };
-        // Must run inside a click so the browser allows the pop-up. done(true) only when Facebook reports a share.
-        window.kyucFbShare = function(done) {
-            copy();
-            if (mobile) {
-                shareOnMobile(done);
-                return;
-            }
-            if (!sdkReady) {
-                // Without the SDK (blocked or still loading) the customer can still share, but nothing confirms it.
-                const win = window.open(link, 'fbshare', 'width=640,height=600');
-                // Never leave this tab: a blocked pop-up becomes a real link the customer taps, which browsers allow.
-                if (!win) sheet.showModal();
-                if (done) done(false);
-                return;
-            }
-            FB.ui({
-                method: 'share',
-                href: box.dataset.url,
-                hashtag: '#HongTraTuoiTho',
-                display: 'popup'
-            }, function(response) {
-                // Closing the dialog gives no response; a post made without app login gives an empty one.
-                const shared = !!response && !response.error_code && !response.error_message;
-                if (done) done(shared);
-            });
         };
         box.querySelector('[data-fb-share-open]').addEventListener('click', function() {
             window.kyucFbShare();
