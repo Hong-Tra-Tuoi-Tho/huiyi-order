@@ -116,6 +116,8 @@ function hymg_share_prize(array $pool): array {
         }
     }
     $prize['weight'] = 10000;
+    // Marks the coupon as won from a 0đ prize, so the revenue report can tell it from a regular 52.000đ prize.
+    $prize['share_bonus'] = true;
     return $prize;
 }
 function hymg_save_board(string $token,array $board): void {
