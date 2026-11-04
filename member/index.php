@@ -12,6 +12,9 @@ header('Cache-Control: private, no-store');
 header('X-Robots-Tag: noindex, nofollow');
 $returnOrder = $_GET['return_order'] ?? '';
 $returnOrder = is_string($returnOrder) && preg_match('/^[A-Za-z0-9_-]{1,80}$/D', $returnOrder) ? $returnOrder : '';
+// Zalo-only sign-in: phones open the Mini App directly, computers also get its QR code.
+$zaloOnly = hym_zalo_only();
+$isPhone = (bool)preg_match('/Android|iPhone|iPad|iPod|Mobile/i', (string)($_SERVER['HTTP_USER_AGENT'] ?? ''));
 $member = null;
 $platformOrders = [];
 $loadFailed = false;
@@ -98,6 +101,9 @@ front_header(mt('member_title'));
     <div class="hym-auth-single">
       <section class="hym-card" id="member-login">
         <h2><?= e(mt('member_login_title')) ?></h2>
+        <?php if ($zaloOnly): ?>
+          <p class="hym-note"><?= e(mt('member_zalo_only_intro')) ?></p>
+        <?php else: ?>
         <form class="hym-form" method="post" action="<?= e(base_url('member/action.php')) ?>"><?= csrf_field() ?><input type="hidden" name="action" value="login"><?php if ($returnOrder !== ''): ?><input type="hidden" name="return_order" value="<?= e($returnOrder) ?>"><?php endif; ?>
           <label for="member-login-phone"><?= e(mt('member_phone')) ?><input id="member-login-phone" type="tel" inputmode="tel" name="phone" required maxlength="32" autocomplete="username"></label>
           <label for="member-login-password"><?= e(mt('member_password')) ?>
@@ -111,11 +117,12 @@ front_header(mt('member_title'));
           </label>
           <button class="btn primary block" type="submit"><?= e(mt('member_login')) ?></button>
         </form>
+        <?php endif; ?>
 
         <!-- Đăng nhập xác thực qua zalo -->
-        <?php if (hym_zalo_enabled()): ?>
-          <div class="hym-auth-divider"><span><?= e(mt('member_or')) ?></span></div>
-          <a class="btn block btn-zalo-login" href="<?= e(base_url('member/zalo.php' . ($returnOrder !== '' ? '?return_order=' . rawurlencode($returnOrder) : ''))) ?>">
+        <?php if ($zaloOnly || hym_zalo_enabled()): ?>
+          <?php if (!$zaloOnly): ?><div class="hym-auth-divider"><span><?= e(mt('member_or')) ?></span></div><?php endif; ?>
+          <a class="btn block btn-zalo-login" href="<?= e($zaloOnly ? hym_zalo_miniapp_url() : base_url('member/zalo.php' . ($returnOrder !== '' ? '?return_order=' . rawurlencode($returnOrder) : ''))) ?>">
             <svg viewBox="0 0 48 48" aria-hidden="true">
               <rect width="48" height="48" rx="12" fill="#fff" /><text x="24" y="30" text-anchor="middle" font-family="Arial,sans-serif" font-size="15" font-weight="700" fill="#0068FF">Zalo</text>
             </svg>
@@ -123,7 +130,16 @@ front_header(mt('member_title'));
           </a>
         <?php endif; ?>
 
-        <a class="btn block hym-register-link" href="<?= e(base_url('member/register.php')) ?>"><?= e(mt('member_register')) ?></a>
+        <?php if ($zaloOnly && !$isPhone): ?>
+          <div class="hym-zalo-qr">
+            <canvas data-zalo-qr="<?= e(hym_zalo_miniapp_url()) ?>" role="img" aria-label="<?= e(mt('member_zalo_qr_hint')) ?>"></canvas>
+            <p class="hym-note"><?= e(mt('member_zalo_qr_hint')) ?></p>
+          </div>
+        <?php endif; ?>
+
+        <?php if (!$zaloOnly): ?>
+          <a class="btn block hym-register-link" href="<?= e(base_url('member/register.php')) ?>"><?= e(mt('member_register')) ?></a>
+        <?php endif; ?>
       </section>
     </div>
   <?php else: ?>
@@ -209,4 +225,31 @@ front_header(mt('member_title'));
     window.addEventListener('resize', cap);
   })();
 </script>
+<?php if ($zaloOnly && !$isPhone && !$member): ?>
+  <script src="<?= e(base_url('assets/vendor/huiyi-qrcode.js?v=19.8.0')) ?>"></script>
+  <script>
+    // Vẽ mã QR mở Mini App để khách trên máy tính quét bằng Zalo trên điện thoại
+    (function() {
+      var canvas = document.querySelector('[data-zalo-qr]');
+      if (!canvas || !window.HuiYiQR) return;
+
+      var qr = window.HuiYiQR.encode(canvas.getAttribute('data-zalo-qr'));
+      var border = 4;
+      var scale = 6;
+      var size = (qr.size + border * 2) * scale;
+      canvas.width = size;
+      canvas.height = size;
+
+      var ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#fff';
+      ctx.fillRect(0, 0, size, size);
+      ctx.fillStyle = '#000';
+      for (var y = 0; y < qr.size; y++) {
+        for (var x = 0; x < qr.size; x++) {
+          if (qr.isDark(x, y)) ctx.fillRect((x + border) * scale, (y + border) * scale, scale, scale);
+        }
+      }
+    })();
+  </script>
+<?php endif; ?>
 <?php front_footer(); ?>

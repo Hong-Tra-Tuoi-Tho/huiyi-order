@@ -44,7 +44,12 @@ function hym_zalo_http(string $url,array $headers,?array $post=null): array {
     if($post!==null){$options[CURLOPT_POST]=true;$options[CURLOPT_POSTFIELDS]=http_build_query($post,'','&');}
     curl_setopt_array($curl,$options);
     $body=curl_exec($curl);
-    if(!is_string($body)||(int)curl_getinfo($curl,CURLINFO_RESPONSE_CODE)!==200)hym_fail('member_zalo_failed');
+    $status=(int)curl_getinfo($curl,CURLINFO_RESPONSE_CODE);
+    if(!is_string($body)||$status!==200){
+        // Only the path is logged; the query and headers carry tokens.
+        error_log('zalo_http '.parse_url($url,PHP_URL_PATH).' status='.$status.' curl='.curl_error($curl).' body='.substr((string)$body,0,500));
+        hym_fail('member_zalo_failed');
+    }
     try{$result=json_decode($body,true,32,JSON_THROW_ON_ERROR|JSON_BIGINT_AS_STRING);}catch(Throwable $e){hym_fail('member_zalo_failed');}
     if(!is_array($result))hym_fail('member_zalo_failed');return $result;
 }
@@ -95,9 +100,27 @@ function hym_zalo_miniapp_secret(): string {
     if($secret==='')hym_fail('member_zalo_unavailable');
     return $secret;
 }
+/** Mini App ID from mini.zalo.me; empty = the website does not link to the Mini App. */
+function hym_zalo_miniapp_id(): string {
+    return defined('ZALO_MINIAPP_ID') ? (string)ZALO_MINIAPP_ID : '';
+}
+/** Opens the live Mini App, or the Testing version set in ZALO_MINIAPP_TEST_VERSION (admin/tester only). */
+function hym_zalo_miniapp_url(): string {
+    $url = 'https://zalo.me/s/' . rawurlencode(hym_zalo_miniapp_id()) . '/';
+    $testVersion = defined('ZALO_MINIAPP_TEST_VERSION') ? (string)ZALO_MINIAPP_TEST_VERSION : '';
+    if ($testVersion !== '') $url .= '?env=TESTING&version=' . rawurlencode($testVersion);
+    return $url;
+}
+/** Customers sign in only through the Mini App: password sign-in and registration are closed. */
+function hym_zalo_only(): bool {
+    return defined('MEMBER_ZALO_ONLY') && MEMBER_ZALO_ONLY === true && hym_zalo_miniapp_id() !== '';
+}
 function hym_zalo_graph(string $url,array $headers): array {
     $result=hym_zalo_http($url,$headers);
-    if((int)($result['error']??0)!==0)hym_fail('member_zalo_failed');
+    if((int)($result['error']??0)!==0){
+        error_log('zalo_graph '.parse_url($url,PHP_URL_PATH).' error='.(int)$result['error'].' message='.(string)($result['message']??''));
+        hym_fail('member_zalo_failed');
+    }
     return $result;
 }
 /** Returns the member id for a Mini App user, creating a phone-verified account on first use. */
@@ -117,11 +140,10 @@ function hym_zalo_miniapp_member(string $accessToken,string $phoneToken): int {
         $st=db()->prepare('SELECT id FROM members WHERE phone=?');$st->execute([$phone]);$memberId=(int)$st->fetchColumn();
     }
     if($memberId<1){
-        // No password is known to the customer; they sign in through Zalo or reset it with staff.
-        $hash=password_hash(bin2hex(random_bytes(24)),PASSWORD_DEFAULT);
+        // An empty hash marks a Zalo-only account: password_verify() never accepts it.
         try{
-            $st=db()->prepare('INSERT INTO members(phone,password_hash,display_name,delivery_address,created_at,updated_at) VALUES(?,?,?,\'\',UTC_TIMESTAMP(),UTC_TIMESTAMP())');
-            $st->execute([$phone,$hash,$name]);$memberId=(int)db()->lastInsertId();
+            $st=db()->prepare('INSERT INTO members(phone,password_hash,display_name,delivery_address,created_at,updated_at) VALUES(?,\'\',?,\'\',UTC_TIMESTAMP(),UTC_TIMESTAMP())');
+            $st->execute([$phone,$name]);$memberId=(int)db()->lastInsertId();
         }catch(PDOException $e){
             if($e->getCode()!=='23000')throw $e;
             $st=db()->prepare('SELECT id FROM members WHERE phone=?');$st->execute([$phone]);$memberId=(int)$st->fetchColumn();

@@ -22,6 +22,11 @@ try{
         $_SESSION['member_flash']=['type'=>'success','key'=>'member_zalo_linked'];
         redirect(base_url('member/index.php'));
     }
+    if($memberId<1&&hym_zalo_only()){
+        // Only the Mini App shares the phone number the new account needs.
+        $_SESSION['member_flash']=['type'=>'info','key'=>'member_zalo_need_miniapp'];
+        redirect(base_url('member/index.php'));
+    }
     if($memberId<1){
         // Zalo does not share the phone number, so the customer completes a local account first.
         $_SESSION['zalo_pending']=['id'=>$zalo['id'],'name'=>$zalo['name'],'created_at'=>time()];
