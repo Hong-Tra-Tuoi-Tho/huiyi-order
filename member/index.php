@@ -71,13 +71,15 @@ $formatDate = static function ($value, bool $dateOnly = false, bool $isUtc = tru
   }
 };
 $GLOBALS['hym_member_page'] = true;
-front_header(mt('member_title'));
+// Chưa đăng nhập thì trang là lời mời kết nối, đã đăng nhập mới là "Tài khoản của tôi".
+$pageTitle = $member ? mt('member_title') : mt('member_connect_title');
+front_header($pageTitle);
 ?>
 <div class="hym-page<?= $member ? '' : ' hym-page-auth' ?>">
   <a class="back" href="<?= e(base_url('index.php')) ?>">← <?= e(mt('member_back_menu')) ?></a>
   <header class="hym-page-head">
     <div><span class="hym-eyebrow"><?= e(mt('member_entry')) ?></span>
-      <h1><?= e(mt('member_title')) ?></h1>
+      <h1><?= e($pageTitle) ?></h1>
       <?php if ($member): ?>
         <div class="hym-points" aria-label="<?= e(mt('member_group_points_title')) ?>">
           <span class="hym-points-icon" aria-hidden="true">★</span>
@@ -100,23 +102,28 @@ front_header(mt('member_title'));
   <?php if (!$member): ?>
     <div class="hym-auth-single">
       <section class="hym-card" id="member-login">
-        <h2><?= e(mt('member_login_title')) ?></h2>
+        <!-- <h2><?= e(mt('member_login_title')) ?></h2> -->
         <?php if ($zaloOnly): ?>
-          <p class="hym-note"><?= e(mt('member_zalo_only_intro')) ?></p>
+          <!-- <p class="hym-note"><?= e(mt('member_zalo_only_intro')) ?></p> -->
         <?php else: ?>
-        <form class="hym-form" method="post" action="<?= e(base_url('member/action.php')) ?>"><?= csrf_field() ?><input type="hidden" name="action" value="login"><?php if ($returnOrder !== ''): ?><input type="hidden" name="return_order" value="<?= e($returnOrder) ?>"><?php endif; ?>
-          <label for="member-login-phone"><?= e(mt('member_phone')) ?><input id="member-login-phone" type="tel" inputmode="tel" name="phone" required maxlength="32" autocomplete="username"></label>
-          <label for="member-login-password"><?= e(mt('member_password')) ?>
-            <span class="hym-pass">
-              <input id="member-login-password" type="password" name="password" required maxlength="72" autocomplete="current-password">
-              <button class="hym-pass-toggle" type="button" data-pass-toggle aria-controls="member-login-password" aria-pressed="false" aria-label="<?= e(mt('member_password_show')) ?>" data-show-label="<?= e(mt('member_password_show')) ?>" data-hide-label="<?= e(mt('member_password_hide')) ?>">
-                <svg class="hym-pass-eye" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z" /><circle cx="12" cy="12" r="3" /></svg>
-                <svg class="hym-pass-eye-off" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3l18 18M10.6 5.1A10.4 10.4 0 0 1 12 5c6.4 0 10 7 10 7a17.6 17.6 0 0 1-3.2 4.1M6.6 6.6C3.7 8.4 2 12 2 12s3.6 7 10 7a9.7 9.7 0 0 0 5.4-1.6M9.9 9.9a3 3 0 0 0 4.2 4.2" /></svg>
-              </button>
-            </span>
-          </label>
-          <button class="btn primary block" type="submit"><?= e(mt('member_login')) ?></button>
-        </form>
+          <form class="hym-form" method="post" action="<?= e(base_url('member/action.php')) ?>"><?= csrf_field() ?><input type="hidden" name="action" value="login"><?php if ($returnOrder !== ''): ?><input type="hidden" name="return_order" value="<?= e($returnOrder) ?>"><?php endif; ?>
+            <label for="member-login-phone"><?= e(mt('member_phone')) ?><input id="member-login-phone" type="tel" inputmode="tel" name="phone" required maxlength="32" autocomplete="username"></label>
+            <label for="member-login-password"><?= e(mt('member_password')) ?>
+              <span class="hym-pass">
+                <input id="member-login-password" type="password" name="password" required maxlength="72" autocomplete="current-password">
+                <button class="hym-pass-toggle" type="button" data-pass-toggle aria-controls="member-login-password" aria-pressed="false" aria-label="<?= e(mt('member_password_show')) ?>" data-show-label="<?= e(mt('member_password_show')) ?>" data-hide-label="<?= e(mt('member_password_hide')) ?>">
+                  <svg class="hym-pass-eye" viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z" />
+                    <circle cx="12" cy="12" r="3" />
+                  </svg>
+                  <svg class="hym-pass-eye-off" viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M3 3l18 18M10.6 5.1A10.4 10.4 0 0 1 12 5c6.4 0 10 7 10 7a17.6 17.6 0 0 1-3.2 4.1M6.6 6.6C3.7 8.4 2 12 2 12s3.6 7 10 7a9.7 9.7 0 0 0 5.4-1.6M9.9 9.9a3 3 0 0 0 4.2 4.2" />
+                  </svg>
+                </button>
+              </span>
+            </label>
+            <button class="btn primary block" type="submit"><?= e(mt('member_login')) ?></button>
+          </form>
         <?php endif; ?>
 
         <!-- Đăng nhập xác thực qua zalo -->
