@@ -108,6 +108,9 @@
 .btn-zalo-login:hover{background:#8F1D1D;border-color:#8F1D1D;color:#fff}
 .btn-zalo-login:focus-visible{outline:3px solid #B32424;outline-offset:3px}
 .btn-zalo-login svg{width:26px;height:26px;flex:0 0 26px}
+/* QR mở Zalo Mini App cho khách đăng nhập trên máy tính */
+.hym-zalo-qr{display:flex;flex-direction:column;align-items:center;gap:8px;margin-top:18px;text-align:center}
+.hym-zalo-qr canvas{width:200px;height:200px;image-rendering:pixelated;border:1px solid var(--line);border-radius:12px}
 /* Sign-in and registration: one centered column. */
 .hym-page-auth{max-width:560px}
 .hym-page-auth .hym-page-head{justify-content:center;text-align:center}

@@ -3,6 +3,8 @@ require __DIR__ . '/../lib/bootstrap.php';
 require __DIR__ . '/../lib/layout.php';
 header('Cache-Control: private, no-store');
 header('X-Robots-Tag: noindex, nofollow');
+// Accounts are created by the Zalo Mini App.
+if (hym_zalo_only()) redirect(base_url('member/index.php'));
 $loadFailed = false;
 try {
   hym_schema();

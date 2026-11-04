@@ -11,6 +11,8 @@ $returnOrder=$_POST['return_order']??'';
 $returnOrder=is_string($returnOrder)&&preg_match('/^[A-Za-z0-9_-]{1,80}$/D',$returnOrder)?$returnOrder:'';
 try{
     hym_csrf();$action=hym_post('action');$type='success';
+    // The hidden forms stay closed to direct POSTs too.
+    if(in_array($action,['register','login'],true)&&hym_zalo_only())hym_fail('member_zalo_only');
     switch($action){
         case 'register':hym_register(hym_post('phone'),hym_post('password'),hym_post('password_confirm'),hym_post('display_name'),hym_post('delivery_address'));$key=hym_zalo_link_pending((int)$_SESSION['member_id'])?'member_zalo_linked':'member_registered';break;
         case 'login':

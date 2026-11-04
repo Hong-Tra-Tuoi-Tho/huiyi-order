@@ -149,9 +149,11 @@ function hym_login(string $phone,string $password): array {
     try{$normalized=hym_normalize_phone($phone);}catch(HymMemberError $e){$normalized='';}
     hym_rate_limit('login-phone',$normalized!==''?$normalized:substr($phone,0,80),10,900);
     $st=db()->prepare('SELECT id,password_hash FROM members WHERE phone=?');$st->execute([$normalized]);$row=$st->fetch();
-    // The dummy hash gives an unknown account the same password verification work.
-    $hash=$row?(string)$row['password_hash']:'$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2uheWG/igi.';
-    $valid=strlen($password)<=72&&password_verify($password,$hash);
+    // The dummy hash gives an unknown or Zalo-only (empty hash) account the same password verification work.
+    $hash=$row?(string)$row['password_hash']:'';
+    $passwordless=$hash==='';
+    if($passwordless)$hash='$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2uheWG/igi.';
+    $valid=strlen($password)<=72&&password_verify($password,$hash)&&!$passwordless;
     if(!$row||!$valid)hym_fail('member_login_failed');
     if(password_needs_rehash($hash,PASSWORD_DEFAULT)){
         $new=password_hash($password,PASSWORD_DEFAULT);$update=db()->prepare('UPDATE members SET password_hash=?,updated_at=UTC_TIMESTAMP() WHERE id=?');$update->execute([$new,$row['id']]);
