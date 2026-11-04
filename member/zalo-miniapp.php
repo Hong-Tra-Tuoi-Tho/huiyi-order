@@ -15,8 +15,8 @@ try{
     hym_schema();
     $memberId=hym_zalo_miniapp_member(is_string($data['access_token']??null)?$data['access_token']:'',is_string($data['phone_token']??null)?$data['phone_token']:'');
     $token=hym_login_token_issue($memberId);
-    // browser_url signs in directly, in the phone's browser or in Zalo's webview.
-    // login_url (zalo-open.php) is for older Mini App builds: it tries the browser, then signs in inside Zalo.
+    // browser_url signs in directly inside Zalo's webview.
+    // login_url (zalo-open.php) is for older Mini App builds and just forwards to zalo-login.php.
     echo json_encode([
         'ok'=>true,
         'login_url'=>base_url('member/zalo-open.php?t='.$token),
