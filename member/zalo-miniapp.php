@@ -14,6 +14,13 @@ try{
     if(!is_array($data))hym_fail('member_zalo_failed');
     hym_schema();
     $memberId=hym_zalo_miniapp_member(is_string($data['access_token']??null)?$data['access_token']:'',is_string($data['phone_token']??null)?$data['phone_token']:'');
+    // Quét QR từ máy tính: đăng nhập cho máy tính, điện thoại không mở web.
+    $qrCode = is_string($data['qr'] ?? null) ? $data['qr'] : '';
+    if ($qrCode !== '') {
+        hym_qr_login_approve($qrCode, $memberId);
+        echo json_encode(['ok' => true, 'mode' => 'desktop']);
+        exit;
+    }
     $token=hym_login_token_issue($memberId);
     // browser_url signs in directly inside Zalo's webview.
     // login_url (zalo-open.php) is for older Mini App builds and just forwards to zalo-login.php.
