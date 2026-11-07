@@ -173,3 +173,102 @@ function hym_login_token_consume(string $token): int {
     if($memberId<1||$delete->rowCount()!==1)hym_fail('member_form_expired');
     return $memberId;
 }
+
+/*
+ * Đăng nhập máy tính bằng QR (giống Zalo Web).
+ * 1. Máy tính tạo mã riêng, lưu trong session của máy tính và gắn vào link Mini App trong QR.
+ * 2. Điện thoại quét QR, khách bấm xác nhận trong Mini App → server gắn member_id vào mã.
+ * 3. Máy tính hỏi server định kỳ (member/qr-status.php); thấy mã đã xác nhận thì đăng nhập session của máy tính.
+ * Chỉ lưu hash của mã trong DB; mã gốc chỉ có trong QR và session của máy tính.
+ */
+const HYM_QR_LOGIN_TTL = 180;
+
+function hym_qr_login_schema(): void {
+    static $done = false;
+    if ($done) return;
+
+    db()->exec('CREATE TABLE IF NOT EXISTS member_qr_logins (
+ code_hash CHAR(64) CHARACTER SET ascii COLLATE ascii_bin PRIMARY KEY,
+ member_id BIGINT UNSIGNED NULL,
+ expires_at BIGINT UNSIGNED NOT NULL,
+ KEY idx_member_qr_login_expiry(expires_at),
+ CONSTRAINT fk_member_qr_login FOREIGN KEY(member_id) REFERENCES members(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4');
+
+    $done = true;
+}
+
+/** Mã QR của session máy tính hiện tại; tạo mã mới khi chưa có hoặc sắp hết hạn. */
+function hym_qr_login_code(bool $renew = false): string {
+    $current = $_SESSION['qr_login'] ?? null;
+    $stillValid = is_array($current)
+        && is_string($current['code'] ?? null)
+        && (int)($current['expires_at'] ?? 0) > time() + 20;
+    if (!$renew && $stillValid) return $current['code'];
+
+    hym_qr_login_schema();
+    db()->prepare('DELETE FROM member_qr_logins WHERE expires_at<?')->execute([time()]);
+    if (is_array($current) && is_string($current['code'] ?? null)) {
+        db()->prepare('DELETE FROM member_qr_logins WHERE code_hash=?')->execute([hash('sha256', $current['code'])]);
+    }
+
+    $code = hym_zalo_b64url(random_bytes(32));
+    $expiresAt = time() + HYM_QR_LOGIN_TTL;
+    db()->prepare('INSERT INTO member_qr_logins(code_hash,member_id,expires_at) VALUES(?,NULL,?)')
+        ->execute([hash('sha256', $code), $expiresAt]);
+
+    $_SESSION['qr_login'] = ['code' => $code, 'expires_at' => $expiresAt];
+    return $code;
+}
+
+/** Link Mini App kèm mã QR của máy tính. */
+function hym_zalo_miniapp_qr_url(string $code): string {
+    $url = hym_zalo_miniapp_url();
+    $separator = str_contains($url, '?') ? '&' : '?';
+    return $url . $separator . 'qr=' . rawurlencode($code);
+}
+
+/** Điện thoại (Mini App) xác nhận đăng nhập cho máy tính đang giữ mã này. */
+function hym_qr_login_approve(string $code, int $memberId): void {
+    if (!preg_match('/^[A-Za-z0-9_-]{43}$/D', $code)) hym_fail('member_qr_expired');
+    if ($memberId < 1) hym_fail('member_zalo_failed');
+
+    hym_qr_login_schema();
+    $st = db()->prepare('UPDATE member_qr_logins SET member_id=? WHERE code_hash=? AND member_id IS NULL AND expires_at>=?');
+    $st->execute([$memberId, hash('sha256', $code), time()]);
+
+    // Mã đã dùng, hết hạn hoặc không tồn tại.
+    if ($st->rowCount() !== 1) hym_fail('member_qr_expired');
+}
+
+/**
+ * Máy tính hỏi trạng thái mã QR của mình.
+ * Trả về 'pending' (chưa quét), 'expired' (cần mã mới) hoặc 'ok' (đã đăng nhập session này).
+ */
+function hym_qr_login_poll(): string {
+    $current = $_SESSION['qr_login'] ?? null;
+    if (!is_array($current) || !is_string($current['code'] ?? null)) return 'expired';
+
+    hym_qr_login_schema();
+    $hash = hash('sha256', $current['code']);
+    $st = db()->prepare('SELECT member_id,expires_at FROM member_qr_logins WHERE code_hash=?');
+    $st->execute([$hash]);
+    $row = $st->fetch();
+
+    if (!$row) return 'expired';
+
+    $memberId = (int)($row['member_id'] ?? 0);
+    if ($memberId < 1) {
+        return (int)$row['expires_at'] < time() ? 'expired' : 'pending';
+    }
+
+    $delete = db()->prepare('DELETE FROM member_qr_logins WHERE code_hash=?');
+    $delete->execute([$hash]);
+    // Chỉ request xoá được dòng mới được đăng nhập (chặn 2 request song song).
+    if ($delete->rowCount() !== 1) return 'expired';
+
+    unset($_SESSION['qr_login']);
+    hym_session_login($memberId);
+    $_SESSION['member_flash'] = ['type' => 'success', 'key' => 'member_logged_in'];
+    return 'ok';
+}

@@ -28,6 +28,16 @@ try {
 } catch (Throwable $error) {
   $loadFailed = true;
 }
+// Máy tính chưa đăng nhập: QR mang mã riêng của session này để điện thoại xác nhận đăng nhập hộ.
+$qrLoginUrl = '';
+if ($zaloOnly && !$isPhone && !$member && !$loadFailed) {
+  try {
+    $qrLoginUrl = hym_zalo_miniapp_qr_url(hym_qr_login_code());
+  } catch (Throwable $error) {
+    error_log('member_qr_login: ' . $error->getMessage());
+    $qrLoginUrl = hym_zalo_miniapp_url();
+  }
+}
 // A guest sent here from a members-only entry point (e.g. "share cart") returns there once signed in.
 $returnTarget = $_GET['return'] ?? '';
 if (is_string($returnTarget) && $returnTarget !== '') hym_remember_return($returnTarget);
@@ -137,9 +147,9 @@ front_header($pageTitle);
           </a>
         <?php endif; ?>
 
-        <?php if ($zaloOnly && !$isPhone): ?>
+        <?php if ($qrLoginUrl !== ''): ?>
           <div class="hym-zalo-qr">
-            <canvas data-zalo-qr="<?= e(hym_zalo_miniapp_url()) ?>" role="img" aria-label="<?= e(mt('member_zalo_qr_hint')) ?>"></canvas>
+            <canvas data-zalo-qr="<?= e($qrLoginUrl) ?>" data-qr-status="<?= e(base_url('member/qr-status.php')) ?>" role="img" aria-label="<?= e(mt('member_zalo_qr_hint')) ?>"></canvas>
             <p class="hym-note"><?= e(mt('member_zalo_qr_hint')) ?></p>
           </div>
         <?php endif; ?>
@@ -232,30 +242,68 @@ front_header($pageTitle);
     window.addEventListener('resize', cap);
   })();
 </script>
-<?php if ($zaloOnly && !$isPhone && !$member): ?>
+<?php if ($qrLoginUrl !== ''): ?>
   <script src="<?= e(base_url('assets/vendor/huiyi-qrcode.js?v=19.8.0')) ?>"></script>
   <script>
-    // Vẽ mã QR mở Mini App để khách trên máy tính quét bằng Zalo trên điện thoại
+    // Vẽ mã QR mở Mini App để khách trên máy tính quét bằng Zalo trên điện thoại.
+    // Sau đó hỏi server định kỳ: điện thoại xác nhận xong thì máy tính tự đăng nhập.
     (function() {
       var canvas = document.querySelector('[data-zalo-qr]');
       if (!canvas || !window.HuiYiQR) return;
 
-      var qr = window.HuiYiQR.encode(canvas.getAttribute('data-zalo-qr'));
-      var border = 4;
-      var scale = 6;
-      var size = (qr.size + border * 2) * scale;
-      canvas.width = size;
-      canvas.height = size;
+      function draw(url) {
+        var qr = window.HuiYiQR.encode(url);
+        var border = 4;
+        var scale = 6;
+        var size = (qr.size + border * 2) * scale;
+        canvas.width = size;
+        canvas.height = size;
 
-      var ctx = canvas.getContext('2d');
-      ctx.fillStyle = '#fff';
-      ctx.fillRect(0, 0, size, size);
-      ctx.fillStyle = '#000';
-      for (var y = 0; y < qr.size; y++) {
-        for (var x = 0; x < qr.size; x++) {
-          if (qr.isDark(x, y)) ctx.fillRect((x + border) * scale, (y + border) * scale, scale, scale);
+        var ctx = canvas.getContext('2d');
+        ctx.fillStyle = '#fff';
+        ctx.fillRect(0, 0, size, size);
+        ctx.fillStyle = '#000';
+        for (var y = 0; y < qr.size; y++) {
+          for (var x = 0; x < qr.size; x++) {
+            if (qr.isDark(x, y)) ctx.fillRect((x + border) * scale, (y + border) * scale, scale, scale);
+          }
         }
       }
+
+      draw(canvas.getAttribute('data-zalo-qr'));
+
+      var statusUrl = canvas.getAttribute('data-qr-status');
+      if (!statusUrl || !window.fetch) return;
+
+      var done = false;
+      var busy = false;
+
+      function check() {
+        // Tab bị ẩn thì tạm dừng, quay lại tab sẽ hỏi tiếp.
+        if (done || busy || document.hidden) return;
+        busy = true;
+
+        fetch(statusUrl, { credentials: 'same-origin', cache: 'no-store' })
+          .then(function(res) { return res.json(); })
+          .then(function(data) {
+            if (data.status === 'ok') {
+              done = true;
+              window.location.reload();
+              return;
+            }
+            if (data.status === 'expired' && data.qr_url) {
+              draw(data.qr_url);
+            }
+            if (data.status === 'disabled') {
+              done = true;
+            }
+          })
+          .catch(function() {})
+          .then(function() { busy = false; });
+      }
+
+      setInterval(check, 2500);
+      document.addEventListener('visibilitychange', check);
     })();
   </script>
 <?php endif; ?>
