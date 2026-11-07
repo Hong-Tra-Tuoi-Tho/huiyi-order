@@ -137,6 +137,18 @@ front_header($pageTitle);
           </a>
         <?php endif; ?>
 
+        <?php if (hym_local_login_allowed()): ?>
+          <!-- Chỉ hiện trên localhost: đăng nhập thử bằng số điện thoại, không cần Zalo -->
+          <form class="hym-form hym-local-login" method="post" action="<?= e(base_url('member/local-login.php')) ?>"><?= csrf_field() ?>
+            <?php if ($returnOrder !== ''): ?><input type="hidden" name="return_order" value="<?= e($returnOrder) ?>"><?php endif; ?>
+            <div class="hym-auth-divider"><span>LOCAL</span></div>
+            <label for="member-local-phone">Số điện thoại (đăng nhập thử)
+              <input id="member-local-phone" type="tel" inputmode="tel" name="phone" required maxlength="32" placeholder="0901234567" autocomplete="off">
+            </label>
+            <button class="btn block" type="submit">Đăng nhập local</button>
+          </form>
+        <?php endif; ?>
+
         <?php if ($zaloOnly && !$isPhone): ?>
           <div class="hym-zalo-qr">
             <canvas data-zalo-qr="<?= e(hym_zalo_miniapp_url()) ?>" role="img" aria-label="<?= e(mt('member_zalo_qr_hint')) ?>"></canvas>

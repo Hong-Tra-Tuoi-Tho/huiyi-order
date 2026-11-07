@@ -148,9 +148,17 @@ function hyg_render_room(array $r): string
   $allConfirmed = !empty($payment['all_confirmed']);
   $hostCollect = ($payment['collection_mode'] ?? 'store') === 'host';
   $promotion = promotion_room_choice($r, $cart);
+  // Nhóm combo (lib/group_combo.php): trạng thái chọn nước của từng combo trong giỏ.
+  // Đơn nhóm gộp: combo và nước lẻ cùng một giỏ; có combo thì chốt món theo luật combo.
+  $comboState = hgc_state($cart);
+  $comboCount = count($comboState);
+  $hasCombo = $comboCount > 0;
+  $comboReady = $hasCombo && hgc_lock_ready($cart);
   if ($r['status'] === 'submitted') $members = array_values(array_map(fn($person) => ['id' => (int)$person['id'], 'nickname' => $person['nickname'], 'ready' => false], $payment['members']));
   foreach ($cart as $row) {
-    if (!empty($row['product_id'])) $drinks += (int)$row['qty'];
+    if (!empty($row['is_combo'])) {
+      // Dòng combo không tính là ly nước hay phần topping.
+    } elseif (!empty($row['product_id'])) $drinks += (int)$row['qty'];
     else $portions += (int)$row['qty'];
     if (!empty($row['_invalid'])) $hasInvalid = true;
   }
@@ -218,16 +226,28 @@ function hyg_render_room(array $r): string
               <?php foreach ($rows as $key => $row): $editable = $open && ($own || $host);
                 $invalid = !empty($row['_invalid']); ?>
                 <article class="hyg-item <?= $invalid ? 'is-invalid' : '' ?>">
-                  <div class="hyg-item-head"><strong><?= e($row['name'] ?? '') ?></strong><span>× <?= (int)($row['qty'] ?? 0) ?></span></div>
-                  <p class="hyg-options"><?= e(implode(' · ', array_filter([$row['cup_size'] ?? '', $row['ice'] ?? '', $row['sugar'] ?? '']))) ?></p>
+                  <div class="hyg-item-head"><strong><?php if (!empty($row['is_combo'])): ?><span class="hyg-combo-badge"><?= e(hgc_t('badge')) ?></span> <?php endif; ?><?= e($row['name'] ?? '') ?></strong><span>× <?= (int)($row['qty'] ?? 0) ?></span></div>
+                  <?php if (!empty($row['is_combo'])): ?>
+                    <?php $comboInfo = $comboState[(int)$row['_item_id']] ?? null; ?>
+                    <?php if ($comboInfo): ?><p class="hyg-options hyg-combo-progress<?= $comboInfo['complete'] ? ' is-complete' : '' ?>"><?= e(hgc_t('progress', ['picked' => $comboInfo['picked'], 'total' => $comboInfo['total_cups']])) ?></p><?php endif; ?>
+                  <?php else: ?>
+                    <p class="hyg-options"><?= e(implode(' · ', array_filter([$row['cup_size'] ?? '', $row['ice'] ?? '', $row['sugar'] ?? '']))) ?></p>
+                  <?php endif; ?>
+                  <?php if (($row['_selection']['kind'] ?? '') === 'combo_drink'): ?>
+                    <?php $parentCombo = $comboState[(int)($row['_selection']['combo_item'] ?? 0)] ?? null; ?>
+                    <p class="hyg-options hyg-combo-of"><?= e(hgc_t('combo_of', ['name' => $parentCombo['name'] ?? '', 'group' => $row['combo_group_name'] ?? ''])) ?></p>
+                  <?php endif; ?>
                   <?php if (!empty($row['toppings'])): ?><p class="hyg-options"><?= e(t('toppings')) ?> · <?= e(implode('、', array_map(fn($x) => $x['display_name'] ?? $x['name'], $row['toppings']))) ?></p><?php endif; ?>
                   <?php if ($invalid): ?><p class="hyg-item-error"><?= e(gt($row['_invalid'])) ?></p><?php endif; ?>
+                  <?php /* Nước thuộc combo: chỉ liệt kê, không hiện giá 0đ và không có nút xóa (xóa qua dòng combo). */ ?>
+                  <?php if (($row['_selection']['kind'] ?? '') !== 'combo_drink'): ?>
                   <div class="hyg-item-bottom"><b><?= e(currency()) ?><?= money(($row['unit_price'] ?? 0) * ($row['qty'] ?? 0)) ?></b><?php if ($editable): ?><div class="hyg-item-actions">
-                        <?php if ($own): $path = !empty($row['product_id']) ? 'product.php?id=' . $row['product_id'] : 'topping.php?id=' . $row['standalone_topping_id']; ?><a class="btn small" href="<?= e(base_url($path . '&group=' . $r['public_id'] . '&edit=' . $row['_item_id'])) ?>"><?= e(gt('edit')) ?></a><?php endif; ?>
+                        <?php if ($own && empty($row['is_combo']) && ($row['_selection']['kind'] ?? '') !== 'combo_drink'): $path = !empty($row['product_id']) ? 'product.php?id=' . $row['product_id'] : 'topping.php?id=' . $row['standalone_topping_id']; ?><a class="btn small" href="<?= e(base_url($path . '&group=' . $r['public_id'] . '&edit=' . $row['_item_id'])) ?>"><?= e(gt('edit')) ?></a><?php endif; ?>
                         <form method="post" action="<?= e(base_url('group/action.php')) ?>" data-confirm="<?= e(gt('remove_confirm')) ?>"><?= hyg_action_fields($r, 'remove') ?><input type="hidden" name="item_id" value="<?= $row['_item_id'] ?>"><input type="hidden" name="item_version" value="<?= $row['_item_version'] ?>"><button class="btn small danger" type="submit"><?= e(gt('remove')) ?></button></form>
                       </div><?php endif; ?>
                   </div>
-                  <?php if ($editable && !$invalid): ?><form method="post" action="<?= e(base_url('group/action.php')) ?>" class="hyg-qty-form"><?= hyg_action_fields($r, 'quantity') ?><input type="hidden" name="item_id" value="<?= $row['_item_id'] ?>"><input type="hidden" name="item_version" value="<?= $row['_item_version'] ?>"><label><?= e(t('quantity')) ?><input aria-label="<?= e(t('quantity')) ?> <?= e($row['name']) ?>" name="qty" type="number" inputmode="numeric" min="1" max="<?= order_qty_max() ?>" value="<?= (int)$row['qty'] ?>"></label><button class="btn small" type="submit"><?= e(gt('update_qty')) ?></button></form><?php endif; ?>
+                  <?php endif; ?>
+                  <?php if ($editable && !$invalid && empty($row['is_combo']) && ($row['_selection']['kind'] ?? '') !== 'combo_drink'): ?><form method="post" action="<?= e(base_url('group/action.php')) ?>" class="hyg-qty-form"><?= hyg_action_fields($r, 'quantity') ?><input type="hidden" name="item_id" value="<?= $row['_item_id'] ?>"><input type="hidden" name="item_version" value="<?= $row['_item_version'] ?>"><label><?= e(t('quantity')) ?><input aria-label="<?= e(t('quantity')) ?> <?= e($row['name']) ?>" name="qty" type="number" inputmode="numeric" min="1" max="<?= order_qty_max() ?>" value="<?= (int)$row['qty'] ?>"></label><button class="btn small" type="submit"><?= e(gt('update_qty')) ?></button></form><?php endif; ?>
                 </article>
               <?php endforeach; ?>
 
@@ -344,13 +364,15 @@ function hyg_render_room(array $r): string
             </div>
           </div><?php endforeach; ?>
 
-        <?php if ($open): ?><div class="hyg-join-actions<?= $drinks > 0 ? ' has-drinks' : '' ?>"><a class="btn primary" href="<?= e(base_url('index.php?group=' . $r['public_id'])) ?>"><?= e(gt('choose')) ?></a>
+        <?php if ($open): ?><div class="hyg-join-actions<?= $drinks > 0 ? ' has-drinks' : '' ?>"><a class="btn primary hyg-act-secondary" href="<?= e(base_url('index.php?group=' . $r['public_id'])) ?>"><?= e(gt('choose')) ?></a>
+            <?php if ($hasCombo): ?><a class="btn primary hyg-act-secondary" href="<?= e(base_url('group/combo.php?id=' . $r['public_id'])) ?>"><?= e(hgc_t('pick_drinks')) ?></a><?php endif; ?>
             <?php if ($host): ?>
               <!-- Button chốt món: gửi form ưu đãi ở cột tổng tiền qua thuộc tính form -->
-              <button class="btn primary block" id="hyg-lock-btn" type="submit" form="group-promotion-selector" name="lock_after" value="1" <?= !$cart || $hasInvalid || $drinks < hyg_min_lock_cups() ? 'disabled' : '' ?>>
+              <button class="btn primary block" id="hyg-lock-btn" type="submit" form="group-promotion-selector" name="lock_after" value="1" <?= !$cart || $hasInvalid || ($hasCombo ? !$comboReady : $drinks < hyg_min_lock_cups()) ? 'disabled' : '' ?>>
                 <?= e(gt('lock')) ?>
               </button>
             <?php endif; ?>
+            <?php if ($host && $hasCombo && !$comboReady): ?><small class="hyg-muted hgc-lock-hint"><?= e(hgc_t('lock_hint')) ?></small><?php endif; ?>
           </div>
           <?php /* TODO: Tạm ẩn câu "Thêm món sẽ hiển thị “Đã chọn xong”; xóa hết món sẽ hiển thị “Chưa chọn món”."
           <p class="hyg-muted"><?= e(gt('automatic_ready_hint')) ?></p>
@@ -362,7 +384,7 @@ function hyg_render_room(array $r): string
       <aside class="hyg-summary hyg-card"><span class="hyg-eyebrow">HỒNG TRÀ TUỔI THƠ</span>
         <h2><?= e(gt($order ? 'final_total' : 'total')) ?></h2>
         <div class="hyg-total"><?= e(currency()) ?><?= money($order ? $order['total_amount'] : $payment['total']) ?></div>
-        <p class="hyg-counts"><?= e(gt('people', ['n' => count($members)])) ?> · <?= e(gt('cups', ['n' => $drinks])) ?><?php if ($portions): ?><br><?= e(gt('portions', ['n' => $portions])) ?><?php endif; ?></p>
+        <p class="hyg-counts"><?= e(gt('people', ['n' => count($members)])) ?><?php if ($hasCombo): ?> · <?= e(hgc_t('combos_count', ['n' => $comboCount])) ?><?php endif; ?> · <?= e(gt('cups', ['n' => $drinks])) ?><?php if ($portions): ?><br><?= e(gt('portions', ['n' => $portions])) ?><?php endif; ?></p>
         <div class="hyg-totals-line"><span><?= e(gt('subtotal')) ?></span><b><?= e(currency()) ?><?= money($subtotal) ?></b></div>
         <?php $shownDiscount = $order ? (float)$order['discount_amount'] : (float)$payment['discount']; ?>
         <?php if ($shownDiscount > 0): ?><div class="hyg-totals-line"><span><?= e(gt('discount')) ?></span><b>−<?= e(currency()) ?><?= money($shownDiscount) ?></b></div><?php endif; ?>
@@ -387,7 +409,7 @@ function hyg_render_room(array $r): string
 
           <?= promotion_selector($promotion, ['group_public' => $r['public_id'], 'revision' => $r['revision'], 'host_discount_available' => $payment['host_obligation'] > 0]) ?>
 
-          <?php if ($drinks < hyg_min_lock_cups()): ?><small class="hyg-muted"><?= e(gt('min_cups')) ?></small><?php endif; ?>
+          <?php if (!$hasCombo && $drinks < hyg_min_lock_cups()): ?><small class="hyg-muted"><?= e(gt('min_cups')) ?></small><?php endif; ?>
         <?php endif; ?>
 
         <?php if ($status === 'locked' && $host): ?><?php if (!$payment['legacy']): ?>

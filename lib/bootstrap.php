@@ -26,6 +26,8 @@ ensure_v186_schema();
 refresh_cart_language();
 
 require_once __DIR__ . '/group_order.php';
+require_once __DIR__ . '/cart_combo.php';
+require_once __DIR__ . '/order_combo.php';
 hyg_schema();
 
 require_once __DIR__ . '/member.php';

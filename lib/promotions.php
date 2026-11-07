@@ -44,7 +44,8 @@ function promotion_schema(): void
 function promotion_drink_qty(array $cart): int
 {
     $qty = 0;
-    foreach ($cart as $row) if (!empty($row['product_id']) && empty($row['standalone_topping_id'])) $qty += max(0, (int)($row['qty'] ?? 0));
+    // Ly nước nằm trong combo không tính vào ưu đãi.
+    foreach ($cart as $row) if (!empty($row['product_id']) && empty($row['standalone_topping_id']) && empty($row['combo_drink'])) $qty += max(0, (int)($row['qty'] ?? 0));
     return $qty;
 }
 /** "Buy 4 get 1" only applies from this many drinks: the discount is 1 drink per full 5 (cart_coupon_summary). */

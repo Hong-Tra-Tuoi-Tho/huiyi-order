@@ -53,6 +53,7 @@ function hym_current_member(): ?array { return hym_member_row((int)($_SESSION['m
 /** Maps a ?return= value to the page a guest is sent back to after signing in; null if not allowed. */
 function hym_return_path(string $target): ?string {
     if($target==='group')return 'group/';
+    if($target==='group-combo')return 'group/?mode=combo';
     // A group invite link: the guest comes back to the same invite to join.
     if(preg_match('/^invite-([a-f0-9]{64})$/D',$target,$m))return 'group/?invite='.$m[1];
     return null;

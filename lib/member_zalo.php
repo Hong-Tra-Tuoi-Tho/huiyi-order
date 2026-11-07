@@ -173,3 +173,23 @@ function hym_login_token_consume(string $token): int {
     if($memberId<1||$delete->rowCount()!==1)hym_fail('member_form_expired');
     return $memberId;
 }
+
+/**
+ * Đăng nhập thử cho môi trường phát triển (member/local-login.php).
+ * Chỉ bật khi cả 3 điều kiện cùng đúng: truy cập từ chính máy này (127.0.0.1 / ::1),
+ * host là localhost hoặc 127.0.0.1, và không đi qua proxy / ngrok (không có X-Forwarded-*).
+ * Trên shoptest hay production các điều kiện này không bao giờ thỏa nên nút tự ẩn.
+ */
+function hym_local_login_allowed(): bool {
+    $addr = (string)($_SERVER['REMOTE_ADDR'] ?? '');
+    if (!in_array($addr, ['127.0.0.1', '::1'], true)) return false;
+
+    $host = strtolower((string)preg_replace('/:\d+$/', '', (string)($_SERVER['HTTP_HOST'] ?? '')));
+    if (!in_array($host, ['localhost', '127.0.0.1'], true)) return false;
+
+    foreach (['HTTP_X_FORWARDED_HOST', 'HTTP_X_FORWARDED_FOR', 'HTTP_X_FORWARDED_PROTO', 'HTTP_FORWARDED'] as $header) {
+        if (!empty($_SERVER[$header])) return false;
+    }
+
+    return true;
+}
