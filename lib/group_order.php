@@ -325,7 +325,7 @@ function hyg_reprice_after_append(array $r,array $host,array $quote): void {
     $settlement=['version'=>2,'payment'=>$payment,'coupon'=>$coupon,'coupon_record'=>$record,'coupon_rule'=>'group_min_base_per_5_v1'];
     $promotion=$quote['settlement']['promotion']??null;
     if($promotion!==null){
-        $promotion['eligible_qty']=promotion_drink_qty($cart);
+        $promotion['eligible_qty']=promotion_game_qty($cart);
         if($promotion['mode']==='draw'&&minigame_enabled())$promotion['expected_chances']=max((int)$promotion['expected_chances'],game_chances_for_drink_qty($promotion['eligible_qty']));
         $settlement['promotion']=$promotion;
     }
@@ -415,7 +415,7 @@ function hyg_remove_member(array $r,array $host,array $data): void {
     }
     $settlement=['version'=>2,'payment'=>$payment,'coupon'=>$coupon,'coupon_record'=>$record,'coupon_rule'=>'group_min_base_per_5_v1'];
     $promotion=$quote['settlement']['promotion']??null;
-    if($promotion!==null){$promotion['eligible_qty']=promotion_drink_qty($cart);$promotion['expected_chances']=$promotion['mode']==='draw'?min(max(0,(int)$promotion['expected_chances']),game_chances_for_drink_qty($promotion['eligible_qty'])):0;$settlement['promotion']=$promotion;}
+    if($promotion!==null){$promotion['eligible_qty']=promotion_game_qty($cart);$promotion['expected_chances']=$promotion['mode']==='draw'?min(max(0,(int)$promotion['expected_chances']),game_chances_for_drink_qty($promotion['eligible_qty'])):0;$settlement['promotion']=$promotion;}
     hyg_exec('UPDATE group_rooms SET lock_signature=?,settlement_json=? WHERE id=?',[hyg_fingerprint($cart,$coupon,$payment,$promotion),json_encode($settlement,JSON_UNESCAPED_UNICODE|JSON_PRESERVE_ZERO_FRACTION|JSON_THROW_ON_ERROR),$r['id']]);
 }
 /** A group order needs at least this many drinks in total before the host can press "Chốt món". */

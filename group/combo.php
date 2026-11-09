@@ -254,7 +254,7 @@ front_header(hgc_t('page_title'));
 
                                         <div class="hgc-submit">
                                             <label><?= e(t('quantity')) ?>
-                                                <input type="number" name="qty" min="1" max="<?= (int)$canAdd ?>" value="1" inputmode="numeric">
+                                                <input type="number" name="qty" min="1" max="<?= (int)$canAdd ?>" value="1" inputmode="numeric" data-msg-max="<?= e(hgc_t('qty_max', ['max' => (int)$canAdd])) ?>" data-msg-min="<?= e(hgc_t('qty_min')) ?>" oninvalid="this.setCustomValidity(this.validity.rangeOverflow ? this.dataset.msgMax : this.dataset.msgMin)" oninput="this.setCustomValidity('')">
                                             </label>
                                             <button class="btn primary" type="submit"><?= e(hgc_t('add_to_combo')) ?></button>
                                         </div>

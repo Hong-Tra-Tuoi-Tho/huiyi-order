@@ -84,7 +84,7 @@ try{
         if($choice['mode']==='reward'&&(float)$coupon['discount']<=0)throw new RuntimeException('coupon_no_discount');
     }
     $subtotal=cart_subtotal($cart);$discount=(float)$coupon['discount'];$total=max(0,$subtotal-$discount);$couponCode=$coupon['valid']?$coupon['code']:'';
-    $eligibleDrinkQty=0;foreach($cart as $r){if(!empty($r['product_id'])&&empty($r['standalone_topping_id'])&&empty($r['combo_drink']))$eligibleDrinkQty+=(int)$r['qty'];}
+    $eligibleDrinkQty=promotion_game_qty($cart);
     $expectedGameChances=$choice['mode']==='draw'&&$couponCode===''&&$discount<=0?game_saved_chance_count($eligibleDrinkQty,(int)$choice['expected_chances']):0;
     // Money prizes won in this checkout session are summed, taken off this order and spent with it.
     $gameCash=hcgs_cash_discount($cart,$coupon,hcgs_row($gameSessionId));

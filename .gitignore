@@ -26,3 +26,6 @@ error_log
 *.bak
 *.zip
 *.tar.gz
+
+# Nút đăng nhập test local (chỉ dùng trên máy dev)
+member/_local_login.php

@@ -48,6 +48,15 @@ function promotion_drink_qty(array $cart): int
     foreach ($cart as $row) if (!empty($row['product_id']) && empty($row['standalone_topping_id']) && empty($row['combo_drink'])) $qty += max(0, (int)($row['qty'] ?? 0));
     return $qty;
 }
+/** Số ly tính lượt chơi minigame: ly lẻ + ly nước nằm trong combo (khác promotion_drink_qty, hàm này không loại ly combo). */
+function promotion_game_qty(array $cart): int
+{
+    $qty = 0;
+    foreach ($cart as $row) {
+        if (!empty($row['product_id']) && empty($row['standalone_topping_id'])) $qty += max(0, (int)($row['qty'] ?? 0));
+    }
+    return $qty;
+}
 /** "Buy 4 get 1" only applies from this many drinks: the discount is 1 drink per full 5 (cart_coupon_summary). */
 function promotion_buy4_min_qty(): int
 {
@@ -102,7 +111,7 @@ function promotion_cart_choice(?array $cart = null): array
     } catch (Throwable $e) {
         $valid = false;
     }
-    $qty = promotion_drink_qty($cart);
+    $qty = promotion_game_qty($cart);
     return ['mode' => $mode, 'code' => $code, 'eligible_qty' => $qty, 'expected_chances' => $valid && $mode === 'draw' ? game_chances_for_drink_qty($qty) : 0, 'valid' => $valid];
 }
 /** Includes the promotion even when switching it does not change the price. */
@@ -123,7 +132,7 @@ function promotion_room_choice(array $room, array $cart): array
     $settlement = hyg_settlement($room);
     if ($settlement && in_array($room['status'], ['locked', 'submitted'], true) && isset($settlement['promotion'])) return $settlement['promotion'];
     $mode = promotion_room_mode($room);
-    $qty = promotion_drink_qty($cart);
+    $qty = promotion_game_qty($cart);
     $chances = $mode === 'draw' && minigame_enabled() ? game_chances_for_drink_qty($qty) : 0;
     // Pre-snapshot locked rooms were quoted under the original one-chance rule.
     if ($settlement && in_array($room['status'], ['locked', 'submitted'], true)) $chances = min(1, $chances);
