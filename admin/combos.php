@@ -5,6 +5,18 @@ require __DIR__ . '/../lib/combo_admin.php';
 require_admin();
 ensure_combo_schema();
 
+// Nhân bản combo (POST + CSRF), xong chuyển sang trang sửa bản sao để đổi tên, giá.
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['act'] ?? '') === 'duplicate') {
+    verify_csrf();
+    $newId = combo_admin_duplicate((int)($_POST['id'] ?? 0));
+
+    if ($newId < 1) {
+        redirect('combos.php?msg=duplicate_missing');
+    }
+
+    redirect('combo_edit.php?id=' . $newId . '&msg=duplicated');
+}
+
 $combos = db()->query('SELECT * FROM combos ORDER BY sort_order, id')->fetchAll();
 
 // Gom nhóm + món của tất cả combo: combo_id => group_id => ['label' => 'Nhóm 1 (chọn 2)', 'items' => ['Trà đào — L', ...]]
@@ -52,6 +64,8 @@ admin_header(cb('title'));
     <div class="alert info"><?= e(cb('deleted_rooms', ['rooms' => (int)$_GET['rooms']])) ?></div>
 <?php elseif ($flash === 'deleted'): ?>
     <div class="alert success"><?= e(cb('deleted')) ?></div>
+<?php elseif ($flash === 'duplicate_missing'): ?>
+    <div class="alert info"><?= e(cb('duplicate_missing')) ?></div>
 <?php endif; ?>
 
 <div class="alert info"><?= e(cb('info')) ?></div>
@@ -105,7 +119,15 @@ admin_header(cb('title'));
                     </td>
                     <td><?= number_format((int)$c['sort_order']) ?></td>
                     <td><?= $c['active'] ? e(cb('active')) : e(cb('inactive')) ?></td>
-                    <td><a class="btn small" href="combo_edit.php?id=<?= (int)$c['id'] ?>"><?= e(t('edit')) ?></a></td>
+                    <td>
+                        <a class="btn small" href="combo_edit.php?id=<?= (int)$c['id'] ?>"><?= e(t('edit')) ?></a>
+                        <form method="post" style="display:inline" onsubmit="return confirm(<?= e(json_encode(cb('duplicate_confirm'), JSON_UNESCAPED_UNICODE)) ?>)">
+                            <?= csrf_field() ?>
+                            <input type="hidden" name="act" value="duplicate">
+                            <input type="hidden" name="id" value="<?= (int)$c['id'] ?>">
+                            <button class="btn small" type="submit"><?= e(cb('duplicate')) ?></button>
+                        </form>
+                    </td>
                 </tr>
             <?php endforeach; ?>
         </tbody>

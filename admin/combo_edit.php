@@ -504,6 +504,10 @@ admin_header($id ? cb('edit') : cb('add'));
     <?php if ($openRooms > 0): ?>
         <div class="alert info"><?= e(cb('open_rooms_warn', ['rooms' => $openRooms])) ?></div>
     <?php endif; ?>
+    <?php if (($_GET['msg'] ?? '') === 'duplicated' && $_SERVER['REQUEST_METHOD'] !== 'POST'): ?>
+        <div class="alert success"><?= e(cb('duplicated')) ?></div>
+    <?php endif; ?>
+
     <?php if ($errors): ?>
         <div class="alert danger">
             <?php foreach ($errors as $err): ?>
