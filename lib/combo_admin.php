@@ -20,6 +20,26 @@ function ensure_combo_schema(): void
     }
     $done = true;
 
+    // Bảng gốc: DB mới (shoptest, production) chưa có thì phải tạo trước combo_groups vì khoá ngoại trỏ vào combos.
+    try {
+        db()->exec(
+            'CREATE TABLE IF NOT EXISTS combos (
+                id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+                name VARCHAR(160) NOT NULL,
+                image VARCHAR(255) NULL DEFAULT NULL,
+                price DECIMAL(10,2) NOT NULL,
+                total_cups INT UNSIGNED NOT NULL,
+                all_products TINYINT(1) NOT NULL DEFAULT 0,
+                active TINYINT(1) NOT NULL DEFAULT 1,
+                sort_order INT NOT NULL DEFAULT 0,
+                created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci'
+        );
+    } catch (Throwable $e) {
+        error_log('combo schema (combos): ' . $e->getMessage());
+    }
+
     try {
         db()->exec(
             'CREATE TABLE IF NOT EXISTS combo_groups (
@@ -36,6 +56,29 @@ function ensure_combo_schema(): void
         );
     } catch (Throwable $e) {
         error_log('combo schema: ' . $e->getMessage());
+    }
+
+    // combo_items tạo sau combo_groups để khoá ngoại fk_combo_item_group có bảng để trỏ tới.
+    try {
+        db()->exec(
+            'CREATE TABLE IF NOT EXISTS combo_items (
+                id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+                combo_id INT UNSIGNED NOT NULL,
+                group_id INT UNSIGNED NULL DEFAULT NULL,
+                product_id INT UNSIGNED NOT NULL,
+                cup_size VARCHAR(10) NOT NULL DEFAULT \'\',
+                max_quantity INT UNSIGNED NOT NULL,
+                PRIMARY KEY (id),
+                UNIQUE KEY uq_group_product (group_id, product_id),
+                KEY fk_combo_item_product (product_id),
+                KEY idx_combo_items_combo (combo_id),
+                CONSTRAINT fk_combo_item_combo FOREIGN KEY (combo_id) REFERENCES combos (id) ON DELETE CASCADE,
+                CONSTRAINT fk_combo_item_group FOREIGN KEY (group_id) REFERENCES combo_groups (id) ON DELETE CASCADE,
+                CONSTRAINT fk_combo_item_product FOREIGN KEY (product_id) REFERENCES products (id) ON DELETE CASCADE
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci'
+        );
+    } catch (Throwable $e) {
+        error_log('combo schema (combo_items): ' . $e->getMessage());
     }
 
     // Bản trước chỉ có pick_count (chọn đúng N ly): thêm min/max, giữ nguyên nghĩa cũ (min = max = N).
