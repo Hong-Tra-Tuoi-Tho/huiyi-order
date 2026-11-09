@@ -16,7 +16,9 @@ try {
             exit;
         }
         $account = htp_group_input($_POST, $_FILES);
-        $r = hyg_create($_POST['title'] ?? '', $_POST['nickname'] ?? '', !empty($_POST['copy_cart']), (string)($_POST['request_key'] ?? ''), $account);
+        // order_type=combo: tạo từ nút "Đặt combo nhóm" (group/?mode=combo).
+        $orderType = ($_POST['order_type'] ?? '') === 'combo' ? 'combo' : 'drink';
+        $r = hyg_create($_POST['title'] ?? '', $_POST['nickname'] ?? '', !empty($_POST['copy_cart']), (string)($_POST['request_key'] ?? ''), $account, $orderType);
         // dd('create', $r);
     } elseif ($action === 'join') {
         // dd('join', $r);
@@ -46,7 +48,26 @@ try {
             header('Location: ' . base_url('checkout.php?group=' . rawurlencode($r['room']['public_id'])), true, 303);
             exit;
         }
+        // Nhóm combo: chủ nhóm thêm combo (index.php?group=...), thành viên chọn nước (group/combo.php).
+        if ($action === 'add_combo') {
+            hgc_add_combo($id, $_POST);
+            $_SESSION['hyg_message'] = hgc_t('combo_added');
+            header('Location: ' . hyg_room_url($id), true, 303);
+            exit;
+        }
+        if ($action === 'combo_drink') {
+            hgc_add_drink($id, $_POST);
+            $_SESSION['hyg_message'] = hgc_t('drink_added');
+            header('Location: ' . base_url('group/combo.php?id=' . $id), true, 303);
+            exit;
+        }
         hyg_mutate($id, $action, $_POST);
+        if ($action === 'remove' && ($_POST['back'] ?? '') === 'combo') {
+            // Xoá combo hay chỉ bỏ 1 ly nước: phân biệt theo dòng vừa xoá (đã bị xoá nên đọc từ form gửi lên).
+            $_SESSION['hyg_message'] = hgc_t(($_POST['removed'] ?? '') === 'drink' ? 'drink_removed' : 'combo_removed');
+            header('Location: ' . base_url('group/combo.php?id=' . $id), true, 303);
+            exit;
+        }
         if ($action === 'cancel') {
             // A cancelled group is deleted right away and the host goes back to the menu.
             hyg_delete_cancelled_room($id);
@@ -88,7 +109,6 @@ try {
             }
         }
         if ($action === 'payment_confirm') {
-            dd('payment_confirm', $r);
             $quote = hyg_locked_quote($r);
             $hasInvalid = false;
             foreach ($quote['cart'] as $item) {
@@ -122,6 +142,11 @@ try {
                 $r = hyg_room(hyg_code($_POST['room_id']));
                 hyg_member($r);
                 $return = hyg_room_url($r['public_id']);
+                // Lỗi từ trang chọn nước (thêm nước, xoá combo) quay lại trang đó.
+                $fromComboPage = ($_POST['action'] ?? '') === 'combo_drink' || ($_POST['back'] ?? '') === 'combo';
+                if ($fromComboPage) {
+                    $return = base_url('group/combo.php?id=' . $r['public_id']);
+                }
             } elseif (!empty($_POST['invite']) && preg_match('/^[a-f0-9]{64}$/D', (string)$_POST['invite'])) $return = base_url('group/?invite=' . $_POST['invite']);
         } catch (Throwable $ignored) {
         }

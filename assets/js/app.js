@@ -342,3 +342,20 @@ document.addEventListener('submit', event => {
 window.addEventListener('pageshow', () => {
   document.querySelectorAll('form.option-form[data-cart-flying]').forEach(form => delete form.dataset.cartFlying);
 });
+
+// Nút quay lại dính dưới thanh trên cùng: đo chiều cao thanh (đổi theo màn hình, ngôn ngữ) vào biến CSS.
+(() => {
+  const topbar = document.querySelector('.front-body .topbar');
+  if (!topbar) {
+    return;
+  }
+  const setHeight = () => {
+    document.documentElement.style.setProperty('--front-topbar-h', topbar.offsetHeight + 'px');
+  };
+  setHeight();
+  if ('ResizeObserver' in window) {
+    new ResizeObserver(setHeight).observe(topbar);
+  } else {
+    window.addEventListener('resize', setHeight);
+  }
+})();

@@ -106,11 +106,11 @@
   }
   window.addEventListener('pageshow', () => document.querySelectorAll('form[data-submitting]').forEach(form => delete form.dataset.submitting));
   if (config.snapshot) {
-    pollTimer = setInterval(() => refresh(), 5000);
+    pollTimer = setInterval(() => refresh(), 3000);
     document.addEventListener('visibilitychange', () => { if (!document.hidden) refresh(); });
     window.addEventListener('online', () => refresh());
     window.addEventListener('offline', () => notice(config.offline, true));
     window.addEventListener('pagehide', () => clearInterval(pollTimer));
-    window.addEventListener('pageshow', event => { if (event.persisted) { clearInterval(pollTimer); pollTimer = setInterval(() => refresh(), 5000); refresh(); } });
+    window.addEventListener('pageshow', event => { if (event.persisted) { clearInterval(pollTimer); pollTimer = setInterval(() => refresh(), 3000); refresh(); } });
   }
 })();

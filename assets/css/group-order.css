@@ -433,6 +433,117 @@ body.theme-deep-red .hyg-page,body.theme-deep-red .hyg-mode,body.theme-deep-red 
     transform: translateX(3px);
 }
 
+/* Hai nút xếp dọc: "Đặt combo nhóm" (nổi bật nhất, vàng phát sáng) nằm trên "Đặt đơn nhóm". */
+.hyg-entry .hyg-entry-actions {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+    min-width: min(100%, 300px);
+}
+
+.hyg-entry .btn.hyg-entry-combo-cta {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    min-height: 62px;
+    padding: 0 26px;
+    overflow: hidden;
+    border: 2px solid #fff3c4;
+    border-radius: 16px;
+    background: linear-gradient(180deg, #ffe680 0%, #ffc21a 55%, #ffab00 100%);
+    color: #5a0f0f;
+    font-size: 19px;
+    font-weight: 900;
+    letter-spacing: .02em;
+    text-transform: uppercase;
+    cursor: pointer;
+    box-shadow: 0 0 0 4px rgba(255, 194, 26, .3), 0 10px 26px rgba(255, 171, 0, .55);
+    transition: transform .15s, box-shadow .15s;
+    animation: hyg-combo-glow 1.8s ease-in-out infinite;
+}
+
+/* Vệt sáng chạy ngang nút */
+.hyg-entry .btn.hyg-entry-combo-cta::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: -60%;
+    width: 40%;
+    background: linear-gradient(100deg, transparent, rgba(255, 255, 255, .75), transparent);
+    transform: skewX(-20deg);
+    animation: hyg-combo-shine 2.8s ease-in-out infinite;
+    pointer-events: none;
+}
+
+.hyg-entry .btn.hyg-entry-combo-cta svg {
+    flex: 0 0 auto;
+}
+
+.hyg-entry .btn.hyg-entry-combo-cta:hover,
+.hyg-entry .btn.hyg-entry-combo-cta:focus-visible {
+    transform: translateY(-2px) scale(1.02);
+    box-shadow: 0 0 0 6px rgba(255, 194, 26, .38), 0 14px 32px rgba(255, 171, 0, .7);
+    animation: none;
+}
+
+.hyg-entry .btn.hyg-entry-combo-cta:active {
+    transform: translateY(1px);
+}
+
+/* Đang trong đơn nhóm: nút combo nhóm cũng khoá, giống nút Đặt đơn nhóm */
+.hyg-entry .btn.hyg-entry-combo-cta:disabled {
+    background: #d9dce2;
+    border-color: #d9dce2;
+    color: #8a91a0;
+    box-shadow: none;
+    cursor: not-allowed;
+    transform: none;
+    animation: none;
+}
+
+.hyg-entry .btn.hyg-entry-combo-cta:disabled::after {
+    display: none;
+}
+
+@keyframes hyg-combo-glow {
+    0%,
+    100% {
+        box-shadow: 0 0 0 4px rgba(255, 194, 26, .3), 0 10px 26px rgba(255, 171, 0, .55);
+    }
+
+    50% {
+        box-shadow: 0 0 0 10px rgba(255, 194, 26, .1), 0 12px 32px rgba(255, 171, 0, .8);
+    }
+}
+
+@keyframes hyg-combo-shine {
+    0%,
+    55% {
+        left: -60%;
+    }
+
+    100% {
+        left: 130%;
+    }
+}
+
+@media (max-width: 760px) {
+    .hyg-entry .hyg-entry-actions {
+        width: 100%;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .hyg-entry .btn.hyg-entry-combo-cta,
+    .hyg-entry .btn.hyg-entry-combo-cta::after {
+        animation: none;
+    }
+}
+
 /* Soft red halo so the button catches the eye without moving the layout */
 @keyframes hyg-entry-pulse {
     0%,
@@ -588,4 +699,135 @@ body.theme-deep-red .hyg-page,body.theme-deep-red .hyg-mode,body.theme-deep-red 
     background: #E3B5B5;
     border-color: #E3B5B5;
     opacity: 1;
+}
+
+/* Tiêu đề trang tạo nhóm (group/index.php): nổi bật như nút ở trang chủ.
+   COMBO NHÓM và ĐƠN NHÓM dùng chung màu vàng phát sáng (giống nút Đặt combo nhóm). */
+.hyg-welcome h1.hyg-mode-title {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    margin: 0 0 18px;
+    padding: 16px 20px;
+    border-radius: 16px;
+    font-size: clamp(24px, 6vw, 32px);
+    font-weight: 900;
+    letter-spacing: .04em;
+    line-height: 1.2;
+    text-align: center;
+    text-transform: uppercase;
+}
+
+.hyg-welcome h1.hyg-mode-title.is-combo,
+.hyg-welcome h1.hyg-mode-title.is-group {
+    border: 2px solid #fff3c4;
+    background: linear-gradient(180deg, #ffe680 0%, #ffc21a 55%, #ffab00 100%);
+    color: #5a0f0f;
+    box-shadow: 0 0 0 4px rgba(255, 194, 26, .3), 0 10px 26px rgba(255, 171, 0, .55);
+    animation: hyg-combo-glow 1.8s ease-in-out infinite;
+}
+
+/* Vệt sáng chạy ngang tiêu đề */
+.hyg-welcome h1.hyg-mode-title::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: -60%;
+    width: 40%;
+    background: linear-gradient(100deg, transparent, rgba(255, 255, 255, .6), transparent);
+    transform: skewX(-20deg);
+    animation: hyg-combo-shine 2.8s ease-in-out infinite;
+    pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .hyg-welcome h1.hyg-mode-title,
+    .hyg-welcome h1.hyg-mode-title::after {
+        animation: none;
+    }
+}
+
+/* Thanh nút dính ở đáy phòng nhóm: "Chốt món" là nút chính (đỏ đặc, full chiều ngang),
+   các nút còn lại là nút phụ viền đỏ nền trắng, xếp 2 cột bên dưới. Cả thanh nằm trong một khung trắng nổi. */
+.hyg-page .hyg-join-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    padding: 10px;
+    background: rgba(255, 255, 255, .97);
+    border: 1px solid #f0d4d4;
+    border-radius: 20px;
+    box-shadow: 0 10px 30px rgba(17, 24, 39, .16);
+}
+.hyg-page .hyg-join-actions > * {
+    grid-column: 1 / -1;
+    margin: 0;
+}
+.hyg-page .hyg-join-actions .btn.primary.hyg-act-secondary {
+    grid-column: auto;
+    min-height: 50px;
+    padding: 0 10px;
+    font-size: 15px;
+    line-height: 1.2;
+    text-align: center;
+    /* Nút "Chọn đồ uống" / "Chọn nước": vàng nổi bật, dễ thấy hơn nút phụ nền trắng. */
+    background: linear-gradient(180deg, #ffe680 0%, #ffc21a 55%, #ffab00 100%);
+    border: 2px solid #fff3c4;
+    color: #5a0f0f;
+    font-weight: 900;
+    box-shadow: 0 8px 22px rgba(255, 171, 0, .45);
+}
+.hyg-page .hyg-join-actions .btn.primary.hyg-act-secondary:hover {
+    background: linear-gradient(180deg, #ffd95a 0%, #ffb800 55%, #f09a00 100%);
+    color: #5a0f0f;
+    border-color: #fff3c4;
+}
+/* Chỉ có 1 nút phụ (nhóm chưa có combo): chiếm trọn hàng. */
+.hyg-page .hyg-join-actions .btn.primary.hyg-act-secondary:only-of-type {
+    grid-column: 1 / -1;
+}
+.hyg-page .hyg-join-actions .hyg-lock-hint,
+.hyg-page .hyg-join-actions .hgc-lock-hint {
+    text-align: center;
+    padding: 0 4px;
+}
+
+/* Khối chia sẻ nhóm trên điện thoại: "Chia sẻ nhóm" là nút chính full hàng,
+   "Sao chép liên kết" và "Tải mã QR" là 2 nút phụ nhỏ, viền đỏ nền trắng nằm cạnh nhau. */
+.front-body .hyg-share .hyg-share-actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    margin-top: 10px;
+}
+.front-body .hyg-share .hyg-share-actions .btn {
+    min-height: 42px;
+    padding: 0 8px;
+    font-size: 14px;
+    line-height: 1.2;
+    text-align: center;
+    background: #fff;
+    border: 1.5px solid #B32424;
+    color: #B32424;
+    box-shadow: none;
+}
+.front-body .hyg-share .hyg-share-actions .btn:hover {
+    background: #fdf1f1;
+}
+.front-body .hyg-share .hyg-share-actions .btn.primary {
+    grid-column: 1 / -1;
+    min-height: 46px;
+    font-size: 15px;
+    background: #B32424;
+    color: #fff;
+    box-shadow: 0 6px 16px rgba(179, 36, 36, .25);
+}
+.front-body .hyg-share .hyg-share-main input {
+    min-height: 42px;
+    font-size: 14px;
+}
+.front-body .hyg-share .hyg-share-deadline {
+    margin: 8px 0 0;
 }

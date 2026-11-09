@@ -29,7 +29,7 @@ function order_notification_email_payload(int $orderId): ?array {
         if(!$order) return null;
         $it=db()->prepare('SELECT * FROM order_items WHERE order_id=? ORDER BY id');
         $it->execute([$orderId]);
-        return ['order'=>$order,'items'=>$it->fetchAll()];
+        return ['order'=>$order,'items'=>order_lines_flat($orderId,$it->fetchAll())];
     } catch(Throwable $e){
         return null;
     }
@@ -84,6 +84,7 @@ function build_order_notification_email(array $order,array $items): array {
     foreach($items as $item){
         $itemNo++;
         $name=(string)($item['product_name']??'');
+        if(function_exists('occ_label')&&($label=occ_label($item))!=='')$name=($item['_kind']==='combo'?'['.$label.'] ':'').$name.($item['_kind']==='combo_drink'?' ['.$label.']':'');
         $size=trim((string)($item['cup_size']??''));
         $qty=max(1,(int)($item['qty']??1));
         if(!empty($item['group_member_name']))$lines[]='Người đặt / 訂購人：'.$item['group_member_name'];
@@ -168,6 +169,7 @@ function build_order_notification_email(array $order,array $items): array {
     foreach($items as $item){
         $itemNo++;
         $name=(string)($item['product_name']??'');
+        if(function_exists('occ_label')&&($label=occ_label($item))!=='')$name=($item['_kind']==='combo'?'['.$label.'] ':'').$name.($item['_kind']==='combo_drink'?' ['.$label.']':'');
         $size=trim((string)($item['cup_size']??''));
         $qty=max(1,(int)($item['qty']??1));
         $ice=trim((string)($item['ice_choice']??''));

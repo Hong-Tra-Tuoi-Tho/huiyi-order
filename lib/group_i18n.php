@@ -26,6 +26,9 @@ function gt(string $key,array $vars=[]): string {
             'title'=>'團購訂單',
             'share_cart'=>'分享購物車',
             'entry_cta'=>'團購下單',
+            'entry_combo_cta'=>'套餐團購',
+            'mode_group'=>'團購',
+            'mode_combo'=>'套餐團購',
             'entry_title'=>'一起點飲料',
             'entry_desc'=>'分享連結或 QR Code，邀請大家選購，再由團主選擇統一結帳或分開結帳。',
             'guide_title'=>'團購步驟',
@@ -254,6 +257,9 @@ function gt(string $key,array $vars=[]): string {
             'title'=>'Đặt hàng nhóm',
             'share_cart'=>'Chia sẻ giỏ hàng',
             'entry_cta'=>'Đặt đơn nhóm',
+            'entry_combo_cta'=>'Đặt combo nhóm',
+            'mode_group'=>'ĐƠN NHÓM',
+            'mode_combo'=>'COMBO NHÓM',
             'entry_title'=>'Cùng nhau đặt đồ uống',
             'entry_desc'=>'Chia sẻ liên kết hoặc mã QR để mọi người chọn món, rồi trưởng nhóm chọn thanh toán chung hoặc riêng.',
             'guide_title'=>'Các bước đặt hàng nhóm',
@@ -482,6 +488,9 @@ function gt(string $key,array $vars=[]): string {
             'title'=>'Group order',
             'share_cart'=>'Share cart',
             'entry_cta'=>'Start a group order',
+            'entry_combo_cta'=>'Group combo order',
+            'mode_group'=>'GROUP ORDER',
+            'mode_combo'=>'GROUP COMBO',
             'entry_title'=>'Order together',
             'entry_desc'=>'Share a link or QR Code so everyone can choose, then the host selects Pay together or Pay separately.',
             'guide_title'=>'Group order steps',
@@ -717,6 +726,6 @@ function gt(string $key,array $vars=[]): string {
         ]
     ];
     static $auditLoaded=false;if(!$auditLoaded){foreach($audit as $auditLang=>$strings)$d[$auditLang]=array_replace($d[$auditLang],$strings);$auditLoaded=true;}
-    $lang=function_exists('current_lang')?current_lang():'vi';$text=$d[$lang][$key]??$d['en'][$key]??$key;
+    $lang=function_exists('current_lang')?current_lang():'vi';$text=$d[$lang][$key]??$d['en'][$key]??(function_exists('hgc_t')?hgc_t($key):$key);
     foreach($vars as $k=>$v)$text=str_replace('{'.$k.'}',(string)$v,$text);return $text;
 }

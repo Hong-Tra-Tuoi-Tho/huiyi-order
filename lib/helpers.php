@@ -319,7 +319,7 @@ function calculate_cart_coupon_summary(array $cart, ?array $record, ?array $gift
     if ($record['type'] === 'buy4get1') {
         $units = [];
         foreach ($cart as $key => $row) {
-            if (empty($row['product_id']) || !empty($row['standalone_topping_id'])) continue;
+            if (empty($row['product_id']) || !empty($row['standalone_topping_id']) || !empty($row['combo_drink'])) continue;
             $qty = max(0, (int)($row['qty'] ?? 0));
             $base = max(0, (float)($row['base_price'] ?? 0));
             $result['eligible_qty'] += $qty;
@@ -339,7 +339,7 @@ function calculate_cart_coupon_summary(array $cart, ?array $record, ?array $gift
     if ($record['type'] === 'fixed_drink') {
         $remaining = max(0, (float)$record['amount']);
         foreach ($cart as $key => $row) {
-            if (empty($row['product_id']) || !empty($row['standalone_topping_id'])) continue;
+            if (empty($row['product_id']) || !empty($row['standalone_topping_id']) || !empty($row['combo_drink'])) continue;
             $qty = max(0, (int)($row['qty'] ?? 0));
             $base = max(0, (float)($row['base_price'] ?? 0));
             $result['eligible_qty'] += $qty;
@@ -540,7 +540,11 @@ function send_order_notification(array $order, array $cart): bool
 function cart_count(): int
 {
     $n = 0;
-    foreach (($_SESSION['cart'] ?? []) as $row) $n += (int)$row['qty'];
+    // Dòng combo chỉ là "vỏ" chứa các ly nước: không tính là 1 ly, tránh đếm dư (5 ly + 3 ly = 8, không phải 9).
+    foreach (($_SESSION['cart'] ?? []) as $row) {
+        if (!empty($row['is_combo'])) continue;
+        $n += (int)$row['qty'];
+    }
     return $n;
 }
 function order_no(): string

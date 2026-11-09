@@ -2,6 +2,7 @@
 // test cicd
 require __DIR__ . '/lib/bootstrap.php';
 require __DIR__ . '/lib/layout.php';
+require __DIR__ . '/lib/combo_front.php';
 try {
   $groupContext = hyg_context();
 } catch (Throwable $e) {
@@ -18,6 +19,8 @@ $featuredProducts = db()->query("SELECT p.*,COALESCE(s.sold_qty,0) sold_qty FROM
 $featuredToppings = db()->query('SELECT * FROM toppings WHERE active=1 AND sell_separately=1 AND (is_new=1 OR is_hot=1) ORDER BY is_new DESC,is_hot DESC,sort_order,id LIMIT 12')->fetchAll();
 // Home banner slider (admin/banners.php). Inside a group order, banner links keep the group context.
 $banners = hbn_active();
+// Combo đang bán (admin/combos.php) cho slider "Khám phá combo mới nhất".
+$homeCombos = hcf_active();
 if ($groupContext) {
   foreach ($banners as &$slide) {
     if ($slide['url'] !== '') {
@@ -66,20 +69,38 @@ front_header(); ?>
 <?php if (!$groupContext): ?>
   <?php $inGroupOrder = hyg_has_live_group(); ?>
   <section class="hyg-entry hyg-entry-highlight<?= $inGroupOrder ? ' is-locked' : '' ?>">
-    <div><strong><?= e(gt('entry_title')) ?></strong>
-      <p><?= e(gt('entry_desc')) ?></p>
+    <div class="hyg-entry-text"><strong><?= e(gt('entry_title')) ?></strong></div>
+    <div class="hyg-entry-actions">
+      <?php if ($inGroupOrder): ?><button type="button" class="btn primary hyg-entry-cta" disabled aria-disabled="true"><?php else: ?><a class="btn primary hyg-entry-cta" href="<?= e(hym_login_gate_url('group')) ?>"><?php endif; ?>
+          <!-- people icon -->
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="9" cy="8" r="3" />
+            <path d="M3 20v-1a6 6 0 0 1 12 0v1M16 5a3 3 0 0 1 0 6M21 20v-1a6 6 0 0 0-4-5.6" />
+          </svg>
+          <span><?= e(gt('entry_cta')) ?></span>
+          <span class="hyg-entry-arrow" aria-hidden="true">→</span>
+          <?php if ($inGroupOrder): ?></button><?php else: ?></a><?php endif; ?>
     </div>
-    <?php if ($inGroupOrder): ?><button type="button" class="btn primary hyg-entry-cta" disabled aria-disabled="true"><?php else: ?><a class="btn primary hyg-entry-cta" href="<?= e(hym_login_gate_url('group')) ?>"><?php endif; ?>
-        <!-- people icon -->
-        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <circle cx="9" cy="8" r="3" />
-          <path d="M3 20v-1a6 6 0 0 1 12 0v1M16 5a3 3 0 0 1 0 6M21 20v-1a6 6 0 0 0-4-5.6" />
-        </svg>
-        <span><?= e(gt('entry_cta')) ?></span>
-        <span class="hyg-entry-arrow" aria-hidden="true">→</span>
-        <?php if ($inGroupOrder): ?></button><?php else: ?></a><?php endif; ?>
   </section>
 <?php endif; ?>
+
+<!-- Combo slider: lib/combo_front.php hcf_render_section(). Điện thoại 1 thẻ, iPad 2, màn lớn 3. -->
+<?php /* Thiết bị đang ở trong một đơn nhóm (kể cả bấm "Quay lại menu" nên URL không còn ?group=) thì ẩn combo. */ ?>
+<?php if ($groupContext): ?>
+  <?php /* Đơn nhóm gộp: chỉ chủ nhóm thêm combo vào giỏ nhóm; "Đặt ngay" gửi add_combo (group/action.php). */ ?>
+  <?php if (hyg_host($groupContext['room']) && $groupContext['room']['status'] === 'open'): ?><?= hcf_render_section($homeCombos, $groupContext['room']) ?><?php endif; ?>
+<?php elseif (hyg_has_live_group()): ?>
+  <?php /* Vào menu không có ?group=: chủ nhóm vẫn thấy combo của phòng đang mở. */ ?>
+  <?php
+    $liveComboRoom = null;
+    try {
+      $liveComboRoom = hyg_one("SELECT * FROM group_rooms WHERE owner_hash=? AND status='open' AND order_id IS NULL AND expires_at>UTC_TIMESTAMP() ORDER BY id DESC LIMIT 1", [hyg_device()]);
+    } catch (Throwable $e) {
+      $liveComboRoom = null;
+    }
+  ?>
+  <?php if ($liveComboRoom): ?><?= hcf_render_section($homeCombos, $liveComboRoom) ?><?php endif; ?>
+<?php elseif (!hyg_in_active_group()): ?><?= hcf_render_section($homeCombos) ?><?php endif; ?>
 
 <?php if ($featuredProducts || $featuredToppings): ?>
   <section class="featured-section" id="featured">

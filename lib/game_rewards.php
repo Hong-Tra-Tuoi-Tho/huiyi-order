@@ -314,7 +314,7 @@ function hgr_calculate(array $cart, array $record, array $result, ?array $giftLi
         if ($price > 0 && (!isset($candidates[$id]) || $price < $candidates[$id]['price'])) $candidates[$id] = ['key' => $key, 'price' => $price, 'qty' => $count];
     };
     foreach ($cart as $key => $row) {
-        if (empty($row['product_id']) || !empty($row['standalone_topping_id'])) continue;
+        if (empty($row['product_id']) || !empty($row['standalone_topping_id']) || !empty($row['combo_drink'])) continue;
         $count = max(0, (int)($row['qty'] ?? 0));
         if ($count < 1) continue;
         $base = max(0, (float)($row['base_price'] ?? 0));

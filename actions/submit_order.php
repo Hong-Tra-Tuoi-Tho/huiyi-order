@@ -24,6 +24,7 @@ if(hcq_outcome($postedToken,$checkoutContext)){
 }
 $groupCheckout=null;
 $cart=$_SESSION['cart']??[]; if(!$groupId&&!$cart) redirect(base_url('index.php'));
+if(!$groupId&&!hcc_all_complete($cart))redirect(base_url('cart.php'));
 $draft=hcq_capture($checkoutContext,$_POST);$values=$draft['values'];
 if($groupId===''&&$values['payment_method']==='split'){$_SESSION['checkout_drafts'][$checkoutContext]['errors']['payment_method']='incomplete_data';$draft['errors']['payment_method']='incomplete_data';}
 if($draft['errors'])hcq_fail($checkoutContext,$groupId,htp_ux('draft_error'));
@@ -61,6 +62,8 @@ if(!@session_start())hcq_fail($checkoutContext,$groupId,htp_ux('unknown'));
 $reopenedRequest=hcq_lookup($checkoutToken,$checkoutContext);
 if(!$reopenedRequest||($reopenedRequest['state']??'')!=='unknown'||($reopenedRequest['order_no']??'')!==$no||(int)($_SESSION['member_id']??0)!==(int)($orderMemberId??0))hcq_fail($checkoutContext,$groupId,htp_ux('unknown'));
 $pdo=db();
+// Bảng chi tiết combo của đơn (lib/order_combo.php): tạo ngoài transaction vì DDL tự commit; lỗi thì đơn vẫn lưu như cũ.
+occ_schema();
 try{
     $pdo->beginTransaction();
     if($groupId!==''){
@@ -81,7 +84,7 @@ try{
         if($choice['mode']==='reward'&&(float)$coupon['discount']<=0)throw new RuntimeException('coupon_no_discount');
     }
     $subtotal=cart_subtotal($cart);$discount=(float)$coupon['discount'];$total=max(0,$subtotal-$discount);$couponCode=$coupon['valid']?$coupon['code']:'';
-    $eligibleDrinkQty=0;foreach($cart as $r){if(!empty($r['product_id'])&&empty($r['standalone_topping_id']))$eligibleDrinkQty+=(int)$r['qty'];}
+    $eligibleDrinkQty=0;foreach($cart as $r){if(!empty($r['product_id'])&&empty($r['standalone_topping_id'])&&empty($r['combo_drink']))$eligibleDrinkQty+=(int)$r['qty'];}
     $expectedGameChances=$choice['mode']==='draw'&&$couponCode===''&&$discount<=0?game_saved_chance_count($eligibleDrinkQty,(int)$choice['expected_chances']):0;
     // Money prizes won in this checkout session are summed, taken off this order and spent with it.
     $gameCash=hcgs_cash_discount($cart,$coupon,hcgs_row($gameSessionId));
@@ -94,13 +97,17 @@ try{
     $st->execute([$no,$name,$phone,$address,$pay,$invoice?1:0,$companyName?:null,$taxId?:null,$companyAddress?:null,$companyRepresentative?:null,$companyPhone?:null,$invoiceEmail?:null,$orderNote?:null,$couponCode?:null,$subtotal,$discount,$total,$choice['mode']==='draw'?($walletToken?:null):null,$groupCheckout['room']['id']??null,$groupCheckout['room']['title']??null,$orderMemberId,$choice['mode'],$expectedGameChances,hash('sha256',$checkoutToken)]);
     $oid=(int)$pdo->lastInsertId();
     $st2=$pdo->prepare('INSERT INTO order_items(order_id,product_id,standalone_topping_id,product_name,cup_size,base_price,ice_choice,sugar_choice,toppings_text,unit_price,discount_amount,qty,line_total,group_member_name,group_member_id) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)');
+    $itemIds=[];
     foreach($cart as $key=>$r){
         $tops=implode('、',array_map(fn($top)=>($top['display_name']??$top['name']).'(+'.currency().money($top['price']).')',$r['toppings']??[]));
         $lineDiscount=(float)($coupon['line_discounts'][(string)$key]??0); $lineOriginal=(float)$r['unit_price']*(int)$r['qty'];
         $productId=!empty($r['product_id'])?(int)$r['product_id']:null;
         $standaloneId=!empty($r['standalone_topping_id'])?(int)$r['standalone_topping_id']:null;
         $st2->execute([$oid,$productId,$standaloneId,$r['name'],$r['cup_size']??null,$r['base_price'],$r['ice']??'',$r['sugar']??'',$tops,$r['unit_price'],$lineDiscount,$r['qty'],max(0,$lineOriginal-$lineDiscount),$r['group_member_name']??null,$r['group_member_id']??null]);
+        $itemIds[$key]=(int)$pdo->lastInsertId();
     }
+    // Đơn có combo: ghi thêm chi tiết combo / nhóm món (order_items ở trên vẫn đủ dữ liệu như trước).
+    occ_save($oid,$cart,$coupon,$itemIds);
     if(($coupon['source']??'')==='game' && $couponCode!==''){
         if(!mark_customer_coupon_used($couponCode,$oid)) throw new RuntimeException('Coupon already used.');
     }
