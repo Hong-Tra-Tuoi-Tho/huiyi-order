@@ -161,7 +161,7 @@ front_header(t('order_info'));
           ?>
 
           <!-- Hiển thị thông báo đề nghị mua thêm nước ở khung mini-game -->
-          <?php if ($gameMoreQty > 0 && $gameMoreQty > 5): ?>
+          <?php if ($gameMoreQty > 0 && $gameMoreQty <= 5): ?>
             <p class="checkout-game-upsell">
               <?= e(hcgs_text('upsell', ['more' => $gameMoreQty])) ?>
             </p>
