@@ -302,6 +302,10 @@ function cb(string $key, array $values = []): string
             'product_off' => 'ngừng bán',
             'saved' => 'Đã lưu combo.',
             'deleted' => 'Đã xoá combo.',
+            'duplicate' => 'Nhân bản',
+            'duplicated' => 'Đã nhân bản combo. Bản sao đang tắt, hãy kiểm tra rồi bật lên.',
+            'duplicate_confirm' => 'Nhân bản combo này? Bản sao sẽ tạm tắt.',
+            'duplicate_missing' => 'Không tìm thấy combo để nhân bản.',
             'saved_removed' => 'Đã lưu combo. Đã gỡ {groups} nhóm và {items} món khỏi combo; khách trong {rooms} nhóm đang mở sẽ phải chọn lại các ly bị ảnh hưởng.',
             'deleted_rooms' => 'Đã xoá combo. {rooms} nhóm đang mở có combo này: khách sẽ thấy báo combo không còn bán và phải chọn lại.',
             'open_rooms_warn' => 'Đang có {rooms} nhóm đặt đơn mở dùng combo này. Sửa tên, giá, số ly, thứ tự thì khách không bị ảnh hưởng; xoá nhóm, xoá món hoặc xoá combo thì khách trong các nhóm đó phải chọn lại.',
@@ -377,6 +381,10 @@ function cb(string $key, array $values = []): string
             'product_off' => 'unavailable',
             'saved' => 'Combo saved.',
             'deleted' => 'Combo deleted.',
+            'duplicate' => 'Duplicate',
+            'duplicated' => 'Combo duplicated. The copy is inactive; review it and turn it on.',
+            'duplicate_confirm' => 'Duplicate this combo? The copy will be inactive.',
+            'duplicate_missing' => 'Combo to duplicate not found.',
             'saved_removed' => 'Combo saved. Removed {groups} group(s) and {items} drink(s); customers in {rooms} open group order(s) must pick the affected cups again.',
             'deleted_rooms' => 'Combo deleted. {rooms} open group order(s) use it: customers will see it is unavailable and must pick again.',
             'open_rooms_warn' => '{rooms} open group order(s) use this combo. Changing name, price, cup counts or order does not affect customers; removing a group, a drink or the combo makes them pick again.',
@@ -452,6 +460,10 @@ function cb(string $key, array $values = []): string
             'product_off' => '停售',
             'saved' => '套餐已保存。',
             'deleted' => '套餐已刪除。',
+            'duplicate' => '複製',
+            'duplicated' => '已複製套餐。副本目前為停用狀態，請檢查後再啟用。',
+            'duplicate_confirm' => '要複製此套餐嗎？副本會先停用。',
+            'duplicate_missing' => '找不到要複製的套餐。',
             'saved_removed' => '套餐已保存。已移除 {groups} 個飲品組與 {items} 個飲品；{rooms} 個進行中的團購需重新選擇受影響的飲品。',
             'deleted_rooms' => '套餐已刪除。{rooms} 個進行中的團購使用此套餐：顧客將看到套餐已停售並需重新選擇。',
             'open_rooms_warn' => '目前有 {rooms} 個進行中的團購使用此套餐。修改名稱、價格、杯數或順序不影響顧客；刪除飲品組、飲品或套餐則顧客需重新選擇。',
@@ -771,6 +783,71 @@ function combo_admin_save(int $id, array $combo, array $groups, array &$removed 
 }
 
 /** Đường dẫn file ảnh combo trong uploads/. */
+/**
+ * Nhân bản combo: tạo combo mới (id mới) cùng các nhóm (id mới) và món của combo gốc.
+ * Bản sao tạm ẩn để khách không thấy 2 combo trùng tên trước khi admin chỉnh; ảnh được copy ra file riêng
+ * để xoá combo này không làm mất ảnh của combo kia. Trả về id combo mới, 0 nếu không tìm thấy combo gốc.
+ */
+function combo_admin_duplicate(int $sourceId): int
+{
+    $st = db()->prepare('SELECT * FROM combos WHERE id=?');
+    $st->execute([$sourceId]);
+    $source = $st->fetch();
+
+    if (!$source) {
+        return 0;
+    }
+
+    // Tên "Combo A (1)", "Combo A (2)"...: lấy số nhỏ nhất chưa có combo nào dùng.
+    $base = (string)$source['name'];
+    $exists = db()->prepare('SELECT COUNT(*) FROM combos WHERE name=?');
+    $n = 1;
+
+    do {
+        $suffix = ' (' . $n . ')';
+        $name = mb_substr($base, 0, 160 - mb_strlen($suffix)) . $suffix;
+        $exists->execute([$name]);
+        $n++;
+    } while ((int)$exists->fetchColumn() > 0 && $n < 1000);
+
+    // Copy file ảnh sang tên mới (nếu combo gốc có ảnh và file còn tồn tại).
+    $image = '';
+    $oldFile = (string)($source['image'] ?? '');
+
+    if ($oldFile !== '' && is_file(combo_image_path($oldFile))) {
+        $ext = strtolower(pathinfo($oldFile, PATHINFO_EXTENSION));
+        $newFile = 'combo-' . date('YmdHis') . '-' . bin2hex(random_bytes(4)) . ($ext !== '' ? '.' . $ext : '');
+
+        if (@copy(combo_image_path($oldFile), combo_image_path($newFile))) {
+            $image = $newFile;
+        }
+    }
+
+    $combo = [
+        'name' => $name,
+        'image' => $image,
+        'price' => $source['price'],
+        'total_cups' => (int)$source['total_cups'],
+        'all_products' => (int)$source['all_products'],
+        'active' => 0,
+        'sort_order' => (int)$source['sort_order'] + 1,
+    ];
+
+    // id nhóm về 0 để combo_admin_save tạo nhóm mới thay vì sửa nhóm của combo gốc.
+    $groups = array_map(static function (array $group): array {
+        $group['id'] = 0;
+        return $group;
+    }, combo_admin_groups($sourceId));
+
+    try {
+        $removed = [];
+        return combo_admin_save(0, $combo, $groups, $removed);
+    } catch (Throwable $e) {
+        combo_delete_image($image);
+        throw $e;
+    }
+}
+
 function combo_image_path(string $file): string
 {
     return __DIR__ . '/../uploads/' . basename($file);
