@@ -11,7 +11,9 @@ try {
   $id = (string)($_GET['id'] ?? '');
   $invite = (string)($_GET['invite'] ?? '');
   // Creating a group needs a signed-in member (the group's owner_member_id).
-  if ($id === '' && $invite === '' && !hym_current_member()) redirect(hym_login_gate_url('group'));
+  // ?mode=combo: vào từ nút "Đặt combo nhóm" ở trang chủ (chỉ đổi tiêu đề, form tạo nhóm giữ nguyên).
+  $comboMode = ($_GET['mode'] ?? '') === 'combo';
+  if ($id === '' && $invite === '' && !hym_current_member()) redirect(hym_login_gate_url($comboMode ? 'group-combo' : 'group'));
   if ($id !== '') {
     $r = hyg_room($id);
     hyg_member($r);
@@ -53,8 +55,10 @@ unset($_SESSION['hyg_message']);
 $orderSuccess = !empty($_SESSION['hyg_order_success']);
 unset($_SESSION['hyg_order_success']);
 ?>
+<?php if ($r): ?><link rel="stylesheet" href="<?= e(base_url('assets/css/group-combo.css?v=4')) ?>"><?php endif; ?>
 <div class="hyg-page">
-  <a class="back" href="<?= e(base_url('index.php')) ?>">← <?= e(t('back_menu')) ?></a>
+  <?php /* Nhóm combo: "menu" của nhóm là trang chọn combo (chủ nhóm) / chọn nước (thành viên), không phải danh sách món. */ ?>
+  <a class="back" href="<?= e(base_url($r ? 'index.php?group=' . $r['public_id'] : 'index.php')) ?>">← <?= e(t('back_menu')) ?></a>
   <?php if ($msg !== ''): ?><div class="alert info"><?= e($msg) ?></div><?php endif; ?>
   <?php if (!$r && !$invited): ?>
     <!-- Group order guide: create page = step 1. -->
@@ -108,12 +112,12 @@ unset($_SESSION['hyg_order_success']);
       <form method="post" action="<?= e(base_url('group/action.php')) ?>" class="hyg-form"><?= csrf_field() ?><input type="hidden" name="action" value="join"><input type="hidden" name="invite" value="<?= e($invite) ?>"><label><?= e(gt('nickname')) ?><input name="nickname" required maxlength="32" autocomplete="nickname" value="<?= e($memberNickname) ?>"></label><small><?= e(gt('nickname_hint')) ?></small><button class="btn primary block" type="submit"><?= e(gt('join')) ?></button></form>
     </section>
   <?php else: ?>
-    <section class="hyg-welcome hyg-card"><span class="hyg-eyebrow"><?= e(gt('title')) ?></span>
-      <h1><?= e(gt('entry_title')) ?></h1>
-      <p><?= e(gt('entry_desc')) ?></p>
+    <section class="hyg-welcome hyg-card">
+      <h1 class="hyg-mode-title <?= $comboMode ? 'is-combo' : 'is-group' ?>"><?= e(gt($comboMode ? 'mode_combo' : 'mode_group')) ?></h1>
       <form method="post" enctype="multipart/form-data" action="<?= e(base_url('group/action.php')) ?>" class="hyg-form">
         <?= csrf_field() ?>
         <input type="hidden" name="action" value="create">
+        <?php if ($comboMode): ?><input type="hidden" name="order_type" value="combo"><?php endif; ?>
         <input type="hidden" name="request_key" value="<?= bin2hex(random_bytes(16)) ?>">
         <label><?= e(gt('room_name')) ?>
           <input name="title" maxlength="80" required placeholder="<?= e(gt('room_placeholder')) ?>">
@@ -126,7 +130,7 @@ unset($_SESSION['hyg_order_success']);
         <!-- close-test-Hai | (Trưởng nhóm thu tiền hộ) -->
         <!-- <?= htp_render_group_fields() ?> -->
 
-        <?php if (!empty($_SESSION['cart'])): ?>
+        <?php if (!$comboMode && !empty($_SESSION['cart'])): ?>
           <label class="hyg-check"><input type="checkbox" name="copy_cart" value="1" checked>
             <span><?= e(gt('copy_cart')) ?> · <?= cart_count() ?></span>
           </label>

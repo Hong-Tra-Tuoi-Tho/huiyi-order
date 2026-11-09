@@ -30,7 +30,11 @@ function front_header(string $title = ''): void
     $frontCartCount = cart_count();
     if ($cartRoom) {
         $frontCartCount = 0;
-        foreach (hyg_cart($cartRoom, false) as $row) $frontCartCount += (int)$row['qty'];
+        // Dòng combo không cộng vào số ly nước (khách dễ hiểu nhầm); chỉ đếm nước.
+        foreach (hyg_cart($cartRoom, false) as $row) {
+            if (!empty($row['is_combo'])) continue;
+            $frontCartCount += (int)$row['qty'];
+        }
     }
 
 ?>
@@ -45,10 +49,11 @@ function front_header(string $title = ''): void
         <link rel="apple-touch-icon" href="<?= e(base_url('assets/icons/apple-touch-icon.png?v=19')) ?>">
         <link rel="manifest" href="<?= e(base_url('manifest.webmanifest?v=19')) ?>">
         <link rel="stylesheet" href="<?= e(base_url('assets/css/app.css?v=' . $assetVersion)) ?>">
-        <link rel="stylesheet" href="<?= e(base_url('assets/css/group-order.css?v=19.8.22')) ?>">
+        <link rel="stylesheet" href="<?= e(base_url('assets/css/group-order.css?v=19.8.31')) ?>">
         <link rel="stylesheet" href="<?= e(base_url('assets/css/member.css?v=19.8.9')) ?>">
         <link rel="stylesheet" href="<?= e(base_url('assets/css/footer.css?v=1.0.4')) ?>">
         <link rel="stylesheet" href="<?= e(base_url('assets/css/header.css?v=1.0.8')) ?>">
+        <link rel="stylesheet" href="<?= e(base_url('assets/css/front-buttons.css?v=8')) ?>">
         <title><?= e($title ? $title . '｜' . $store : $store) ?></title><?php $ogDesc = ['vi' => '🎁 Mua 4 tặng 1 · 🎮 Mua 10 ly nhận 1 lượt Mini Game – cơ hội trúng giải đến 145K · 👥 Đặt đơn nhóm cùng bạn bè, giao tận nơi.', 'zh' => '🎁 買4送1 · 🎮 買10杯送1次小遊戲機會，最高抽中145K好禮 · 👥 揪團點單，外送到府。', 'en' => '🎁 Buy 4 get 1 free · 🎮 Buy 10 drinks for a Mini Game chance to win up to 145K · 👥 Group orders, delivered to your door.'][current_lang()] ?? ''; ?>
         <meta name="description" content="<?= e($ogDesc) ?>">
         <meta property="og:type" content="website">
@@ -147,7 +152,10 @@ function front_header(string $title = ''): void
                                 $floatingUrl = $floatingRoom ? hyg_room_url($floatingRoom['public_id']) : base_url(!empty($_SESSION['hcgs_adding']) ? 'actions/game_back_checkout.php' : 'cart.php');
                                 if ($floatingRoom) {
                                     $count = 0;
-                                    foreach (hyg_cart($floatingRoom, false) as $row) $count += (int)$row['qty'];
+                                    foreach (hyg_cart($floatingRoom, false) as $row) {
+                                        if (!empty($row['is_combo'])) continue;
+                                        $count += (int)$row['qty'];
+                                    }
                                 }
 
                                 $page = basename($_SERVER['SCRIPT_NAME'] ?? '');
@@ -278,8 +286,8 @@ function front_header(string $title = ''): void
         </footer>
 
 
-        <script src="<?= e(base_url('assets/js/app.js?v=19.15.4')) ?>"></script><?php if (!empty($GLOBALS['hyg_qr_page'])): ?><script src="<?= e(base_url('assets/vendor/huiyi-qrcode.js?v=19.8.0')) ?>"></script>
-            <script src="<?= e(base_url('assets/js/group-qr.js?v=19.8.5')) ?>"></script><?php endif; ?><script src="<?= e(base_url('assets/js/group-order.js?v=19.8.6.3')) ?>"></script>
+        <script src="<?= e(base_url('assets/js/app.js?v=19.15.5')) ?>"></script><?php if (!empty($GLOBALS['hyg_qr_page'])): ?><script src="<?= e(base_url('assets/vendor/huiyi-qrcode.js?v=19.8.0')) ?>"></script>
+            <script src="<?= e(base_url('assets/js/group-qr.js?v=19.8.5')) ?>"></script><?php endif; ?><script src="<?= e(base_url('assets/js/group-order.js?v=19.8.6.4')) ?>"></script>
         <script src="<?= e(base_url('assets/js/promotion.js?v=19.9.2')) ?>"></script>
         <script src="<?= e(base_url('assets/js/game-entry.js?v=19.9.1')) ?>"></script>
     </body>
@@ -324,7 +332,7 @@ function front_header(string $title = ''): void
         <link rel="apple-touch-icon" href="<?= e(base_url('assets/icons/apple-touch-icon.png?v=19')) ?>">
         <link rel="manifest" href="<?= e(base_url('admin/manifest.webmanifest?v=19.1')) ?>">
         <link rel="stylesheet" href="<?= e(base_url('assets/css/app.css?v=19.15.2')) ?>">
-        <link rel="stylesheet" href="<?= e(base_url('assets/css/group-order.css?v=19.8.22')) ?>">
+        <link rel="stylesheet" href="<?= e(base_url('assets/css/group-order.css?v=19.8.31')) ?>">
         <link rel="stylesheet" href="<?= e(base_url('assets/css/dispatch.css?v=19.8.0')) ?>">
         <link rel="stylesheet" href="<?= e(base_url('assets/css/admin-shell.css?v=19.14.3')) ?>">
         <link rel="stylesheet" href="<?= e(base_url('assets/css/admin-ui.css?v=19.14.4')) ?>">
@@ -366,7 +374,7 @@ function front_header(string $title = ''): void
                             function admin_footer(): void
                             { ?>
             </main>
-            <script src="<?= e(base_url('assets/js/app.js?v=19.15.4')) ?>"></script>
+            <script src="<?= e(base_url('assets/js/app.js?v=19.15.5')) ?>"></script>
             <script src="<?= e(base_url('assets/js/admin-shell.js?v=19.14.5')) ?>"></script>
             <script src="<?= e(base_url('assets/js/admin-tables.js?v=19.14.5')) ?>" defer></script><?php if (!admin_is_embed()) hqp_ui_config('admin'); ?>
     </body>

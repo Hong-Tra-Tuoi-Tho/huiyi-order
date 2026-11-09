@@ -44,6 +44,8 @@ if (!$groupCheckout && ($uncertainToken = hcq_unknown_token(hcq_context()))) {
   exit;
 }
 if (!$cart) redirect(base_url('index.php'));
+// Giỏ thường có combo chưa chọn đủ nước: quay lại giỏ để chọn tiếp.
+if (!$groupCheckout && !hcc_all_complete($cart)) redirect(base_url('cart.php'));
 $promotion = $groupCheckout ? promotion_room_choice($groupCheckout['room'], $cart) : promotion_cart_choice($cart);
 if (!$groupCheckout && !$promotion['valid']) {
   $_SESSION['coupon_error'] = pt('selection_changed');
@@ -343,6 +345,27 @@ front_header(t('order_info'));
           <p><?= e(t('checkout_data_usage_notice')) ?></p>
         </div>
     </form>
+
+    <?php
+    // Nút hủy nhóm: chỉ chủ nhóm, mọi loại đơn nhóm (combo / thường), và chỉ khi nhóm không có lượt chơi mini-game.
+    // Đang có lượt chơi thì nhóm bị khoá (hcgs_guard_group) nên hủy không được, ẩn nút cho khỏi bấm nhầm.
+    $groupGameLocked = false;
+    if ($groupCheckout) {
+      $lockedGame = hcgs_locked();
+      $groupGameLocked = $lockedGame && hash_equals(hcgs_group_of($lockedGame), (string)$groupCheckout['room']['public_id']);
+    }
+    $canCancelGroup = $groupCheckout && hyg_host($groupCheckout['room']) && !$groupGameLocked;
+    ?>
+    <?php if ($canCancelGroup): ?>
+      <!-- Checkout nhóm: chủ nhóm hủy nhóm ngay tại đây (cùng action "cancel" như ở trang giỏ nhóm) -->
+      <form action="<?= e(base_url('group/action.php')) ?>" method="post" class="hyg-payment-form checkout-cancel-group" data-confirm="<?= e(gt('cancel_confirm')) ?>">
+        <?= hyg_payment_action_fields($groupCheckout['room'], 'cancel') ?>
+        <label><?= e(gt('payment_reason')) ?>
+          <input name="reason" required minlength="3" maxlength="240">
+        </label>
+        <button class="btn danger block" type="submit"><?= e(gt('cancel')) ?></button>
+      </form>
+    <?php endif; ?>
   </section>
 
   <aside class="order-review">

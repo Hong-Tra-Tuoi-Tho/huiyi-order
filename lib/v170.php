@@ -175,7 +175,7 @@ function game_wallet_summary(?string $token=null): array {
 
 function order_eligible_drink_qty(int $orderId): int {
     try {
-        $st=db()->prepare('SELECT COALESCE(SUM(qty),0) FROM order_items WHERE order_id=? AND product_id IS NOT NULL AND standalone_topping_id IS NULL AND game_reward_code IS NULL');
+        $st=db()->prepare('SELECT COALESCE(SUM(qty),0) FROM order_items WHERE order_id=? AND product_id IS NOT NULL AND standalone_topping_id IS NULL AND game_reward_code IS NULL AND base_price > 0');
         $st->execute([$orderId]);
         return max(0,(int)$st->fetchColumn());
     } catch(Throwable $e){ return 0; }

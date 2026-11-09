@@ -116,7 +116,7 @@ function hyg_calculate_group_coupon(array $cart, ?array $record, array $room, ar
         $lowest = null;
         $qty = 0;
         foreach ($cart as $row) {
-            if (empty($row['product_id']) || !empty($row['standalone_topping_id'])) continue;
+            if (empty($row['product_id']) || !empty($row['standalone_topping_id']) || !empty($row['combo_drink'])) continue;
             $count = max(0, (int)($row['qty'] ?? 0));
             if (!$count) continue;
             $base = hyg_money((float)($row['base_price'] ?? 0));

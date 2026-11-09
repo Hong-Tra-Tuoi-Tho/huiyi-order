@@ -3,6 +3,7 @@
 require_once __DIR__.'/group_i18n.php';
 require_once __DIR__.'/group_payments.php';
 require_once __DIR__.'/group_payment_audit.php';
+require_once __DIR__.'/group_combo.php';
 class GroupOrderError extends RuntimeException {}
 function hyg_fail(string $key): never { throw new GroupOrderError($key); }
 function hyg_schema(): void {
@@ -51,6 +52,8 @@ function hyg_schema(): void {
     }
     hyg_apply_four_hour_lifetime();
     hyg_payment_audit_schema();
+    // Nhóm combo: cột group_rooms.order_type (lib/group_combo.php).
+    hgc_schema();
     $done=true;
 }
 
@@ -179,6 +182,9 @@ function hyg_selection(array $row): array {
 }
 function hyg_resolve(array $s): array {
     $qty=(int)($s['qty']??0);if($qty<1||$qty>order_qty_max())hyg_fail('invalid_quantity');
+    // Nhóm combo: dòng combo và ly nước chọn theo combo (lib/group_combo.php).
+    if(($s['kind']??'')==='combo')return hgc_resolve_combo($s);
+    if(($s['kind']??'')==='combo_drink')return hgc_resolve_drink($s);
     if(($s['kind']??'')==='topping'){
         $p=hyg_catalog_one('SELECT * FROM toppings WHERE id=? AND active=1 AND sell_separately=1',[(int)$s['id']]);
         if(!$p)hyg_fail('item_unavailable');$price=(float)$p['retail_price'];
@@ -259,19 +265,22 @@ function hyg_coupon(array $r,array $cart,bool $validate=true): array {
     }
     return hyg_calculate_group_coupon($cart,$record,$r,hyg_all('SELECT * FROM group_members WHERE room_id=? ORDER BY id',[$r['id']]));
 }
-function hyg_create(string $title,string $nickname,bool $copy,string $request,?array $hostAccount=null): array {
+function hyg_create(string $title,string $nickname,bool $copy,string $request,?array $hostAccount=null,string $orderType='drink'): array {
     hyg_schema();$owner=hyg_device(true);$title=hyg_text($title,80);$nickname=hyg_text($nickname,32);
     if($title===''||$nickname==='')hyg_fail('required_fields');
     if(!preg_match('/^[a-f0-9]{32}$/D',$request))hyg_fail('expired_form');
-    return hyg_tx(function()use($owner,$title,$nickname,$copy,$request,$hostAccount){
+    // Đơn nhóm gộp: combo và nước lẻ cùng một nhóm, nên không còn kiểu nhóm riêng cho combo ($orderType giữ để tương thích).
+    $isCombo=false;
+    return hyg_tx(function()use($owner,$title,$nickname,$copy,$request,$hostAccount,$isCombo){
         $previous=hyg_one('SELECT * FROM group_rooms WHERE owner_hash=? AND create_key=?',[$owner,$request]);if($previous)return $previous;
         $n=hyg_one('SELECT COUNT(*) n FROM group_rooms WHERE owner_hash=? AND created_at>DATE_SUB(NOW(),INTERVAL 1 DAY)',[$owner]);if((int)$n['n']>=20)hyg_fail('too_many');
         $public=bin2hex(random_bytes(16));$invite=bin2hex(random_bytes(32));
         $account=(int)($_SESSION['member_id']??0)?:null; // The signed-in member who creates the group is its owner.
-        hyg_exec('INSERT INTO group_rooms(public_id,invite_token,owner_hash,create_key,title,promotion_mode,owner_member_id,expires_at) VALUES(?,?,?,?,?,?,?,DATE_ADD(UTC_TIMESTAMP(),INTERVAL 4 HOUR))',[$public,$invite,$owner,$request,$title,minigame_enabled()?'draw':'none',$account]);$id=(int)db()->lastInsertId();
+        hyg_exec('INSERT INTO group_rooms(public_id,invite_token,owner_hash,create_key,title,promotion_mode,owner_member_id,expires_at) VALUES(?,?,?,?,?,?,?,DATE_ADD(UTC_TIMESTAMP(),INTERVAL 4 HOUR))',[$public,$invite,$owner,$request,$title,!$isCombo&&minigame_enabled()?'draw':'none',$account]);$id=(int)db()->lastInsertId();
+        if($isCombo)hyg_exec("UPDATE group_rooms SET order_type='combo' WHERE id=?",[$id]);
         if($hostAccount!==null){htp_group_save($id,$hostAccount);hyg_exec("UPDATE group_rooms SET checkout_mode='split' WHERE id=?",[$id]);}
         hyg_exec('INSERT INTO group_members(room_id,device_hash,nickname,member_id) VALUES(?,?,?,?)',[$id,$owner,$nickname,$account]);$mid=(int)db()->lastInsertId();
-        if($copy){$cart=$_SESSION['cart']??[];if(count($cart)>200)hyg_fail('room_full');foreach($cart as $row){$selection=hyg_selection($row);$resolved=hyg_resolve($selection);hyg_insert_item($id,$mid,$selection,$resolved,bin2hex(random_bytes(16)));}}
+        if($copy){$cart=$_SESSION['cart']??[];if(count($cart)>200)hyg_fail('room_full');foreach($cart as $row){if(!empty($row['is_combo'])||!empty($row['combo_drink']))continue;$selection=hyg_selection($row);$resolved=hyg_resolve($selection);hyg_insert_item($id,$mid,$selection,$resolved,bin2hex(random_bytes(16)));}}
         return hyg_room($public);
     });
 }
@@ -418,7 +427,16 @@ function hyg_mutate(string $public,string $action,array $data): void {
         if($action==='cancel'){
             if(!in_array($r['status'],['open','locked'],true))hyg_fail('not_open');
             $members=hyg_all('SELECT * FROM group_members WHERE room_id=? ORDER BY id',[$rid]);
-            if(hyg_room_has_payment_work($members))hyg_fail('payment_cancel_unresolved');
+            // Phần của chính chủ nhóm được tự xác nhận "đã trả" lúc chốt món: không phải tiền thu của ai,
+            // nên không chặn hủy nhóm. Chỉ chặn khi thành viên khác đã báo trả / đã được ghi nhận tiền.
+            $hostMemberId = hyg_host_member_id($r, $members);
+            $otherMembers = array_filter(
+                $members,
+                fn($member) => (int)$member['id'] !== $hostMemberId
+            );
+            if (hyg_room_has_payment_work($otherMembers)) {
+                hyg_fail('payment_cancel_unresolved');
+            }
             if(hyg_positive_int($data['revision']??null)!==(int)$r['revision'])hyg_fail('changed_reload');
             $reason=hyg_payment_reason($data);if($r['status']==='locked')hyg_payment_control_quote($r,$data);
             hyg_payment_event($r,null,(int)$m['id'],'cancelled',0,$reason);
@@ -430,7 +448,9 @@ function hyg_mutate(string $public,string $action,array $data): void {
         }elseif($action==='lock'){
             hyg_open($r);if((int)($data['revision']??-1)!==(int)$r['revision'])hyg_fail('changed_reload');
             $cart=hyg_cart($r);if(!$cart)hyg_fail('empty_room');
-            if(promotion_drink_qty($cart)<hyg_min_lock_cups())hyg_fail('min_cups');
+            // Giỏ có combo: mọi combo phải chọn đủ nước theo luật combo (thay luật tối thiểu 2 ly nước lẻ).
+            if(hgc_has_combo($cart))hgc_validate_lock($cart);
+            elseif(promotion_drink_qty($cart)<hyg_min_lock_cups())hyg_fail('min_cups');
             $record=promotion_group_record($r);
             $members=hyg_all('SELECT * FROM group_members WHERE room_id=? ORDER BY id',[$rid]);$coupon=hyg_calculate_group_coupon($cart,$record,$r,$members);$payment=hyg_build_payment_summary($r,$members,$cart,$coupon);$payment['frozen']=true;
             $promotion=promotion_room_choice($r,$cart);
@@ -487,6 +507,9 @@ function hyg_mutate(string $public,string $action,array $data): void {
             hyg_open($r);$i=hyg_one('SELECT * FROM group_items WHERE id=? AND room_id=?',[(int)($data['item_id']??0),$rid]);
             if(!$i||((int)$i['member_id']!==(int)$m['id']&&!hyg_host($r)))hyg_fail('own_items_only');
             if((int)$i['version']!==(int)($data['item_version']??-1))hyg_fail('changed_reload');
+            // Nhóm combo: số lượng đi theo luật combo, không sửa trực tiếp; xoá combo thì xoá luôn nước đã chọn cho nó.
+            if($action==='quantity'&&in_array(json_decode((string)$i['selection_json'],true)['kind']??'',['combo','combo_drink'],true))hyg_fail('combo_room_only');
+            if($action==='remove'&&(json_decode((string)$i['selection_json'],true)['kind']??'')==='combo')hgc_delete_children($rid,(int)$i['id']);
             if($action==='remove')hyg_exec('DELETE FROM group_items WHERE id=?',[$i['id']]);
             else{$qty=filter_var($data['qty']??'',FILTER_VALIDATE_INT);if($qty===false||$qty<1||$qty>order_qty_max())hyg_fail('invalid_quantity');$s=json_decode($i['selection_json'],true);$s['qty']=$qty;$row=hyg_resolve($s);hyg_exec('UPDATE group_items SET selection_json=?,snapshot_json=?,version=version+1 WHERE id=?',[json_encode($s,JSON_UNESCAPED_UNICODE),json_encode($row,JSON_UNESCAPED_UNICODE),$i['id']]);}
         }else hyg_fail('invalid_input');
