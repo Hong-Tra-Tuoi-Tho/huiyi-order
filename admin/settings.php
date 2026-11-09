@@ -70,6 +70,7 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
         set_setting('order_alert_mode',$alertMode);
         set_setting('order_alert_duration',(string)$alertDuration);
 
+        require_once __DIR__.'/../lib/promo_popup.php'; promo_popup_save($_POST);
         set_setting('minigame_enabled',isset($_POST['minigame_enabled'])?'1':'0');
         set_setting('game_cups_per_chance','10');
         // Random game prizes are configured in admin/game.php; preserve legacy coupon settings.
@@ -125,6 +126,7 @@ admin_header(t('system_settings'));
 <?php $pushDiag=push_runtime_diagnostics(); ?>
 <div class="settings-block mobile-push-settings"><h2><?=e(t('mobile_push_settings'))?> <small>v19.1</small></h2><p class="field-hint"><?=e(t('mobile_push_help'))?></p><div class="email-diagnostics"><div><span><?=e(t('push_server_status'))?></span><strong><?=($pushDiag['openssl']&&$pushDiag['curl']&&$pushDiag['vapid']&&empty($pushDiag['schema_error']))?e(t('push_ready')):e(t('push_unavailable'))?></strong></div><div><span><?=e(t('push_devices'))?></span><strong><?=e((string)$pushDiag['active'])?></strong></div></div><button class="btn" type="button" id="admin-push-enable-settings"><?=e(current_lang()==='zh'?'通知設定／伺服器推播測試':(current_lang()==='en'?'Notification settings / server test':'Cài đặt thông báo / thử từ máy chủ'))?></button><p class="field-hint"><?=e(t('install_android_help'))?><br><?=e(t('install_ios_help'))?></p></div>
 
+<?php require_once __DIR__.'/../lib/promo_popup.php'; promo_popup_admin_block(); ?>
 <div class="settings-block"><h2><?=e(t('game_settings'))?></h2>
 <label class="toggle-row"><input type="checkbox" name="minigame_enabled" value="1" <?=minigame_enabled()?'checked':''?>><span><strong><?=e(t('enable_minigame'))?></strong><small><?=e(t('game_pending_note',['cups'=>game_cups_per_chance()]))?></small></span></label>
 <label><?=e(t('game_cups_per_chance'))?><input type="number" value="10" readonly></label>

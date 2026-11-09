@@ -262,4 +262,7 @@ front_header(); ?>
     </div>
   </section>
 <?php endif; ?>
-<?php front_footer(); ?>
+<?php
+require_once __DIR__ . '/lib/promo_popup.php';
+promo_popup_render($groupContext['room']['public_id'] ?? '');
+front_footer(); ?>

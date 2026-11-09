@@ -8,7 +8,11 @@ require_once __DIR__ . '/../lib/bootstrap.php';
 header('Cache-Control: private, no-store, max-age=0');
 header('X-Robots-Tag: noindex, nofollow');
 
-if (!hym_local_login_allowed() || $_SERVER['REQUEST_METHOD'] !== 'POST') {
+// File helper nằm trong .gitignore: có trên máy local, không có trên server => trả 404.
+if (is_file(__DIR__ . '/_local_login.php')) {
+    require_once __DIR__ . '/_local_login.php';
+}
+if (!function_exists('hym_local_login_allowed') || !hym_local_login_allowed() || $_SERVER['REQUEST_METHOD'] !== 'POST') {
     http_response_code(404);
     exit;
 }

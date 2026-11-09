@@ -136,6 +136,12 @@ front_header($pageTitle);
           </form>
         <?php endif; ?>
 
+        <?php // Nút đăng nhập test local: file _local_login.php nằm trong .gitignore, server thật không có thì không hiện.
+        if (is_file(__DIR__ . '/_local_login.php')) {
+            require_once __DIR__ . '/_local_login.php';
+            hym_local_login_form($returnOrder);
+        } ?>
+
         <!-- Đăng nhập xác thực qua zalo -->
         <?php if ($zaloOnly || hym_zalo_enabled()): ?>
           <?php if (!$zaloOnly): ?><div class="hym-auth-divider"><span><?= e(mt('member_or')) ?></span></div><?php endif; ?>
