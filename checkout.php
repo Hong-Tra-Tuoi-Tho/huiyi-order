@@ -377,6 +377,8 @@ front_header(t('order_info'));
     // Tổng số ly/phần để hiện trên nút dropdown Chi tiết đơn hàng.
     $reviewQty = 0;
     foreach ($cart as $r) {
+      // Dòng combo (qty luôn 1) chỉ là gói; số ly tính theo các ly nước của combo.
+      if (!empty($r['is_combo'])) continue;
       $reviewQty += (int)$r['qty'];
     }
     foreach ($gameGifts as $gift) {
@@ -392,11 +394,29 @@ front_header(t('order_info'));
           <path d="M6 9l6 6 6-6" />
         </svg>
       </summary>
-      <?php foreach ($cart as $r): ?>
-        <div class="review-row">
+      <?php
+      // Làm rõ ly nước nào thuộc combo nào: tên combo theo khoá dòng (giỏ thường) hoặc id dòng (giỏ nhóm).
+      $comboNames = [];
+      foreach ($cart as $ck => $cr) {
+        if (empty($cr['is_combo'])) continue;
+        $comboNames['k' . $ck] = $cr['name'];
+        if (isset($cr['_item_id'])) $comboNames['i' . $cr['_item_id']] = $cr['name'];
+      }
+      ?>
+      <?php foreach ($cart as $r):
+        $isComboRow = !empty($r['is_combo']);
+        $isComboDrink = !empty($r['combo_drink']);
+        $parentComboName = '';
+        if ($isComboDrink) {
+          $parentComboName = $comboNames['i' . ($r['combo_item'] ?? '')] ?? $comboNames['k' . ($r['combo_parent'] ?? '')] ?? '';
+        }
+      ?>
+        <div class="review-row<?= $isComboRow ? ' is-combo' : '' ?><?= $isComboDrink ? ' is-combo-drink' : '' ?>">
           <div>
+            <?php if ($isComboRow): ?><span class="review-combo-tag">COMBO · <?= (int)($r['total_cups'] ?? 0) ?> ly</span><?php endif; ?>
+            <?php if ($isComboDrink): ?><span class="review-combo-tag is-drink">Ly nước thuộc combo<?= $parentComboName !== '' ? ' ' . e($parentComboName) : '' ?></span><?php endif; ?>
             <?php if (!empty($r['group_member_name'])): ?><span class="hyg-member-tag"><?= e(gt('ordered_by')) ?>：<?= e($r['group_member_name']) ?></span><?php endif; ?><strong><?= e($r['name']) ?><?php if (!empty($r['cup_size'])): ?> · <?= e($r['cup_size']) ?><?php endif; ?> × <?= $r['qty'] ?></strong>
-            <small><?= e($r['ice']) ?> / <?= e($r['sugar']) ?></small><?php if (!empty($r['toppings'])): ?><small><?= e(t('toppings')) ?>：<?= e(implode('、', array_map(fn($top) => $top['display_name'] ?? $top['name'], $r['toppings']))) ?></small><?php endif; ?>
+            <?php if (!$isComboRow): ?><small><?= e($r['ice']) ?> / <?= e($r['sugar']) ?></small><?php endif; ?><?php if (!empty($r['toppings'])): ?><small><?= e(t('toppings')) ?>：<?= e(implode('、', array_map(fn($top) => $top['display_name'] ?? $top['name'], $r['toppings']))) ?></small><?php endif; ?>
           </div>
           <b><?= e(currency()) ?><?= money($r['unit_price'] * $r['qty']) ?></b>
         </div>

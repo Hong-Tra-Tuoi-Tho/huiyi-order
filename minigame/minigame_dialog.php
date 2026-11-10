@@ -23,8 +23,8 @@ $prizeHeading = ['zh' => '獎項與使用條件', 'vi' => 'Quà và điều ki�
 ?>
 
 <!-- File CSS của Minigame -->
-<link rel="stylesheet" href="<?= e(base_url('minigame/assets/style.css?v=19.9.20')) ?>">
-<link rel="stylesheet" href="<?= e(base_url('minigame/assets/style.css?v=19.9.20')) ?>">
+<link rel="stylesheet" href="<?= e(base_url('minigame/assets/style.css?v=19.9.21')) ?>">
+<link rel="stylesheet" href="<?= e(base_url('minigame/assets/style.css?v=19.9.21')) ?>">
 
 <style>
     /* Style tùy chỉnh cơ bản cho Dialog */

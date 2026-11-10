@@ -6678,6 +6678,7 @@ body.front-body {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
+  justify-content: center;
   gap: 12px;
 }
 .checkout-game-add-form {
@@ -6972,4 +6973,41 @@ body.front-body {
     animation: none;
     stroke-dashoffset: 0;
   }
+}
+
+/* Giỏ hàng: nút "Cập nhật giỏ hàng" full ngang, chữ một dòng, gọn và dễ bấm. */
+.cart-actions {
+  grid-template-columns: 1fr;
+}
+.cart-actions > .btn {
+  width: 100%;
+  min-height: 48px;
+  padding: 0 18px;
+  font-size: 16px;
+  line-height: 1.2;
+  white-space: nowrap;
+  text-align: center;
+}
+
+/* Chi tiết đơn hàng: làm rõ combo và các ly nước thuộc combo. */
+.review-row .review-combo-tag {
+  display: inline-block;
+  margin: 0 6px 4px 0;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #ffe8a3;
+  color: #7a4b00;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.4;
+}
+.review-row .review-combo-tag.is-drink {
+  background: #fff6d6;
+  color: #8a5a00;
+  font-weight: 700;
+}
+.review-row.is-combo-drink {
+  margin-left: 12px;
+  padding-left: 10px;
+  border-left: 3px solid #ffc21a;
 }

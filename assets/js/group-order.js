@@ -37,7 +37,13 @@
   document.addEventListener('submit', (event) => {
     const form = event.target;
     const confirmText = event.submitter?.dataset.confirm || form.dataset.confirm;
-    if (confirmText && !window.confirm(confirmText)) { event.preventDefault(); return; }
+    if (confirmText && !window.confirm(confirmText)) {
+      event.preventDefault();
+      // Bấm Hủy: nếu nút có data-cancel-url thì chuyển khách về trang chọn món (index) để mua thêm.
+      const cancelUrl = event.submitter?.dataset.cancelUrl;
+      if (cancelUrl) window.location.href = cancelUrl;
+      return;
+    }
     if (form.closest('.hyg-page') && form.dataset.submitting) { event.preventDefault(); return; }
     if (form.closest('.hyg-page')) form.dataset.submitting = '1';
   });

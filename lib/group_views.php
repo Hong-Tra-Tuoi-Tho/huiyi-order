@@ -223,9 +223,30 @@ function hyg_render_room(array $r): string
               <?php if (!$rows): ?><p class="hyg-muted"><?= e(gt('empty_person')) ?></p><?php endif; ?>
 
               <!-- Danh sách sản phẩm đã đặt -->
+              <?php
+              // Gom ly nước ngay dưới combo của chúng; món lẻ giữ thứ tự cũ.
+              $comboKids = [];
+              foreach ($rows as $key => $row) {
+                if (($row['_selection']['kind'] ?? '') === 'combo_drink') $comboKids[(int)($row['_selection']['combo_item'] ?? 0)][$key] = $row;
+              }
+              $comboIdsHere = [];
+              foreach ($rows as $row) if (!empty($row['is_combo'])) $comboIdsHere[(int)$row['_item_id']] = true;
+              $grouped = [];
+              foreach ($rows as $key => $row) {
+                $kind = $row['_selection']['kind'] ?? '';
+                if ($kind === 'combo_drink' && isset($comboIdsHere[(int)($row['_selection']['combo_item'] ?? 0)])) continue;
+                $grouped[$key] = $row;
+                if (!empty($row['is_combo'])) {
+                  foreach ($comboKids[(int)$row['_item_id']] ?? [] as $kidKey => $kid) $grouped[$kidKey] = $kid;
+                }
+              }
+              // Ly nước mà combo cha không nằm trong danh sách người này (combo của chủ nhóm) vẫn hiện ở chỗ cũ.
+              foreach ($rows as $key => $row) if (!isset($grouped[$key])) $grouped[$key] = $row;
+              $rows = $grouped;
+              ?>
               <?php foreach ($rows as $key => $row): $editable = $open && ($own || $host);
                 $invalid = !empty($row['_invalid']); ?>
-                <article class="hyg-item <?= $invalid ? 'is-invalid' : '' ?>">
+                <article class="hyg-item <?= $invalid ? 'is-invalid' : '' ?><?= ($row['_selection']['kind'] ?? '') === 'combo_drink' ? ' is-combo-child' : '' ?>">
                   <div class="hyg-item-head"><strong><?php if (!empty($row['is_combo'])): ?><span class="hyg-combo-badge"><?= e(hgc_t('badge')) ?></span> <?php endif; ?><?= e($row['name'] ?? '') ?></strong><span>× <?= (int)($row['qty'] ?? 0) ?></span></div>
                   <?php if (!empty($row['is_combo'])): ?>
                     <?php $comboInfo = $comboState[(int)$row['_item_id']] ?? null; ?>
@@ -367,10 +388,19 @@ function hyg_render_room(array $r): string
         <?php if ($open): ?><div class="hyg-join-actions<?= $drinks > 0 ? ' has-drinks' : '' ?>"><a class="btn primary hyg-act-secondary" href="<?= e(base_url('index.php?group=' . $r['public_id'])) ?>"><?= e(gt($hasCombo ? 'choose_outside_combo' : 'choose')) ?></a>
             <?php if ($hasCombo): ?><a class="btn primary hyg-act-secondary" href="<?= e(base_url('group/combo.php?id=' . $r['public_id'])) ?>"><?= e(hgc_t('pick_drinks')) ?></a><?php endif; ?>
             <?php if ($host): ?>
+              <?php
+              // Ly tính mini-game = ly đã chọn + số ly combo còn phải chọn (combo chưa chọn nước vẫn sẽ đủ total_cups ly).
+              $gameCups = $drinks;
+              foreach ($comboState as $comboRow) $gameCups += max(0, (int)$comboRow['total_cups'] - (int)$comboRow['picked']);
+              ?>
               <!-- Button chốt món: gửi form ưu đãi ở cột tổng tiền qua thuộc tính form -->
-              <button class="btn primary block" id="hyg-lock-btn" type="submit" form="group-promotion-selector" name="lock_after" value="1" <?= !$cart || $hasInvalid || ($hasCombo ? !$comboReady : $drinks < hyg_min_lock_cups()) ? 'disabled' : '' ?>>
+              <button class="btn primary block" id="hyg-lock-btn" type="submit" form="group-promotion-selector" name="lock_after" value="1" <?= (minigame_enabled() && $gameCups >= 5 && $gameCups <= 9) ? 'data-confirm="' . e(gt('lock_game_confirm', ['n' => $gameCups, 'more' => 10 - $gameCups])) . '" data-cancel-url="' . e(base_url('index.php?group=' . $r['public_id'])) . '"' : '' ?> <?= !$cart || $hasInvalid || ($hasCombo ? !$comboReady : $drinks < hyg_min_lock_cups()) ? 'disabled' : '' ?>>
                 <?= e($drinks > 0 ? gt('lock_cups', ['n' => $drinks]) : gt('lock')) ?>
               </button>
+              <?php // Gợi ý mua thêm cho đủ 10 ly chơi mini-game khi đang có 5-9 ly. ?>
+              <?php if (minigame_enabled() && $gameCups >= 5 && $gameCups <= 9): ?>
+                <p class="hyg-lock-upsell"><?= e(gt('lock_upsell', ['more' => 10 - $gameCups])) ?></p>
+              <?php endif; ?>
             <?php endif; ?>
             <?php if ($host && $hasCombo && !$comboReady): ?><small class="hyg-muted hgc-lock-hint"><?= e(hgc_t('lock_hint')) ?></small><?php endif; ?>
           </div>

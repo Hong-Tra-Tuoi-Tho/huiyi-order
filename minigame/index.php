@@ -18,7 +18,7 @@ $prizeHeading = ['zh' => '獎項與使用條件', 'vi' => 'Quà và điều ki�
 if (!$canPlay && !$hasReward) http_response_code(403);
 front_header(hgr_text('title'));
 ?>
-<link rel="stylesheet" href="<?= e(base_url('minigame/assets/style.css?v=19.9.20')) ?>">
+<link rel="stylesheet" href="<?= e(base_url('minigame/assets/style.css?v=19.9.21')) ?>">
 <style>
   .kyuc-reward-actions {
     display: flex;

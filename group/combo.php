@@ -276,6 +276,8 @@ front_header(hgc_t('page_title'));
         $todo = array_values(array_filter($combos, fn($c) => empty($c['complete'])));
         $totalPicked = array_sum(array_map(fn($c) => (int)$c['picked'], $combos));
         $isHost = hyg_host($r);
+        // Tổng ly nước của cả phòng (ly combo + ly mua lẻ) để xét ưu đãi mini-game 10 ly.
+        $roomCups = promotion_game_qty($cart) + array_sum(array_map(fn($c) => max(0, (int)$c['total_cups'] - (int)$c['picked']), $combos));
     ?>
     <div class="hgc-bar" data-bar="<?= $todo ? 'todo' : 'done' ?>">
         <?php if ($todo): ?>
@@ -293,6 +295,9 @@ front_header(hgc_t('page_title'));
         <?php else: ?>
             <div class="hgc-bar-msg"><span class="hgc-bar-tick">✓</span><?= e(hgc_t('bar_done')) ?></div>
             <?php if (!$isHost): ?><div class="hgc-bar-sub"><?= e(hgc_t('bar_done_sub_member', ['n' => $totalPicked])) ?></div><?php endif; ?>
+            <?php if ($isHost && minigame_enabled() && $roomCups >= 5 && $roomCups <= 9): ?>
+                <div class="hgc-bar-upsell"><?= e(gt('lock_upsell', ['more' => 10 - $roomCups])) ?></div>
+            <?php endif; ?>
             <?php if ($isHost): ?>
                 <?php /* Chốt món ngay tại đây: gửi như nút "Chốt món" ở đơn nhóm (action coupon + lock_after), xong vào thẳng trang thanh toán. Gửi thường (data-native), không qua fetch. */ ?>
                 <form method="post" action="<?= e(base_url('group/action.php')) ?>" class="hgc-bar-lock" data-native>
@@ -302,7 +307,7 @@ front_header(hgc_t('page_title'));
                     <input type="hidden" name="lock_after" value="1">
                     <input type="hidden" name="back" value="combo">
                     <?php if (minigame_enabled() && promotion_game_qty($cart) >= 10): ?><input type="hidden" name="promotion_mode" value="draw"><?php endif; ?>
-                    <button class="hgc-bar-cta" type="submit"><?= e(hgc_t('bar_cta_host')) ?> →</button>
+                    <button class="hgc-bar-cta" type="submit" <?= (minigame_enabled() && $roomCups >= 5 && $roomCups <= 9) ? 'data-confirm="' . e(gt('lock_game_confirm', ['n' => $roomCups, 'more' => 10 - $roomCups])) . '" data-cancel-url="' . e(base_url('index.php?group=' . $r['public_id'])) . '"' : '' ?>><?= e(hgc_t('bar_cta_host')) ?> →</button>
                 </form>
             <?php else: ?>
                 <a class="hgc-bar-cta is-alt" href="<?= e(hyg_room_url($r['public_id'])) ?>"><?= e(hgc_t('bar_cta_member')) ?> →</a>
