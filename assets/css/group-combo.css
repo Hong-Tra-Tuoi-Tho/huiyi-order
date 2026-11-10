@@ -589,3 +589,166 @@
     flex: 0 0 auto;
     white-space: nowrap;
 }
+
+/* Thông báo nổi sau thao tác (gửi form ngầm): thẻ nổi giống khung "Có đơn hàng mới" ở admin, nằm ở đáy màn hình. */
+.hgc-toast {
+    position: fixed;
+    left: 50%;
+    bottom: max(150px, calc(env(safe-area-inset-bottom) + 144px));
+    z-index: 200;
+    transform: translateX(-50%);
+    width: max-content;
+    min-width: min(300px, calc(100vw - 28px));
+    max-width: min(480px, calc(100vw - 28px));
+    padding: 22px 28px;
+    border: 2px solid #f79009;
+    border-radius: 20px;
+    background: #fff4d6;
+    color: #7a2e0e;
+    font-size: 18px;
+    font-weight: 800;
+    line-height: 1.45;
+    text-align: center;
+    box-shadow:
+        0 0 0 6px rgba(247, 144, 9, 0.22),
+        0 22px 60px rgba(17, 24, 39, 0.4);
+    animation: hgcToastIn 0.22s ease-out;
+}
+
+@keyframes hgcToastIn {
+    from {
+        opacity: 0;
+        transform: translate(-50%, 14px);
+    }
+    to {
+        opacity: 1;
+        transform: translate(-50%, 0);
+    }
+}
+
+/* Vị trí cuộn do group-combo-live.js tự giữ; tắt neo mặc định của trình duyệt để 2 bên không cộng dồn. */
+.hgc-live {
+    overflow-anchor: none;
+}
+
+/* Chừa chỗ cho thanh đầu trang khi cuộn tới nhóm món. */
+.hgc-group {
+    scroll-margin-top: 90px;
+}
+
+
+/* Thanh hành động dưới đáy trang chọn nước: báo combo nào đủ / còn thiếu và nút đi tiếp theo vai trò. */
+.hgc-bar {
+    position: sticky;
+    bottom: max(10px, env(safe-area-inset-bottom));
+    z-index: 20;
+    display: grid;
+    gap: 6px;
+    margin-top: 12px;
+    padding: 12px 14px 14px;
+    border: 1px solid #ead8d8;
+    border-radius: 18px;
+    background: rgba(255, 255, 255, .97);
+    box-shadow: 0 -6px 30px rgba(60, 30, 30, .16);
+}
+
+.hgc-bar-msg {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    font-weight: 800;
+    font-size: 15px;
+    color: #1d1a1a;
+}
+
+.hgc-bar-tick {
+    flex: none;
+    display: grid;
+    place-items: center;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: #12a150;
+    color: #fff;
+    font-size: 13px;
+    font-weight: 900;
+}
+
+.hgc-bar-tick.is-todo {
+    background: #ffb800;
+    color: #3d1010;
+}
+
+.hgc-bar-sub {
+    padding-left: 31px;
+    font-size: 12px;
+    color: #6b6262;
+}
+
+.hgc-bar-cta {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    margin-top: 4px;
+    min-height: 48px;
+    padding: 0 14px;
+    border-radius: 12px;
+    background: linear-gradient(180deg, #ee4040 0%, #d92b2b 55%, #c21f1f 100%);
+    color: #fff;
+    font-size: 15px;
+    font-weight: 800;
+    text-align: center;
+    text-decoration: none;
+    box-shadow: 0 8px 18px rgba(217, 43, 43, .35);
+}
+
+.hgc-bar-cta.is-alt {
+    background: #ffb800;
+    color: #3d1010;
+    box-shadow: 0 8px 18px rgba(255, 184, 0, .35);
+}
+
+.hgc-combo {
+    scroll-margin-top: 90px;
+}
+
+/* Số ly còn thiếu trên thanh dưới đáy: nổi bật để khách chú ý. */
+.hgc-missing {
+    display: inline-block;
+    margin-left: 2px;
+    padding: 2px 10px;
+    border-radius: 999px;
+    background: #d92b2b;
+    color: #fff;
+    font-size: 1.05em;
+    font-weight: 900;
+    white-space: nowrap;
+    animation: hgcMissingPulse 1.8s ease-in-out infinite;
+}
+
+@keyframes hgcMissingPulse {
+    0%, 100% {
+        box-shadow: 0 0 0 0 rgba(217, 43, 43, .45);
+    }
+    50% {
+        box-shadow: 0 0 0 6px rgba(217, 43, 43, 0);
+    }
+}
+
+.hgc-bar-lock {
+    margin: 0;
+}
+
+button.hgc-bar-cta {
+    width: 100%;
+    border: 0;
+    font-family: inherit;
+    cursor: pointer;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .hgc-missing {
+        animation: none;
+    }
+}

@@ -25,7 +25,9 @@ function ensure_combo_schema(): void
         db()->exec(
             'CREATE TABLE IF NOT EXISTS combos (
                 id INT UNSIGNED NOT NULL AUTO_INCREMENT,
-                name VARCHAR(160) NOT NULL,
+                name_vi VARCHAR(160) NOT NULL,
+                name_en VARCHAR(160) NULL DEFAULT NULL,
+                name_zh VARCHAR(160) NULL DEFAULT NULL,
                 image VARCHAR(255) NULL DEFAULT NULL,
                 price DECIMAL(10,2) NOT NULL,
                 total_cups INT UNSIGNED NOT NULL,
@@ -45,7 +47,9 @@ function ensure_combo_schema(): void
             'CREATE TABLE IF NOT EXISTS combo_groups (
                 id INT UNSIGNED NOT NULL AUTO_INCREMENT,
                 combo_id INT UNSIGNED NOT NULL,
-                name VARCHAR(120) NOT NULL,
+                name_vi VARCHAR(120) NOT NULL,
+                name_en VARCHAR(120) NULL DEFAULT NULL,
+                name_zh VARCHAR(120) NULL DEFAULT NULL,
                 min_pick INT UNSIGNED NOT NULL DEFAULT 0,
                 max_pick INT UNSIGNED NOT NULL DEFAULT 1,
                 sort_order INT NOT NULL DEFAULT 0,
@@ -81,8 +85,27 @@ function ensure_combo_schema(): void
         error_log('combo schema (combo_items): ' . $e->getMessage());
     }
 
+    // Bản cũ chỉ có cột name: đổi thành name_vi, thêm name_en / name_zh (mặc định lấy theo tiếng Việt).
+    foreach (['combos' => 160, 'combo_groups' => 120] as $table => $len) {
+        try {
+            if (column_exists($table, 'name') && !column_exists($table, 'name_vi')) {
+                db()->exec("ALTER TABLE `$table` CHANGE COLUMN name name_vi VARCHAR($len) NOT NULL");
+            }
+            if (!column_exists($table, 'name_en')) {
+                db()->exec("ALTER TABLE `$table` ADD COLUMN name_en VARCHAR($len) NULL DEFAULT NULL AFTER name_vi");
+                db()->exec("UPDATE `$table` SET name_en = name_vi");
+            }
+            if (!column_exists($table, 'name_zh')) {
+                db()->exec("ALTER TABLE `$table` ADD COLUMN name_zh VARCHAR($len) NULL DEFAULT NULL AFTER name_en");
+                db()->exec("UPDATE `$table` SET name_zh = name_vi");
+            }
+        } catch (Throwable $e) {
+            error_log('combo schema (i18n ' . $table . '): ' . $e->getMessage());
+        }
+    }
+
     // Bản trước chỉ có pick_count (chọn đúng N ly): thêm min/max, giữ nguyên nghĩa cũ (min = max = N).
-    if (!column_exists('combo_groups', 'max_pick')) {
+    if (!column_exists('combo_groups', 'max_pick') && column_exists('combo_groups', 'pick_count')) {
         try {
             db()->exec('ALTER TABLE combo_groups ADD COLUMN min_pick INT UNSIGNED NOT NULL DEFAULT 0 AFTER name, ADD COLUMN max_pick INT UNSIGNED NOT NULL DEFAULT 1 AFTER min_pick');
             db()->exec('UPDATE combo_groups SET min_pick = pick_count, max_pick = pick_count');
@@ -197,8 +220,8 @@ function combo_migrate_items_to_groups(): void
 
         $cups = max(1, (int)$row['total_cups']);
 
-        db()->prepare('INSERT INTO combo_groups (combo_id, name, min_pick, max_pick, sort_order) VALUES (?, ?, ?, ?, 0)')
-            ->execute([$comboId, cb('group_default', ['no' => 1]), $cups, $cups]);
+        db()->prepare('INSERT INTO combo_groups (combo_id, name_vi, name_en, name_zh, min_pick, max_pick, sort_order) VALUES (?, ?, ?, ?, ?, ?, 0)')
+            ->execute([$comboId, cb('group_default', ['no' => 1]), cb('group_default', ['no' => 1]), cb('group_default', ['no' => 1]), $cups, $cups]);
         $groupId = (int)db()->lastInsertId();
 
         db()->prepare('UPDATE combo_items SET group_id=? WHERE combo_id=? AND group_id IS NULL')
@@ -504,18 +527,20 @@ function combo_admin_products(): array
 
 /**
  * Nhóm của 1 combo kèm món:
- * [['name'=>..,'min_pick'=>int,'max_pick'=>int,'items'=>[['product_id'=>int,'cup_size'=>'L,XL'], ...]], ...]
+ * [['name_vi'=>..,'name_en'=>..,'name_zh'=>..,'min_pick'=>int,'max_pick'=>int,'items'=>[['product_id'=>int,'cup_size'=>'L,XL'], ...]], ...]
  */
 function combo_admin_groups(int $comboId): array
 {
-    $st = db()->prepare('SELECT id, name, min_pick, max_pick FROM combo_groups WHERE combo_id=? ORDER BY sort_order, id');
+    $st = db()->prepare('SELECT id, name_vi, name_en, name_zh, min_pick, max_pick FROM combo_groups WHERE combo_id=? ORDER BY sort_order, id');
     $st->execute([$comboId]);
 
     $groups = [];
     foreach ($st->fetchAll() as $g) {
         $groups[(int)$g['id']] = [
             'id' => (int)$g['id'],
-            'name' => (string)$g['name'],
+            'name_vi' => (string)$g['name_vi'],
+            'name_en' => (string)$g['name_en'],
+            'name_zh' => (string)$g['name_zh'],
             'min_pick' => (int)$g['min_pick'],
             'max_pick' => (int)$g['max_pick'],
             'items' => [],
@@ -575,7 +600,7 @@ function combo_admin_validate(array $combo, array $groups, array $products): arr
 {
     $errors = [];
 
-    if ($combo['name'] === '') {
+    if ($combo['name_vi'] === '') {
         $errors[] = cb('err_name');
     }
 
@@ -598,7 +623,7 @@ function combo_admin_validate(array $combo, array $groups, array $products): arr
     foreach ($groups as $g => $group) {
         $no = $g + 1;
 
-        if ($group['name'] === '') {
+        if ($group['name_vi'] === '') {
             $errors[] = cb('err_group_name', ['no' => $no]);
         }
 
@@ -694,7 +719,9 @@ function combo_admin_save(int $id, array $combo, array $groups, array &$removed 
 
     try {
         $params = [
-            $combo['name'],
+            $combo['name_vi'],
+            $combo['name_en'] !== '' ? $combo['name_en'] : $combo['name_vi'],
+            $combo['name_zh'] !== '' ? $combo['name_zh'] : $combo['name_vi'],
             $combo['image'] !== '' ? $combo['image'] : null,
             (float)$combo['price'],
             (int)$combo['total_cups'],
@@ -705,7 +732,7 @@ function combo_admin_save(int $id, array $combo, array $groups, array &$removed 
 
         if ($id) {
             $params[] = $id;
-            $pdo->prepare('UPDATE combos SET name=?, image=?, price=?, total_cups=?, all_products=?, active=?, sort_order=? WHERE id=?')
+            $pdo->prepare('UPDATE combos SET name_vi=?, name_en=?, name_zh=?, image=?, price=?, total_cups=?, all_products=?, active=?, sort_order=? WHERE id=?')
                 ->execute($params);
 
             $st = $pdo->prepare('SELECT id FROM combo_groups WHERE combo_id=? FOR UPDATE');
@@ -726,13 +753,13 @@ function combo_admin_save(int $id, array $combo, array $groups, array &$removed 
             $pdo->prepare('DELETE FROM combo_items WHERE combo_id=? AND group_id IS NULL')
                 ->execute([$id]);
         } else {
-            $pdo->prepare('INSERT INTO combos (name, image, price, total_cups, all_products, active, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?)')
+            $pdo->prepare('INSERT INTO combos (name_vi, name_en, name_zh, image, price, total_cups, all_products, active, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)')
                 ->execute($params);
             $id = (int)$pdo->lastInsertId();
         }
 
-        $insertGroup = $pdo->prepare('INSERT INTO combo_groups (combo_id, name, min_pick, max_pick, sort_order) VALUES (?, ?, ?, ?, ?)');
-        $updateGroup = $pdo->prepare('UPDATE combo_groups SET name=?, min_pick=?, max_pick=?, sort_order=? WHERE id=? AND combo_id=?');
+        $insertGroup = $pdo->prepare('INSERT INTO combo_groups (combo_id, name_vi, name_en, name_zh, min_pick, max_pick, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?)');
+        $updateGroup = $pdo->prepare('UPDATE combo_groups SET name_vi=?, name_en=?, name_zh=?, min_pick=?, max_pick=?, sort_order=? WHERE id=? AND combo_id=?');
         $clearItems = $pdo->prepare('DELETE FROM combo_items WHERE group_id=?');
         // max_quantity không còn dùng (chỉ giới hạn theo nhóm); ghi bằng số ly tối đa của nhóm cho cột NOT NULL.
         $insertItem = $pdo->prepare('INSERT INTO combo_items (combo_id, group_id, product_id, cup_size, max_quantity) VALUES (?, ?, ?, ?, ?)');
@@ -744,11 +771,11 @@ function combo_admin_save(int $id, array $combo, array $groups, array &$removed 
 
             if ($groupId && isset($oldItems[$groupId]) && !isset($kept[$groupId])) {
                 // Nhóm cũ: giữ nguyên id, chỉ cập nhật; danh sách món ghi lại, đếm món bị gỡ để cảnh báo.
-                $updateGroup->execute([$group['name'], $group['min_pick'], $group['max_pick'], $sort, $groupId, $id]);
+                $updateGroup->execute([$group['name_vi'], $group['name_en'] !== '' ? $group['name_en'] : $group['name_vi'], $group['name_zh'] !== '' ? $group['name_zh'] : $group['name_vi'], $group['min_pick'], $group['max_pick'], $sort, $groupId, $id]);
                 $clearItems->execute([$groupId]);
                 $removed['items'] += count(array_diff($oldItems[$groupId], array_column($group['items'], 'product_id')));
             } else {
-                $insertGroup->execute([$id, $group['name'], $group['min_pick'], $group['max_pick'], $sort]);
+                $insertGroup->execute([$id, $group['name_vi'], $group['name_en'] !== '' ? $group['name_en'] : $group['name_vi'], $group['name_zh'] !== '' ? $group['name_zh'] : $group['name_vi'], $group['min_pick'], $group['max_pick'], $sort]);
                 $groupId = (int)$pdo->lastInsertId();
             }
 
@@ -799,8 +826,8 @@ function combo_admin_duplicate(int $sourceId): int
     }
 
     // Tên "Combo A (1)", "Combo A (2)"...: lấy số nhỏ nhất chưa có combo nào dùng.
-    $base = (string)$source['name'];
-    $exists = db()->prepare('SELECT COUNT(*) FROM combos WHERE name=?');
+    $base = (string)$source['name_vi'];
+    $exists = db()->prepare('SELECT COUNT(*) FROM combos WHERE name_vi=?');
     $n = 1;
 
     do {
@@ -824,7 +851,9 @@ function combo_admin_duplicate(int $sourceId): int
     }
 
     $combo = [
-        'name' => $name,
+        'name_vi' => $name,
+        'name_en' => mb_substr((string)$source['name_en'], 0, 160 - mb_strlen($suffix)) . $suffix,
+        'name_zh' => mb_substr((string)$source['name_zh'], 0, 160 - mb_strlen($suffix)) . $suffix,
         'image' => $image,
         'price' => $source['price'],
         'total_cups' => (int)$source['total_cups'],

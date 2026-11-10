@@ -10,7 +10,9 @@ $errors = [];
 
 $id = (int)($_GET['id'] ?? 0);
 $combo = [
-    'name' => '',
+    'name_vi' => '',
+    'name_en' => '',
+    'name_zh' => '',
     'image' => '',
     'price' => '',
     'total_cups' => 1,
@@ -21,7 +23,9 @@ $combo = [
 // Combo mới: sẵn 1 nhóm trống, chọn đúng 1 ly.
 $groups = [
     [
-        'name' => cb('group_default', ['no' => 1]),
+        'name_vi' => cb('group_default', ['no' => 1]),
+        'name_en' => '',
+        'name_zh' => '',
         'min_pick' => 1,
         'max_pick' => 1,
         'items' => [],
@@ -61,7 +65,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $currentImage = $combo['image'];
 
     $combo = [
-        'name' => trim((string)($_POST['name'] ?? '')),
+        'name_vi' => trim((string)($_POST['name_vi'] ?? '')),
+        'name_en' => trim((string)($_POST['name_en'] ?? '')),
+        'name_zh' => trim((string)($_POST['name_zh'] ?? '')),
         'image' => $currentImage,
         'price' => trim((string)($_POST['price'] ?? '')),
         // Tổng số ly tối đa khách chọn ở tất cả các nhóm.
@@ -101,7 +107,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $groups[] = [
             // id nhóm cũ (0 = nhóm mới): để lưu kiểu UPSERT, giữ id cho các ly khách đã chọn.
             'id' => (int)($posted['id'] ?? 0),
-            'name' => trim((string)($posted['name'] ?? '')),
+            'name_vi' => trim((string)($posted['name_vi'] ?? '')),
+            'name_en' => trim((string)($posted['name_en'] ?? '')),
+            'name_zh' => trim((string)($posted['name_zh'] ?? '')),
             'min_pick' => (int)($posted['min_pick'] ?? 0),
             'max_pick' => (int)($posted['max_pick'] ?? 0),
             'items' => $items,
@@ -228,7 +236,9 @@ function combo_edit_group(array $products, string $key, array $group): string
             <span class="combo-group-no" data-group-no></span>
             <label class="combo-group-name">
                 <span class="field-hint"><?= e(cb('group_name')) ?></span>
-                <input name="<?= e($prefix) ?>[name]" maxlength="120" value="<?= e($group['name']) ?>" required data-group-name>
+                <input name="<?= e($prefix) ?>[name_vi]" maxlength="120" value="<?= e($group['name_vi']) ?>" placeholder="Tiếng Việt" required data-group-name>
+                <input name="<?= e($prefix) ?>[name_en]" maxlength="120" value="<?= e($group['name_en'] ?? '') ?>" placeholder="English">
+                <input name="<?= e($prefix) ?>[name_zh]" maxlength="120" value="<?= e($group['name_zh'] ?? '') ?>" placeholder="繁體中文">
             </label>
             <!-- Số ly khách chọn trong nhóm: tối thiểu / tối đa (tối thiểu 0 = không bắt buộc). -->
             <!-- Gom 1 hàng: "Số ly (tối thiểu / tối đa): [0] / [2]" -->
@@ -530,7 +540,9 @@ admin_header($id ? cb('edit') : cb('add'));
 
         <label>
             <?= e(cb('name')) ?>
-            <input name="name" maxlength="160" value="<?= e($combo['name']) ?>" placeholder="<?= e(cb('name_hint')) ?>" required>
+            <input name="name_vi" maxlength="160" value="<?= e($combo['name_vi']) ?>" placeholder="Tiếng Việt — <?= e(cb('name_hint')) ?>" required>
+            <input name="name_en" maxlength="160" value="<?= e($combo['name_en'] ?? '') ?>" placeholder="English">
+            <input name="name_zh" maxlength="160" value="<?= e($combo['name_zh'] ?? '') ?>" placeholder="繁體中文">
         </label>
 
         <label>
@@ -590,7 +602,7 @@ admin_header($id ? cb('edit') : cb('add'));
             </div>
 
             <template data-group-template>
-                <?= combo_edit_group($products, '__KEY__', ['name' => '', 'min_pick' => 1, 'max_pick' => 1, 'items' => []]) ?>
+                <?= combo_edit_group($products, '__KEY__', ['name_vi' => '', 'name_en' => '', 'name_zh' => '', 'min_pick' => 1, 'max_pick' => 1, 'items' => []]) ?>
             </template>
 
             <template data-row-template>

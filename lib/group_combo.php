@@ -70,11 +70,11 @@ function hgc_groups(int $comboId): array
     }
 
     $groups = [];
-    $groupRows = hyg_all('SELECT id, name, min_pick, max_pick FROM combo_groups WHERE combo_id=? ORDER BY sort_order, id', [$comboId]);
+    $groupRows = hyg_all('SELECT id, name_vi, name_en, name_zh, min_pick, max_pick FROM combo_groups WHERE combo_id=? ORDER BY sort_order, id', [$comboId]);
     foreach ($groupRows as $g) {
         $groups[(int)$g['id']] = [
             'id' => (int)$g['id'],
-            'name' => (string)$g['name'],
+            'name' => localized_name($g),
             'min' => (int)$g['min_pick'],
             'max' => (int)$g['max_pick'],
             'items' => [],
@@ -137,7 +137,7 @@ function hgc_resolve_combo(array $s): array
     return [
         'combo_id' => (int)$combo['id'],
         'is_combo' => true,
-        'name' => (string)$combo['name'],
+        'name' => localized_name($combo),
         'image' => (string)($combo['image'] ?? ''),
         'cup_size' => null,
         'base_price' => $price,
@@ -274,9 +274,13 @@ function hgc_state(array $cart): array
     }
 
     foreach ($combos as &$combo) {
-        $complete = !$combo['invalid'] && !$combo['stale'] && $combo['picked'] > 0 && $combo['picked'] <= $combo['total_cups'];
+        // Đủ = chọn đủ số ly của combo (total_cups); nếu các nhóm gộp lại không chứa nổi total_cups thì đủ khi các nhóm đã đầy.
+        // Mức tối thiểu của từng nhóm không còn chặn: khi tổng đã đủ mọi ly đều bị khoá nên khách không thể bù thêm vào nhóm thiếu.
+        $maxSum = array_sum(array_map(fn($g) => (int)$g['max'], $combo['groups']));
+        $need = min((int)$combo['total_cups'], $maxSum);
+        $complete = !$combo['invalid'] && !$combo['stale'] && $combo['picked'] > 0 && $combo['picked'] <= $combo['total_cups'] && $combo['picked'] >= $need;
         foreach ($combo['groups'] as $g) {
-            if ($g['picked'] < $g['min'] || $g['picked'] > $g['max']) {
+            if ($g['picked'] > $g['max']) {
                 $complete = false;
             }
         }
@@ -529,6 +533,14 @@ function hgc_t(string $key, array $vars = []): string
             'remove_combo_confirm' => 'Xoá combo này cùng các ly nước đã chọn trong combo?',
             'combo_removed' => 'Đã xoá combo khỏi giỏ nhóm.',
             'drink_added' => 'Đã thêm nước vào combo.',
+            'combo_complete' => 'Đã chọn đủ nước trong combo',
+            'bar_done' => 'Đã chọn đủ nước',
+            'bar_done_sub_member' => '{n} ly · Chờ trưởng nhóm chốt món',
+            'bar_cta_host' => 'Chốt món',
+            'bar_cta_member' => 'Xem đơn nhóm',
+            'bar_todo' => '{name} chưa đủ nước · {cups}',
+            'bar_missing' => 'Thiếu {n} ly',
+            'bar_cta_todo' => 'Chọn tiếp combo {name}',
             'combo_unavailable' => 'Combo này không còn bán.',
             'combo_drink_not_allowed' => 'Món hoặc size này không thuộc nhóm món của combo.',
             'combo_drink_changed' => 'Combo vừa được cập nhật, ly này không còn trong combo. Vui lòng bỏ ly này và chọn lại.',
@@ -575,6 +587,14 @@ function hgc_t(string $key, array $vars = []): string
             'remove_combo_confirm' => 'Remove this combo and all drinks picked for it?',
             'combo_removed' => 'Combo removed from the group cart.',
             'drink_added' => 'Drink added to the combo.',
+            'combo_complete' => 'All drinks in the combo are picked',
+            'bar_done' => 'All combos have their drinks',
+            'bar_done_sub_member' => '{n} drinks · Waiting for the host to close the order',
+            'bar_cta_host' => 'Close ordering',
+            'bar_cta_member' => 'View the group order',
+            'bar_todo' => '{name} needs more drinks · {cups}',
+            'bar_missing' => '{n} short',
+            'bar_cta_todo' => 'Continue with combo {name}',
             'combo_unavailable' => 'This combo is no longer available.',
             'combo_drink_not_allowed' => 'This drink or size is not part of the combo group.',
             'combo_drink_changed' => 'The combo was just updated and this drink is no longer part of it. Please remove it and pick again.',
@@ -621,6 +641,14 @@ function hgc_t(string $key, array $vars = []): string
             'remove_combo_confirm' => '刪除此套餐及其已選飲品？',
             'combo_removed' => '已從團購購物車刪除套餐。',
             'drink_added' => '已將飲品加入套餐。',
+            'combo_complete' => '套餐飲品已選足',
+            'bar_done' => '套餐飲品已選足',
+            'bar_done_sub_member' => '{n} 杯 · 等待團主結單',
+            'bar_cta_host' => '截止收單',
+            'bar_cta_member' => '查看團購訂單',
+            'bar_todo' => '{name} 飲品未選足 · {cups}',
+            'bar_missing' => '還差 {n} 杯',
+            'bar_cta_todo' => '繼續選擇套餐 {name}',
             'combo_unavailable' => '此套餐已停售。',
             'combo_drink_not_allowed' => '此飲品或尺寸不屬於套餐的飲品組。',
             'combo_drink_changed' => '套餐剛更新，此飲品已不在套餐內。請移除後重新選擇。',

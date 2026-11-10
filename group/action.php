@@ -19,7 +19,18 @@ try {
         // order_type=combo: tạo từ nút "Đặt combo nhóm" (group/?mode=combo).
         $orderType = ($_POST['order_type'] ?? '') === 'combo' ? 'combo' : 'drink';
         $r = hyg_create($_POST['title'] ?? '', $_POST['nickname'] ?? '', !empty($_POST['copy_cart']), (string)($_POST['request_key'] ?? ''), $account, $orderType);
-        // dd('create', $r);
+        // Tạo nhóm từ nút "Đặt ngay" của slider combo: đưa combo khách chọn vào giỏ nhóm vừa tạo.
+        $comboId = (int)($_POST['combo_id'] ?? 0);
+        unset($_SESSION['hyg_pending_combo']);
+        if ($comboId > 0) {
+            try {
+                hgc_add_combo($r['public_id'], ['combo_id' => $comboId, 'request_key' => bin2hex(random_bytes(16))]);
+                $r = hyg_room($r['public_id']);
+            } catch (Throwable $e) {
+                // Combo không còn bán: vẫn tạo nhóm, chủ nhóm chọn lại combo trong nhóm.
+                error_log('create group with combo: ' . $e->getMessage());
+            }
+        }
     } elseif ($action === 'join') {
         // dd('join', $r);
         // Members join without signing in: guests can join straight from the invite link.
@@ -57,7 +68,13 @@ try {
         }
         if ($action === 'combo_drink') {
             hgc_add_drink($id, $_POST);
-            $_SESSION['hyg_message'] = hgc_t('drink_added');
+            // Ly vừa thêm làm combo đủ nước (đủ số ly và mỗi nhóm đạt yêu cầu) thì báo riêng.
+            $message = hgc_t('drink_added');
+            $comboState = hgc_state(hyg_cart(hyg_room($id), false))[(int)($_POST['combo_item'] ?? 0)] ?? null;
+            if ($comboState && !empty($comboState['full']) && !empty($comboState['complete'])) {
+                $message = hgc_t('combo_complete');
+            }
+            $_SESSION['hyg_message'] = $message;
             header('Location: ' . base_url('group/combo.php?id=' . $id), true, 303);
             exit;
         }

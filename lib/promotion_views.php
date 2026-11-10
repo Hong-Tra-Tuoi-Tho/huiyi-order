@@ -144,8 +144,14 @@ function promotion_selector(array $choice, array $options = []): string
     $mode = 'none';
   }
 
+  // Đơn nhóm có combo: chỉ còn ưu đãi "Mua 10 nhận lượt rút thưởng", tự chọn khi đủ 10 ly; các ưu đãi khác ẩn.
+  $comboOnly = !empty($options['combo_only']);
+  if ($comboOnly) {
+    $mode = ($draw && $buy10) ? 'draw' : 'none';
+  }
+
   // Nếu $mode chưa chọn thì chọn theo mốc
-  if (empty($mode) || $mode === 'none') {
+  if (!$comboOnly && (empty($mode) || $mode === 'none')) {
     if ($buy10 && $canUseDrinkDiscount) {
       $mode = 'draw';
     } elseif ($buy4 && $canUseDrinkDiscount) {
@@ -171,7 +177,7 @@ function promotion_selector(array $choice, array $options = []): string
 
         <?php // close-test-Hai | Tạm ẩn lựa chọn "Mã phần thưởng" (giỏ hàng lẫn đơn nhóm)
         // foreach (['none', 'buy4get1', 'draw', 'reward'] as $value): ?>
-        <?php foreach (['none', 'buy4get1', 'draw'] as $value): ?>
+        <?php foreach ($comboOnly ? ['draw'] : ['none', 'buy4get1', 'draw'] as $value): ?>
           <?php
           // Bổ sung điều kiện !$buy10 vào nút 'draw'
           $disabled = ($value === 'buy4get1' && (!$buy4 || !$hostDiscount))
@@ -202,6 +208,8 @@ function promotion_selector(array $choice, array $options = []): string
                 <small><?= e(pt('buy4_need_qty', ['min' => $buy4MinQty, 'qty' => (int) $totalQuantity])) ?></small>
               <?php elseif ($value === 'draw' && !$draw): ?>
                 <small><?= e(pt('draw_unavailable')) ?></small>
+              <?php elseif ($value === 'draw' && !$buy10): ?>
+                <small><?= e(pt('draw_progress', ['qty' => (int) $totalQuantity])) ?></small>
               <?php endif; ?>
             </span>
           </label>

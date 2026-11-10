@@ -69,9 +69,9 @@ function promo_popup_slides(string $groupPublic = ''): array
         foreach (hcf_active() as $combo) {
             $slides[] = [
                 'kind' => 'combo',
-                'combo_id' => ($groupPublic === '') ? (int)$combo['id'] : 0,
+                'combo_id' => (int)$combo['id'],
                 'image' => !empty($combo['image']) ? base_url('uploads/' . $combo['image']) : '',
-                'name' => (string)$combo['name'],
+                'name' => localized_name($combo),
                 'sub' => function_exists('hcf_price') ? hcf_price($combo) : '',
                 'btn' => 'Đặt ngay',
                 'url' => '#combos',
@@ -140,12 +140,23 @@ function promo_popup_render(string $groupPublic = ''): void
             </div>
           </div>
           <?php if (!empty($s['combo_id'])): ?>
-            <?php // Đặt ngay: thêm combo vào giỏ rồi vào thẳng giỏ hàng (actions/add_combo_to_cart.php). ?>
-            <form method="post" action="<?= e(base_url('actions/add_combo_to_cart.php')) ?>" class="promo-popup-form">
-              <?= csrf_field() ?>
-              <input type="hidden" name="combo_id" value="<?= (int)$s['combo_id'] ?>">
-              <button type="submit" class="promo-popup-cta"><?= e($s['btn']) ?> <span aria-hidden="true">&rarr;</span></button>
-            </form>
+            <?php // Đặt ngay / bấm vào hình: luôn vào đơn nhóm (như nút Đặt ngay ở mục combo). ?>
+            <?php if ($groupPublic !== ''): ?>
+              <form method="post" action="<?= e(base_url('group/action.php')) ?>" class="promo-popup-form" data-promo-order>
+                <?= csrf_field() ?>
+                <input type="hidden" name="room_id" value="<?= e($groupPublic) ?>">
+                <input type="hidden" name="action" value="add_combo">
+                <input type="hidden" name="combo_id" value="<?= (int)$s['combo_id'] ?>">
+                <input type="hidden" name="request_key" value="<?= bin2hex(random_bytes(16)) ?>">
+                <button type="submit" class="promo-popup-cta"><?= e($s['btn']) ?> <span aria-hidden="true">&rarr;</span></button>
+              </form>
+            <?php else: ?>
+              <form method="get" action="<?= e(base_url('group/index.php')) ?>" class="promo-popup-form" data-promo-order>
+                <input type="hidden" name="mode" value="combo">
+                <input type="hidden" name="combo" value="<?= (int)$s['combo_id'] ?>">
+                <button type="submit" class="promo-popup-cta"><?= e($s['btn']) ?> <span aria-hidden="true">&rarr;</span></button>
+              </form>
+            <?php endif; ?>
           <?php else: ?>
             <a class="promo-popup-cta" href="<?= e($s['url']) ?>" data-promo-close><?= e($s['btn']) ?> <span aria-hidden="true">&rarr;</span></a>
           <?php endif; ?>
@@ -161,31 +172,33 @@ function promo_popup_render(string $groupPublic = ''): void
 <style>
 .promo-popup[hidden]{display:none}
 .promo-popup{position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;padding:18px;background:rgba(18,8,8,.6);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);animation:ppFade .25s ease}
-.promo-popup-card{position:relative;width:100%;max-width:420px;animation:ppNews .75s cubic-bezier(.2,.8,.25,1) both}
+.promo-popup{--pp-size:min(calc(100vw - 36px),calc(100vh - 220px),620px)}
+.promo-popup-card{position:relative;width:var(--pp-size);max-width:100%;animation:ppNews .75s cubic-bezier(.2,.8,.25,1) both}
 .promo-popup-track{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:none;scroll-behavior:smooth}
 .promo-popup-track::-webkit-scrollbar{display:none}
 .promo-popup-slide{position:relative;flex:0 0 100%;min-width:0;scroll-snap-align:center;display:flex;flex-direction:column;align-items:center;color:#fff;text-align:center}
-.promo-popup-media{position:relative;width:100%;aspect-ratio:1/1;max-height:56vh;overflow:hidden}
+.promo-popup-slide.is-combo .promo-popup-media{cursor:pointer}
+.promo-popup-media{position:relative;width:100%;aspect-ratio:1/1;overflow:hidden;border-radius:12px}
 .promo-popup-media::after{content:"";position:absolute;inset:0;background:linear-gradient(to top,rgba(0,0,0,.7) 0,rgba(0,0,0,0) 45%);pointer-events:none}
 .promo-popup-img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
-.promo-popup-info{position:absolute;left:0;right:0;bottom:0;z-index:2;padding:0 20px 18px;text-align:left}
-.promo-popup-badge{display:inline-block;margin-bottom:6px;color:#ffd54a;font-size:12px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;text-shadow:0 1px 8px rgba(0,0,0,.8)}
-.promo-popup-name{margin:0 0 4px;font-size:26px;line-height:1.2;font-weight:800;text-shadow:0 2px 14px rgba(0,0,0,.9)}
-.promo-popup-sub{margin:0;text-shadow:0 1px 10px rgba(0,0,0,.9);font-size:15px;font-weight:700;color:#ffd54a}
+.promo-popup-info{position:absolute;left:0;right:0;bottom:0;z-index:2;padding:0 clamp(20px,calc(var(--pp-size)*.05),44px) clamp(18px,calc(var(--pp-size)*.045),40px);text-align:left}
+.promo-popup-badge{display:inline-block;margin-bottom:6px;color:#ffd54a;font-size:clamp(12px,calc(var(--pp-size)*.03),18px);font-weight:800;letter-spacing:.14em;text-transform:uppercase;text-shadow:0 1px 8px rgba(0,0,0,.8)}
+.promo-popup-name{margin:0 0 4px;font-size:clamp(26px,calc(var(--pp-size)*.07),56px);line-height:1.2;font-weight:800;text-shadow:0 2px 14px rgba(0,0,0,.9)}
+.promo-popup-sub{margin:0;text-shadow:0 1px 10px rgba(0,0,0,.9);font-size:clamp(15px,calc(var(--pp-size)*.04),28px);font-weight:700;color:#ffd54a}
 .promo-popup-form{margin:16px 0 0;display:flex;justify-content:center}
 .promo-popup-slide>.promo-popup-cta{margin-top:16px}
-.promo-popup-cta{border:0;font-family:inherit;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:8px;min-width:200px;padding:13px 28px;border-radius:999px;background:#ffd54a;color:#4a1d00;font-size:16px;font-weight:800;text-decoration:none;box-shadow:0 10px 30px rgba(255,213,74,.35);transition:transform .15s,box-shadow .15s}
+.promo-popup-cta{border:0;font-family:inherit;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:8px;min-width:clamp(200px,calc(var(--pp-size)*.4),340px);padding:clamp(13px,calc(var(--pp-size)*.025),20px) clamp(28px,calc(var(--pp-size)*.06),48px);border-radius:999px;background:#ffd54a;color:#4a1d00;font-size:clamp(16px,calc(var(--pp-size)*.035),24px);font-weight:800;text-decoration:none;box-shadow:0 10px 30px rgba(255,213,74,.35);transition:transform .15s,box-shadow .15s}
 .promo-popup-cta:hover{transform:translateY(-2px);box-shadow:0 14px 34px rgba(255,213,74,.5)}
 .promo-popup-slide.is-game .promo-popup-media{background:none}
 .promo-popup-gift{position:absolute;inset:0 0 30% 0;display:flex;align-items:center;justify-content:center}
-.promo-popup-gift span{position:relative;z-index:1;font-size:130px;filter:drop-shadow(0 16px 30px rgba(255,159,26,.55));animation:ppFloat 2.6s ease-in-out infinite}
+.promo-popup-gift span{position:relative;z-index:1;font-size:clamp(130px,calc(var(--pp-size)*.32),280px);filter:drop-shadow(0 16px 30px rgba(255,159,26,.55));animation:ppFloat 2.6s ease-in-out infinite}
 .promo-popup-gift i{position:absolute;left:50%;top:50%;border-radius:50%;transform:translate(-50%,-50%);background:radial-gradient(circle,rgba(255,159,26,.45),rgba(255,159,26,0) 70%)}
-.promo-popup-gift i:nth-child(2){width:300px;height:300px}
-.promo-popup-gift i:nth-child(3){width:420px;height:420px;opacity:.5}
+.promo-popup-gift i:nth-child(2){width:calc(var(--pp-size)*.7);height:calc(var(--pp-size)*.7)}
+.promo-popup-gift i:nth-child(3){width:calc(var(--pp-size)*.98);height:calc(var(--pp-size)*.98);opacity:.5}
 .promo-popup-gift i:nth-child(4){display:none}
 .promo-popup-close{position:absolute;top:12px;right:12px;z-index:5;width:40px;height:40px;padding:0;border:0;border-radius:50%;background:#fff;color:#1b0f0f;font-size:26px;font-weight:700;line-height:40px;text-align:center;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.45);transition:transform .15s,background .15s}
 .promo-popup-close:hover{background:#ffd54a;transform:scale(1.08)}
-.promo-popup-nav{position:absolute;top:calc(min(210px,(100vw - 36px)/2,28vh) - 24px);z-index:5;width:48px;height:48px;padding:0 0 4px;border:2px solid #ffa21a;border-radius:50%;background:rgba(20,10,10,.6);color:#ffb52e;font-size:36px;font-weight:800;line-height:42px;text-align:center;cursor:pointer;box-shadow:0 0 0 4px rgba(255,162,26,.25),0 6px 18px rgba(0,0,0,.55);transition:transform .15s,background .15s,color .15s}
+.promo-popup-nav{position:absolute;top:calc(var(--pp-size)/2 - 24px);z-index:5;width:48px;height:48px;padding:0 0 4px;border:2px solid #ffa21a;border-radius:50%;background:rgba(20,10,10,.6);color:#ffb52e;font-size:36px;font-weight:800;line-height:42px;text-align:center;cursor:pointer;box-shadow:0 0 0 4px rgba(255,162,26,.25),0 6px 18px rgba(0,0,0,.55);transition:transform .15s,background .15s,color .15s}
 .promo-popup-nav:hover{background:#ffa21a;color:#2a1200;transform:scale(1.1)}
 .promo-popup-nav.is-prev{left:8px}.promo-popup-nav.is-next{right:8px}
 @keyframes ppFade{from{opacity:0}to{opacity:1}}
@@ -245,7 +258,11 @@ function promo_popup_render(string $groupPublic = ''): void
     box.addEventListener('pointerdown', function () { clearInterval(timer); });
   }
   box.addEventListener('click', function (ev) {
-    if (ev.target === box || ev.target.closest('[data-promo-close]')) close();
+    if (ev.target === box || ev.target.closest('[data-promo-close]')) { close(); return; }
+    // Bấm vào hình combo = bấm "Đặt ngay" của slide đó.
+    var media = ev.target.closest('.promo-popup-media');
+    var orderForm = media && media.parentNode.querySelector('[data-promo-order]');
+    if (orderForm) orderForm.requestSubmit();
   });
   document.addEventListener('keydown', function (ev) { if (ev.key === 'Escape' && !box.hidden) close(); });
 })();

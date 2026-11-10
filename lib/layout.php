@@ -49,11 +49,11 @@ function front_header(string $title = ''): void
         <link rel="apple-touch-icon" href="<?= e(base_url('assets/icons/apple-touch-icon.png?v=19')) ?>">
         <link rel="manifest" href="<?= e(base_url('manifest.webmanifest?v=19')) ?>">
         <link rel="stylesheet" href="<?= e(base_url('assets/css/app.css?v=' . $assetVersion)) ?>">
-        <link rel="stylesheet" href="<?= e(base_url('assets/css/group-order.css?v=19.8.31')) ?>">
+        <link rel="stylesheet" href="<?= e(base_url('assets/css/group-order.css?v=19.8.34')) ?>">
         <link rel="stylesheet" href="<?= e(base_url('assets/css/member.css?v=19.8.9')) ?>">
         <link rel="stylesheet" href="<?= e(base_url('assets/css/footer.css?v=1.0.4')) ?>">
         <link rel="stylesheet" href="<?= e(base_url('assets/css/header.css?v=1.0.8')) ?>">
-        <link rel="stylesheet" href="<?= e(base_url('assets/css/front-buttons.css?v=8')) ?>">
+        <link rel="stylesheet" href="<?= e(base_url('assets/css/front-buttons.css?v=9')) ?>">
         <title><?= e($title ? $title . '｜' . $store : $store) ?></title><?php $ogDesc = ['vi' => '🎁 Mua 4 tặng 1 · 🎮 Mua 10 ly nhận 1 lượt Mini Game – cơ hội trúng giải đến 145K · 👥 Đặt đơn nhóm cùng bạn bè, giao tận nơi.', 'zh' => '🎁 買4送1 · 🎮 買10杯送1次小遊戲機會，最高抽中145K好禮 · 👥 揪團點單，外送到府。', 'en' => '🎁 Buy 4 get 1 free · 🎮 Buy 10 drinks for a Mini Game chance to win up to 145K · 👥 Group orders, delivered to your door.'][current_lang()] ?? ''; ?>
         <meta name="description" content="<?= e($ogDesc) ?>">
         <meta property="og:type" content="website">
@@ -332,7 +332,7 @@ function front_header(string $title = ''): void
         <link rel="apple-touch-icon" href="<?= e(base_url('assets/icons/apple-touch-icon.png?v=19')) ?>">
         <link rel="manifest" href="<?= e(base_url('admin/manifest.webmanifest?v=19.1')) ?>">
         <link rel="stylesheet" href="<?= e(base_url('assets/css/app.css?v=19.15.2')) ?>">
-        <link rel="stylesheet" href="<?= e(base_url('assets/css/group-order.css?v=19.8.31')) ?>">
+        <link rel="stylesheet" href="<?= e(base_url('assets/css/group-order.css?v=19.8.34')) ?>">
         <link rel="stylesheet" href="<?= e(base_url('assets/css/dispatch.css?v=19.8.0')) ?>">
         <link rel="stylesheet" href="<?= e(base_url('assets/css/admin-shell.css?v=19.14.3')) ?>">
         <link rel="stylesheet" href="<?= e(base_url('assets/css/admin-ui.css?v=19.14.4')) ?>">

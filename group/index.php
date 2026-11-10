@@ -13,6 +13,9 @@ try {
   // Creating a group needs a signed-in member (the group's owner_member_id).
   // ?mode=combo: vào từ nút "Đặt combo nhóm" ở trang chủ (chỉ đổi tiêu đề, form tạo nhóm giữ nguyên).
   $comboMode = ($_GET['mode'] ?? '') === 'combo';
+  // ?combo=ID: khách bấm "Đặt ngay" ở slider combo; nhớ lại để vẫn còn sau khi đăng nhập, rồi đưa vào nhóm vừa tạo.
+  if (isset($_GET['combo']) && ctype_digit((string)$_GET['combo'])) $_SESSION['hyg_pending_combo'] = (int)$_GET['combo'];
+  $pendingCombo = (int)($_SESSION['hyg_pending_combo'] ?? 0);
   if ($id === '' && $invite === '' && !hym_current_member()) redirect(hym_login_gate_url($comboMode ? 'group-combo' : 'group'));
   if ($id !== '') {
     $r = hyg_room($id);
@@ -55,7 +58,7 @@ unset($_SESSION['hyg_message']);
 $orderSuccess = !empty($_SESSION['hyg_order_success']);
 unset($_SESSION['hyg_order_success']);
 ?>
-<?php if ($r): ?><link rel="stylesheet" href="<?= e(base_url('assets/css/group-combo.css?v=4')) ?>"><?php endif; ?>
+<?php if ($r): ?><link rel="stylesheet" href="<?= e(base_url('assets/css/group-combo.css?v=31')) ?>"><?php endif; ?>
 <div class="hyg-page">
   <?php /* Nhóm combo: "menu" của nhóm là trang chọn combo (chủ nhóm) / chọn nước (thành viên), không phải danh sách món. */ ?>
   <a class="back" href="<?= e(base_url($r ? 'index.php?group=' . $r['public_id'] : 'index.php')) ?>">← <?= e(t('back_menu')) ?></a>
@@ -118,6 +121,7 @@ unset($_SESSION['hyg_order_success']);
         <?= csrf_field() ?>
         <input type="hidden" name="action" value="create">
         <?php if ($comboMode): ?><input type="hidden" name="order_type" value="combo"><?php endif; ?>
+        <?php if ($pendingCombo > 0): ?><input type="hidden" name="combo_id" value="<?= $pendingCombo ?>"><?php endif; ?>
         <input type="hidden" name="request_key" value="<?= bin2hex(random_bytes(16)) ?>">
         <label><?= e(gt('room_name')) ?>
           <input name="title" maxlength="80" required placeholder="<?= e(gt('room_placeholder')) ?>">

@@ -121,6 +121,21 @@
             });
         }
 
+        // Bấm vào ảnh / thẻ combo = bấm "Đặt ngay" (bỏ qua khi bấm vào nút hoặc liên kết khác).
+        for (var c = 0; c < cards.length; c++) {
+            cards[c].addEventListener('click', function (event) {
+                if (event.target.closest('button, a, input')) {
+                    return;
+                }
+
+                var form = this.querySelector('.hcf-order-form');
+
+                if (form) {
+                    form.requestSubmit();
+                }
+            });
+        }
+
         window.addEventListener('resize', refresh);
         refresh();
     }

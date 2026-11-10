@@ -451,6 +451,9 @@ function hyg_mutate(string $public,string $action,array $data): void {
             // Giỏ có combo: mọi combo phải chọn đủ nước theo luật combo (thay luật tối thiểu 2 ly nước lẻ).
             if(hgc_has_combo($cart))hgc_validate_lock($cart);
             elseif(promotion_drink_qty($cart)<hyg_min_lock_cups())hyg_fail('min_cups');
+            // Đơn nhóm có combo chỉ được ưu đãi "Mua 10 nhận lượt rút thưởng" (tự áp dụng khi đủ 10 ly); bỏ ưu đãi khác đã chọn trước đó.
+            if(hgc_has_combo($cart)){$forced=minigame_enabled()&&promotion_game_qty($cart)>=10?'draw':'none';$current=promotion_room_mode($r);
+                if($current!==$forced&&!($current==='draw'&&$forced==='none')){hyg_exec("UPDATE group_rooms SET promotion_mode=?,coupon_code='',coupon_type='',coupon_source='',coupon_amount=0 WHERE id=?",[$forced,$rid]);$r['promotion_mode']=$forced;$r['coupon_code']='';$r['coupon_type']='';$r['coupon_source']='';$r['coupon_amount']=0;}}
             $record=promotion_group_record($r);
             $members=hyg_all('SELECT * FROM group_members WHERE room_id=? ORDER BY id',[$rid]);$coupon=hyg_calculate_group_coupon($cart,$record,$r,$members);$payment=hyg_build_payment_summary($r,$members,$cart,$coupon);$payment['frozen']=true;
             $promotion=promotion_room_choice($r,$cart);

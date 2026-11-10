@@ -831,3 +831,43 @@ body.theme-deep-red .hyg-page,body.theme-deep-red .hyg-mode,body.theme-deep-red 
 .front-body .hyg-share .hyg-share-deadline {
     margin: 8px 0 0;
 }
+
+/* Nút "Chốt món": giống nút "Thanh toán →": đỏ chuyển màu, bo vừa, chữ trắng đậm, mũi tên bên phải. */
+.hyg-page .hyg-join-actions #hyg-lock-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    min-height: 54px;
+    border: 0;
+    border-radius: 12px;
+    background: linear-gradient(180deg, #ee4040 0%, #d92b2b 55%, #c21f1f 100%);
+    color: #fff;
+    font-size: 17px;
+    font-weight: 800;
+    box-shadow: 0 10px 24px rgba(217, 43, 43, .38);
+    transition: transform .15s ease, box-shadow .15s ease;
+}
+
+.hyg-page .hyg-join-actions #hyg-lock-btn::after {
+    content: "→";
+    font-size: 20px;
+    font-weight: 700;
+    line-height: 1;
+}
+
+.hyg-page .hyg-join-actions #hyg-lock-btn:not(:disabled):hover {
+    transform: translateY(-1px);
+    background: linear-gradient(180deg, #f24a4a 0%, #de3030 55%, #c92222 100%);
+    box-shadow: 0 14px 28px rgba(217, 43, 43, .46);
+}
+
+.hyg-page .hyg-join-actions #hyg-lock-btn:not(:disabled):active {
+    transform: translateY(1px);
+}
+
+.hyg-page .hyg-join-actions #hyg-lock-btn:disabled {
+    background: #ead0d0;
+    color: #a47979;
+    box-shadow: none;
+}

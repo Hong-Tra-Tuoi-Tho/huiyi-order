@@ -42,7 +42,7 @@ $liveUrl = base_url('group/combo.php?id=' . $r['public_id'] . '&live=1');
 
 front_header(hgc_t('page_title'));
 ?>
-<link rel="stylesheet" href="<?= e(base_url('assets/css/group-combo.css?v=16')) ?>">
+<link rel="stylesheet" href="<?= e(base_url('assets/css/group-combo.css?v=31')) ?>">
 <div class="hyg-page hgc-page">
     <a class="back" href="<?= e(hyg_room_url($r['public_id'])) ?>">← <?= e(hgc_t('back_room')) ?></a>
     <?php if ($msg !== ''): ?><div class="alert info" role="status"><?= e($msg) ?></div><?php endif; ?>
@@ -58,7 +58,7 @@ front_header(hgc_t('page_title'));
 
     <?php foreach ($combos as $combo): ?>
         <?php $comboLeft = max(0, $combo['total_cups'] - $combo['picked']); ?>
-        <section class="hyg-card hgc-combo<?= $combo['complete'] ? ' is-complete' : '' ?>" data-combo="<?= (int)$combo['item_id'] ?>">
+        <section class="hyg-card hgc-combo<?= $combo['complete'] ? ' is-complete' : '' ?>" id="hgc-combo-<?= (int)$combo['item_id'] ?>" data-combo="<?= (int)$combo['item_id'] ?>">
             <header class="hgc-combo-head">
                 <?php if ($combo['image'] !== ''): ?>
                     <img class="hgc-combo-thumb" src="<?= e(base_url('uploads/' . $combo['image'])) ?>" alt="" loading="lazy">
@@ -268,7 +268,49 @@ front_header(hgc_t('page_title'));
 
         </section>
     <?php endforeach; ?>
+
+    <?php
+    // Thanh hành động dưới đáy: cho biết combo nào còn thiếu hoặc đã đủ, và nút đi tiếp theo vai trò.
+    // Nằm trong vùng .hgc-live nên tự cập nhật theo vòng làm mới.
+    if ($combos) {
+        $todo = array_values(array_filter($combos, fn($c) => empty($c['complete'])));
+        $totalPicked = array_sum(array_map(fn($c) => (int)$c['picked'], $combos));
+        $isHost = hyg_host($r);
+    ?>
+    <div class="hgc-bar" data-bar="<?= $todo ? 'todo' : 'done' ?>">
+        <?php if ($todo): ?>
+            <?php
+            // Số ly còn thiếu của 1 combo: đủ = min(tổng số ly, tổng tối đa các nhóm), trừ số ly đã chọn.
+            $missing = static function (array $c): int {
+                $need = min((int)$c['total_cups'], array_sum(array_map(fn($g) => (int)$g['max'], $c['groups'])));
+                return max(0, $need - (int)$c['picked']);
+            };
+            $next = $todo[0];
+            $missingAll = array_sum(array_map($missing, $todo));
+            ?>
+            <div class="hgc-bar-msg"><span class="hgc-bar-tick is-todo"><?= count($todo) ?></span><?= str_replace('@@', '<strong class="hgc-missing">' . e(hgc_t('bar_missing', ['n' => $missingAll])) . '</strong>', e(hgc_t('bar_todo', ['name' => implode(', ', array_map(fn($c) => $c['name'], $todo)), 'cups' => '@@']))) ?></div>
+            <a class="hgc-bar-cta" href="#hgc-combo-<?= (int)$next['item_id'] ?>" data-scroll-to="hgc-combo-<?= (int)$next['item_id'] ?>"><?= e(hgc_t('bar_cta_todo', ['name' => $next['name']])) ?> ↓</a>
+        <?php else: ?>
+            <div class="hgc-bar-msg"><span class="hgc-bar-tick">✓</span><?= e(hgc_t('bar_done')) ?></div>
+            <?php if (!$isHost): ?><div class="hgc-bar-sub"><?= e(hgc_t('bar_done_sub_member', ['n' => $totalPicked])) ?></div><?php endif; ?>
+            <?php if ($isHost): ?>
+                <?php /* Chốt món ngay tại đây: gửi như nút "Chốt món" ở đơn nhóm (action coupon + lock_after), xong vào thẳng trang thanh toán. Gửi thường (data-native), không qua fetch. */ ?>
+                <form method="post" action="<?= e(base_url('group/action.php')) ?>" class="hgc-bar-lock" data-native>
+                    <?= csrf_field() ?>
+                    <input type="hidden" name="room_id" value="<?= e($r['public_id']) ?>">
+                    <input type="hidden" name="action" value="coupon">
+                    <input type="hidden" name="lock_after" value="1">
+                    <input type="hidden" name="back" value="combo">
+                    <?php if (minigame_enabled() && promotion_game_qty($cart) >= 10): ?><input type="hidden" name="promotion_mode" value="draw"><?php endif; ?>
+                    <button class="hgc-bar-cta" type="submit"><?= e(hgc_t('bar_cta_host')) ?> →</button>
+                </form>
+            <?php else: ?>
+                <a class="hgc-bar-cta is-alt" href="<?= e(hyg_room_url($r['public_id'])) ?>"><?= e(hgc_t('bar_cta_member')) ?> →</a>
+            <?php endif; ?>
+        <?php endif; ?>
+    </div>
+    <?php } ?>
     </div>
 </div>
-<script src="<?= e(base_url('assets/js/group-combo-live.js?v=1')) ?>" defer></script>
+<script src="<?= e(base_url('assets/js/group-combo-live.js?v=16')) ?>" defer></script>
 <?php front_footer(); ?>

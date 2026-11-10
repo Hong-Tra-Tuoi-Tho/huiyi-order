@@ -9,7 +9,7 @@ function hcf_active(): array
 {
     try {
         $rows = db()->query(
-            'SELECT c.id, c.name, c.image, c.price, c.total_cups, c.all_products,
+            'SELECT c.id, c.name_vi, c.name_en, c.name_zh, c.image, c.price, c.total_cups, c.all_products,
                     COUNT(g.id) AS group_count
              FROM combos c
              LEFT JOIN combo_groups g ON g.combo_id = c.id
@@ -65,7 +65,7 @@ function hcf_render_section(array $combos, ?array $room = null): string
 
     ob_start();
     ?>
-  <link rel="stylesheet" href="<?= e(base_url('assets/css/home-combos.css?v=4')) ?>">
+  <link rel="stylesheet" href="<?= e(base_url('assets/css/home-combos.css?v=5')) ?>">
   <section class="hcf-section" id="combos" data-home-combos data-dot-label="<?= e(hcf_t('go_to')) ?>"
     aria-roledescription="carousel" aria-label="<?= e(hcf_t('title')) ?>">
     <div class="section-title-row hcf-heading">
@@ -83,7 +83,7 @@ function hcf_render_section(array $combos, ?array $room = null): string
               <img class="hcf-card-image" src="<?= e(base_url('uploads/' . $combo['image'])) ?>" alt="" loading="lazy">
             <?php endif; ?>
             <div class="hcf-card-top">
-              <h3 class="hcf-card-name"><?= e($combo['name']) ?></h3>
+              <h3 class="hcf-card-name"><?= e(localized_name($combo)) ?></h3>
               <strong class="hcf-card-price"><?= e(hcf_price($combo)) ?></strong>
             </div>
             <div class="hcf-card-bottom">
@@ -98,9 +98,10 @@ function hcf_render_section(array $combos, ?array $room = null): string
                   <button type="submit" class="hcf-order"><?= e(hcf_t('order_now')) ?></button>
                 </form>
               <?php else: ?>
-                <form method="post" action="<?= e(base_url('actions/add_combo_to_cart.php')) ?>" class="hcf-order-form">
-                  <?= csrf_field() ?>
-                  <input type="hidden" name="combo_id" value="<?= (int)$combo['id'] ?>">
+                <?php /* Trang chủ: "Đặt ngay" mở trang tạo nhóm, combo này được đưa vào nhóm mới ngay khi tạo. */ ?>
+                <form method="get" action="<?= e(base_url('group/index.php')) ?>" class="hcf-order-form">
+                  <input type="hidden" name="mode" value="combo">
+                  <input type="hidden" name="combo" value="<?= (int)$combo['id'] ?>">
                   <button type="submit" class="hcf-order"><?= e(hcf_t('order_now')) ?></button>
                 </form>
               <?php endif; ?>
@@ -113,7 +114,7 @@ function hcf_render_section(array $combos, ?array $room = null): string
     </div>
     <div class="hcf-dots" data-combo-dots></div>
   </section>
-  <script src="<?= e(base_url('assets/js/home-combos.js?v=2')) ?>" defer></script>
+  <script src="<?= e(base_url('assets/js/home-combos.js?v=3')) ?>" defer></script>
     <?php
 
     return (string)ob_get_clean();

@@ -364,12 +364,12 @@ function hyg_render_room(array $r): string
             </div>
           </div><?php endforeach; ?>
 
-        <?php if ($open): ?><div class="hyg-join-actions<?= $drinks > 0 ? ' has-drinks' : '' ?>"><a class="btn primary hyg-act-secondary" href="<?= e(base_url('index.php?group=' . $r['public_id'])) ?>"><?= e(gt('choose')) ?></a>
+        <?php if ($open): ?><div class="hyg-join-actions<?= $drinks > 0 ? ' has-drinks' : '' ?>"><a class="btn primary hyg-act-secondary" href="<?= e(base_url('index.php?group=' . $r['public_id'])) ?>"><?= e(gt($hasCombo ? 'choose_outside_combo' : 'choose')) ?></a>
             <?php if ($hasCombo): ?><a class="btn primary hyg-act-secondary" href="<?= e(base_url('group/combo.php?id=' . $r['public_id'])) ?>"><?= e(hgc_t('pick_drinks')) ?></a><?php endif; ?>
             <?php if ($host): ?>
               <!-- Button chốt món: gửi form ưu đãi ở cột tổng tiền qua thuộc tính form -->
               <button class="btn primary block" id="hyg-lock-btn" type="submit" form="group-promotion-selector" name="lock_after" value="1" <?= !$cart || $hasInvalid || ($hasCombo ? !$comboReady : $drinks < hyg_min_lock_cups()) ? 'disabled' : '' ?>>
-                <?= e(gt('lock')) ?>
+                <?= e($drinks > 0 ? gt('lock_cups', ['n' => $drinks]) : gt('lock')) ?>
               </button>
             <?php endif; ?>
             <?php if ($host && $hasCombo && !$comboReady): ?><small class="hyg-muted hgc-lock-hint"><?= e(hgc_t('lock_hint')) ?></small><?php endif; ?>
@@ -407,7 +407,7 @@ function hyg_render_room(array $r): string
               </select></label><button class="btn" type="submit"><?= e(gt('apply')) ?></button><small><?= e(gt($split ? 'split_hint' : 'together_hint')) ?></small><small><?= e(gt('checkout_mode_hint')) ?></small>
           </form> -->
 
-          <?= promotion_selector($promotion, ['group_public' => $r['public_id'], 'revision' => $r['revision'], 'host_discount_available' => $payment['host_obligation'] > 0]) ?>
+          <?= promotion_selector($promotion, ['group_public' => $r['public_id'], 'revision' => $r['revision'], 'host_discount_available' => $payment['host_obligation'] > 0, 'combo_only' => $hasCombo]) ?>
 
           <?php if (!$hasCombo && $drinks < hyg_min_lock_cups()): ?><small class="hyg-muted"><?= e(gt('min_cups')) ?></small><?php endif; ?>
         <?php endif; ?>

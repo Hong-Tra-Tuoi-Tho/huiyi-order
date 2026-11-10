@@ -76,20 +76,33 @@ function hymg_payload(?array $row,?array $board,int $balance,string $event): arr
         'appearance'=>hymg_public_presentation($presentation),'share_bonus'=>hymg_share_offer($row,$board),
         'prizes'=>$pool?hgr_public_pool($pool):[]];
 }
-/** A 0đ prize earns one replay that always wins 52.000đ for sharing the website, once per board. */
+/** A 0đ prize earns one replay that always wins a configured share prize, once per board. */
 function hymg_share_offer(?array $row,?array $board): bool {
     if(!$row||$row['awarded_at']===null||!isset($row['reward_json'])||!is_array($board['reward_pool']??null))return false;
     $reward=hymg_saved_reward($row);
-    return $reward!==null&&hgr_reward_is_zero($reward);
+    // Chưa cấu hình mức giá chia sẻ ở admin thì không mở lượt chia sẻ (không còn mức mặc định 52.000đ).
+    return $reward!==null&&hgr_reward_is_zero($reward)&&hymg_share_saved()!==[];
 }
-const HYMG_SHARE_AMOUNT = 52000;
-/** The share prize: the board's own 52.000đ prize when it has one, otherwise a 52.000đ discount built from another discount prize. */
+/** Quay ngẫu nhiên 1 mức giảm theo tỷ lệ đã cấu hình. */
+function hymg_share_amount(): int {
+    $list = hymg_share_saved();
+    if (!$list) hymg_fail('share_unavailable');
+    $total = array_sum(array_column($list, 'weight'));
+    $roll = random_int(1, max(1, $total));
+    foreach ($list as $choice) {
+        $roll -= $choice['weight'];
+        if ($roll <= 0) return $choice['amount'];
+    }
+    return $list[array_key_last($list)]['amount'];
+}
+/** The share prize: the board's own prize with the drawn amount when it has one, otherwise a discount of that amount built from another discount prize. */
 function hymg_share_prize(array $pool): array {
+    $amount = hymg_share_amount();
     $prize = null;
     $base = null;
     foreach ($pool as $item) {
         if (!is_array($item) || ($item['kind'] ?? '') !== 'discount') continue;
-        if ((float)($item['amount'] ?? 0) === (float)HYMG_SHARE_AMOUNT) {
+        if ((float)($item['amount'] ?? 0) === (float)$amount) {
             $prize = $item;
             break;
         }
@@ -109,9 +122,9 @@ function hymg_share_prize(array $pool): array {
             'min_paid_cups' => 0,
             'terms' => ['vi' => '', 'zh' => '', 'en' => ''],
         ];
-        $prize['amount'] = HYMG_SHARE_AMOUNT;
+        $prize['amount'] = $amount;
         foreach (['vi', 'zh', 'en'] as $lang) {
-            $money = hgr_money_text(HYMG_SHARE_AMOUNT, $lang);
+            $money = hgr_money_text($amount, $lang);
             $prize['name'][$lang] = ['vi' => 'Giảm ' . $money, 'zh' => '折抵 ' . $money, 'en' => $money . ' off'][$lang];
         }
     }

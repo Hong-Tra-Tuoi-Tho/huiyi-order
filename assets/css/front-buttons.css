@@ -94,10 +94,6 @@
     text-decoration: none;
     box-shadow: 0 4px 12px rgba(255, 171, 0, .4);
     transition: transform .15s, box-shadow .15s;
-    /* Dính theo màn hình khi cuộn, nằm ngay dưới thanh trên cùng (chiều cao đo bằng assets/js/app.js). */
-    position: sticky;
-    top: calc(var(--front-topbar-h, 64px) + 8px);
-    z-index: 15;
 }
 
 .front-body a.back:hover,

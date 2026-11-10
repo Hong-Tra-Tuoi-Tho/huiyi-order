@@ -29,7 +29,7 @@ function hcc_add_combo(int $comboId): string
     $_SESSION['cart'][$key] = [
         'is_combo' => true,
         'combo_id' => (int)$combo['id'],
-        'name' => (string)$combo['name'],
+        'name' => localized_name($combo),
         'image' => (string)($combo['image'] ?? ''),
         'cup_size' => null,
         'base_price' => $price,
@@ -102,9 +102,13 @@ function hcc_state(?array $cart = null): array
     }
 
     foreach ($combos as &$combo) {
-        $complete = $combo['picked'] > 0 && $combo['picked'] <= $combo['total_cups'];
+        // Đủ = chọn đủ số ly của combo (total_cups); nếu các nhóm gộp lại không chứa nổi total_cups thì đủ khi các nhóm đã đầy.
+        // Mức tối thiểu của từng nhóm không còn chặn: khi tổng đã đủ mọi ly đều bị khoá nên khách không thể bù thêm vào nhóm thiếu.
+        $maxSum = array_sum(array_map(fn($g) => (int)$g['max'], $combo['groups']));
+        $need = min((int)$combo['total_cups'], $maxSum);
+        $complete = $combo['picked'] > 0 && $combo['picked'] <= $combo['total_cups'] && $combo['picked'] >= $need;
         foreach ($combo['groups'] as $group) {
-            if ($group['picked'] < $group['min'] || $group['picked'] > $group['max']) {
+            if ($group['picked'] > $group['max']) {
                 $complete = false;
             }
         }

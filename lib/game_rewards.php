@@ -354,3 +354,15 @@ function hgr_calculate(array $cart, array $record, array $result, ?array $giftLi
     }
     return $result;
 }
+
+/** Quà chia sẻ Facebook đã cấu hình ở admin (settings.hgr_share_prizes): [['amount' => int, 'weight' => basis 10000], ...]; chưa cấu hình thì không mở lượt chia sẻ. */
+function hymg_share_saved(): array {
+    $list = [];
+    $decoded = json_decode((string)setting('hgr_share_prizes', ''), true);
+    if (is_array($decoded)) {
+        foreach ($decoded as $row) {
+            if (is_array($row) && (int)($row['amount'] ?? 0) > 0 && (int)($row['weight'] ?? 0) > 0) $list[] = ['amount' => (int)$row['amount'], 'weight' => (int)$row['weight']];
+        }
+    }
+    return $list;
+}

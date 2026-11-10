@@ -21,11 +21,11 @@ $combos = db()->query('SELECT * FROM combos ORDER BY sort_order, id')->fetchAll(
 
 // Gom nhóm + món của tất cả combo: combo_id => group_id => ['label' => 'Nhóm 1 (chọn 2)', 'items' => ['Trà đào — L', ...]]
 $groupsByCombo = [];
-$groupRows = db()->query('SELECT id, combo_id, name, min_pick, max_pick FROM combo_groups ORDER BY sort_order, id')->fetchAll();
+$groupRows = db()->query('SELECT id, combo_id, name_vi, name_en, name_zh, min_pick, max_pick FROM combo_groups ORDER BY sort_order, id')->fetchAll();
 
 foreach ($groupRows as $g) {
     $groupsByCombo[(int)$g['combo_id']][(int)$g['id']] = [
-        'label' => combo_group_label((string)$g['name'], (int)$g['min_pick'], (int)$g['max_pick']),
+        'label' => combo_group_label(localized_name($g), (int)$g['min_pick'], (int)$g['max_pick']),
         'items' => [],
     ];
 }
@@ -103,7 +103,7 @@ admin_header(cb('title'));
                             —
                         <?php endif; ?>
                     </td>
-                    <td><strong><?= e($c['name']) ?></strong></td>
+                    <td><strong><?= e(localized_name($c)) ?></strong></td>
                     <td><?= e(currency()) ?><?= money($c['price']) ?></td>
                     <td><?= number_format((int)$c['total_cups']) ?></td>
                     <td>

@@ -24,7 +24,7 @@ try {
 }
 admin_header(t('game_center'));
 ?>
-<link rel="stylesheet" href="<?= e(base_url('assets/css/game-admin.css?v=19.9.3')) ?>">
+<link rel="stylesheet" href="<?= e(base_url('assets/css/game-admin.css?v=19.9.4')) ?>">
 <?php if ($rewardMessage !== ''): ?><div class="alert" role="status"><?= e($rewardMessage) ?></div><?php endif; ?>
 <?php hgr_revenue_panel(); ?>
 <?php hgr_admin_form(); ?>
@@ -104,5 +104,5 @@ admin_header(t('game_center'));
         </table>
     </div>
 </section> -->
-<script defer src="<?= e(base_url('assets/js/game-admin.js?v=19.9.4')) ?>"></script>
+<script defer src="<?= e(base_url('assets/js/game-admin.js?v=19.9.5')) ?>"></script>
 <?php admin_footer(); ?>
