@@ -1,5 +1,5 @@
 /* Slider combo trang chủ (index.php, assets/css/home-combos.css).
-   Vuốt / cuộn do CSS scroll-snap lo; file này chỉ dựng chấm trang và nút ‹ ›. */
+   Vuốt / cuộn do CSS scroll-snap lo; file này dựng chấm trang, nút ‹ › và tự chạy mỗi 4 giây. */
 (function () {
     'use strict';
 
@@ -136,8 +136,45 @@
             });
         }
 
+        // Tự chạy: 4 giây sang 1 trang, tới trang cuối thì quay về đầu.
+        var AUTO_MS = 4000;
+        var timer = null;
+
+        function autoNext() {
+            if (pageCount < 2 || document.hidden) {
+                return;
+            }
+
+            if (indexNow() >= pageCount - 1) {
+                goTo(0);
+            } else {
+                goTo(indexNow() + 1);
+            }
+        }
+
+        function stopAuto() {
+            if (timer) {
+                window.clearInterval(timer);
+                timer = null;
+            }
+        }
+
+        function startAuto() {
+            stopAuto();
+            timer = window.setInterval(autoNext, AUTO_MS);
+        }
+
+        // Người dùng đang chạm / rê chuột / focus vào slider thì tạm dừng.
+        root.addEventListener('mouseenter', stopAuto);
+        root.addEventListener('mouseleave', startAuto);
+        root.addEventListener('focusin', stopAuto);
+        root.addEventListener('focusout', startAuto);
+        root.addEventListener('touchstart', stopAuto, { passive: true });
+        root.addEventListener('touchend', startAuto, { passive: true });
+
         window.addEventListener('resize', refresh);
         refresh();
+        startAuto();
     }
 
     function init() {
