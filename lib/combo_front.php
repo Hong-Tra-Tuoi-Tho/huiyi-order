@@ -114,7 +114,7 @@ function hcf_render_section(array $combos, ?array $room = null): string
     </div>
     <div class="hcf-dots" data-combo-dots></div>
   </section>
-  <script src="<?= e(base_url('assets/js/home-combos.js?v=3')) ?>" defer></script>
+  <script src="<?= e(base_url('assets/js/home-combos.js?v=5')) ?>" defer></script>
     <?php
 
     return (string)ob_get_clean();

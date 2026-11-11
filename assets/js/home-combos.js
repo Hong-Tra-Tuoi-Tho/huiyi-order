@@ -37,6 +37,11 @@
         function indexNow() {
             var index = Math.round(track.scrollLeft / step());
 
+            // Đang ở vùng thẻ nhân bản (sắp quay vòng) thì tính là trang đầu.
+            if (index >= pageCount) {
+                return 0;
+            }
+
             return Math.max(0, Math.min(pageCount - 1, index));
         }
 
@@ -140,16 +145,47 @@
         var AUTO_MS = 4000;
         var timer = null;
 
+        // Vòng lặp 1 chiều: nhân bản vài thẻ đầu đặt cuối dải.
+        // Chạy tới bản nhân bản cuối thì nhảy ngầm về 0 (giao diện y hệt nên không thấy giật lại).
+        var cloneCount = Math.min(cards.length, 3);
+        for (var k = 0; k < cloneCount; k++) {
+            var copy = cards[k].cloneNode(true);
+            copy.removeAttribute('data-combo-card');
+            copy.setAttribute('aria-hidden', 'true');
+            track.appendChild(copy);
+        }
+
+        function rawIndex() {
+            return Math.round(track.scrollLeft / step());
+        }
+
+        function resetIfAtEnd() {
+            var total = cards.length;
+
+            if (Math.abs(track.scrollLeft - total * step()) > 2) {
+                return;
+            }
+
+            track.style.scrollBehavior = 'auto';
+            track.style.scrollSnapType = 'none';
+            track.scrollLeft = 0;
+
+            window.requestAnimationFrame(function () {
+                window.requestAnimationFrame(function () {
+                    track.style.scrollBehavior = '';
+                    track.style.scrollSnapType = '';
+                });
+            });
+        }
+
+        track.addEventListener('scroll', resetIfAtEnd, { passive: true });
+
         function autoNext() {
             if (pageCount < 2 || document.hidden) {
                 return;
             }
 
-            if (indexNow() >= pageCount - 1) {
-                goTo(0);
-            } else {
-                goTo(indexNow() + 1);
-            }
+            track.scrollTo({ left: (rawIndex() + 1) * step() });
         }
 
         function stopAuto() {
