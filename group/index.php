@@ -11,7 +11,12 @@ try {
   $id = (string)($_GET['id'] ?? '');
   $invite = (string)($_GET['invite'] ?? '');
   // Creating a group needs a signed-in member (the group's owner_member_id).
-  if ($id === '' && $invite === '' && !hym_current_member()) redirect(hym_login_gate_url('group'));
+  // ?mode=combo: vào từ nút "Đặt combo nhóm" ở trang chủ (chỉ đổi tiêu đề, form tạo nhóm giữ nguyên).
+  $comboMode = ($_GET['mode'] ?? '') === 'combo';
+  // ?combo=ID: khách bấm "Đặt ngay" ở slider combo; nhớ lại để vẫn còn sau khi đăng nhập, rồi đưa vào nhóm vừa tạo.
+  if (isset($_GET['combo']) && ctype_digit((string)$_GET['combo'])) $_SESSION['hyg_pending_combo'] = (int)$_GET['combo'];
+  $pendingCombo = (int)($_SESSION['hyg_pending_combo'] ?? 0);
+  if ($id === '' && $invite === '' && !hym_current_member()) redirect(hym_login_gate_url($comboMode ? 'group-combo' : 'group'));
   if ($id !== '') {
     $r = hyg_room($id);
     hyg_member($r);
@@ -50,21 +55,41 @@ if (is_array($pendingNickname) && $invited && ($pendingNickname['invite'] ?? '')
 front_header(gt('title'));
 $msg = (string)($_SESSION['hyg_message'] ?? '');
 unset($_SESSION['hyg_message']);
+$orderSuccess = !empty($_SESSION['hyg_order_success']);
+unset($_SESSION['hyg_order_success']);
 ?>
+<?php if ($r): ?><link rel="stylesheet" href="<?= e(base_url('assets/css/group-combo.css?v=31')) ?>"><?php endif; ?>
 <div class="hyg-page">
-  <a class="back" href="<?= e(base_url('index.php')) ?>">← <?= e(t('back_menu')) ?></a>
+  <?php /* Nhóm combo: "menu" của nhóm là trang chọn combo (chủ nhóm) / chọn nước (thành viên), không phải danh sách món. */ ?>
+  <a class="back" href="<?= e(base_url($r ? 'index.php?group=' . $r['public_id'] : 'index.php')) ?>">← <?= e(t('back_menu')) ?></a>
   <?php if ($msg !== ''): ?><div class="alert info"><?= e($msg) ?></div><?php endif; ?>
+  <?php if (!$r && !$invited): ?>
+    <!-- Group order guide: create page = step 1. -->
+    <?= hyg_render_steps(1) ?>
+  <?php elseif ($r): ?>
+    <!-- Group order guide: room page = step 2, or 3 once the group has a drink. group-order.js refreshes this slot. -->
+    <div id="hyg-steps-slot"><?= $r['status'] === 'submitted' ? '' : hyg_render_steps(hyg_room_step($r)) ?></div>
+  <?php endif; ?>
   <?php if ($r): ?>
-    <header class="hyg-page-head">
-      <div><span class="hyg-eyebrow"><?= e(gt('title')) ?></span>
-        <h1><?= e($r['title']) ?></h1>
-      </div><a class="btn" href="<?= e(base_url('group/')) ?>"><?= e(gt('my_groups')) ?></a>
-    </header>
-    <?php if (hyg_host($r)): ?><div id="hyg-share-slot"><?= hyg_render_share($r) ?></div><?php endif; ?>
+    <?php
+    // The host's share card is titled "Chia sẻ giỏ hàng - <group name>". Without it (members, or a closed/expired
+    // room) the group name stays as the page title. The "Đặt hàng nhóm" eyebrow is no longer shown.
+    $share = hyg_host($r) ? hyg_render_share($r) : '';
+    ?>
+    <?php if ($share === ''): ?>
+      <header class="hyg-page-head">
+        <div>
+          <h1><?= e($r['title']) ?></h1>
+        </div><?php /* TẠM ẨN nút "Nhóm của tôi" ở đầu phòng nhóm (danh sách nhóm đã có ở trang giỏ hàng cart.php)
+        <a class="btn" href="<?= e(base_url('group/')) ?>"><?= e(gt('my_groups')) ?></a>
+        */ ?>
+      </header>
+    <?php endif; ?>
+    <?php if (hyg_host($r)): ?><div id="hyg-share-slot"><?= $share ?></div><?php endif; ?>
     <div class="hyg-sync" role="status"><span data-sync-status><?= e(gt('sync')) ?></span><button type="button" class="hyg-text-btn" data-group-refresh><?= e(gt('refresh')) ?></button></div>
     <?= hyg_render_room($r) ?>
     <script id="hyg-config" type="application/json">
-      <?= json_encode(['snapshot' => base_url('group/state.php?id=' . $r['public_id']), 'copy' => gt('copied'), 'manual' => gt('manual_copy'), 'offline' => gt('offline'), 'changed' => gt('changed_notice'), 'sync' => gt('sync'), 'serverTime' => time(), 'qrError' => gt('qr_error'), 'roomExpired' => gt('room_expired')], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_HEX_APOS | JSON_UNESCAPED_UNICODE) ?>
+      <?= json_encode(['snapshot' => base_url('group/state.php?id=' . $r['public_id']), 'copy' => gt('copied'), 'manual' => gt('manual_copy'), 'offline' => gt('offline'), 'changed' => gt('changed_notice'), 'sync' => gt('sync'), 'serverTime' => time(), 'qrError' => gt('qr_error'), 'copyLabel' => gt('copy'), 'sheetTitle' => gt('share_sheet_title'), 'sheetHint' => gt('share_sheet_hint'), 'zalo' => gt('share_zalo'), 'zaloCopied' => gt('share_zalo_copied'), 'zaloInsideCopied' => gt('share_zalo_inside_copied'), 'messenger' => gt('share_messenger'), 'telegram' => gt('share_telegram'), 'more' => gt('share_more'), 'close' => gt('share_close'),'roomExpired' => gt('room_expired')], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_HEX_APOS | JSON_UNESCAPED_UNICODE) ?>
     </script>
     <script>
       // Browser Back from the group checkout lands here; send the customer to the home page instead.
@@ -82,6 +107,7 @@ unset($_SESSION['hyg_message']);
         window.addEventListener('pageshow', event => { if (event.persisted && leftCheckout()) location.replace(home); });
       })();
     </script>
+    <?php if ($orderSuccess) require __DIR__ . '/../lib/order_success_popup.php'; ?>
   <?php elseif ($invited): ?>
     <section class="hyg-welcome hyg-card"><span class="hyg-eyebrow"><?= e(gt('join_title')) ?></span>
       <h1><?= e($invited['title']) ?></h1>
@@ -89,13 +115,13 @@ unset($_SESSION['hyg_message']);
       <form method="post" action="<?= e(base_url('group/action.php')) ?>" class="hyg-form"><?= csrf_field() ?><input type="hidden" name="action" value="join"><input type="hidden" name="invite" value="<?= e($invite) ?>"><label><?= e(gt('nickname')) ?><input name="nickname" required maxlength="32" autocomplete="nickname" value="<?= e($memberNickname) ?>"></label><small><?= e(gt('nickname_hint')) ?></small><button class="btn primary block" type="submit"><?= e(gt('join')) ?></button></form>
     </section>
   <?php else: ?>
-    <section class="hyg-welcome hyg-card"><span class="hyg-eyebrow"><?= e(gt('title')) ?></span>
-      <h1><?= e(gt('entry_title')) ?></h1>
-      <p><?= e(gt('entry_desc')) ?></p>
-      <div class="hyg-step-line"><span><?= e(gt('step_create')) ?></span><span><?= e(gt('step_share')) ?></span><span><?= e(gt('step_checkout')) ?></span></div>
+    <section class="hyg-welcome hyg-card">
+      <h1 class="hyg-mode-title <?= $comboMode ? 'is-combo' : 'is-group' ?>"><?= e(gt($comboMode ? 'mode_combo' : 'mode_group')) ?></h1>
       <form method="post" enctype="multipart/form-data" action="<?= e(base_url('group/action.php')) ?>" class="hyg-form">
         <?= csrf_field() ?>
         <input type="hidden" name="action" value="create">
+        <?php if ($comboMode): ?><input type="hidden" name="order_type" value="combo"><?php endif; ?>
+        <?php if ($pendingCombo > 0): ?><input type="hidden" name="combo_id" value="<?= $pendingCombo ?>"><?php endif; ?>
         <input type="hidden" name="request_key" value="<?= bin2hex(random_bytes(16)) ?>">
         <label><?= e(gt('room_name')) ?>
           <input name="title" maxlength="80" required placeholder="<?= e(gt('room_placeholder')) ?>">
@@ -108,7 +134,7 @@ unset($_SESSION['hyg_message']);
         <!-- close-test-Hai | (Trưởng nhóm thu tiền hộ) -->
         <!-- <?= htp_render_group_fields() ?> -->
 
-        <?php if (!empty($_SESSION['cart'])): ?>
+        <?php if (!$comboMode && !empty($_SESSION['cart'])): ?>
           <label class="hyg-check"><input type="checkbox" name="copy_cart" value="1" checked>
             <span><?= e(gt('copy_cart')) ?> · <?= cart_count() ?></span>
           </label>
@@ -123,9 +149,11 @@ unset($_SESSION['hyg_message']);
     </section>
 */ ?>
   <?php endif; ?>
+  <?php /* TODO: Tạm ẩn hai dòng ghi chú cuối trang nhóm ("Trưởng nhóm chọn thanh toán chung hoặc riêng..." và "Cần đăng nhập thành viên để tham gia nhóm...").
   <div class="hyg-privacy">
     <p><?= e(gt('rules')) ?></p>
     <p><?= e(gt('device_note')) ?></p>
   </div>
+  */ ?>
 </div>
 <?php front_footer(); ?>

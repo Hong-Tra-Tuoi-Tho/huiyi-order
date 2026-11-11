@@ -8,12 +8,12 @@ function hds_schema(): void {
     static $done=false;if($done)return;$pdo=db();
     if($pdo->inTransaction())hds_fail('dispatch_inside_transaction');
     $marker=$pdo->prepare('SELECT setting_value FROM settings WHERE setting_key=?');$marker->execute(['dispatch_schema_version']);
-    if((string)$marker->fetchColumn()!=='19.7.0'){
+    if((string)$marker->fetchColumn()!=='19.17.0'){
         $lock='hds-schema:'.substr(hash('sha256',(string)$pdo->query('SELECT DATABASE()')->fetchColumn()),0,40);
         $st=$pdo->prepare('SELECT GET_LOCK(?,10)');$st->execute([$lock]);if((int)$st->fetchColumn()!==1)hds_fail('dispatch_schema_busy');
         try{
             $marker->execute(['dispatch_schema_version']);
-            if((string)$marker->fetchColumn()!=='19.7.0'){
+            if((string)$marker->fetchColumn()!=='19.17.0'){
                 $sql=file_get_contents(__DIR__.'/dispatch_schema.sql');if($sql===false)hds_fail('dispatch_schema_missing');
                 foreach(explode(';',$sql) as $statement)if(trim($statement)!=='')$pdo->exec($statement);
                 foreach(['coord_source'=>"VARCHAR(16) NOT NULL DEFAULT 'manual'",'geocoded_at'=>'DATETIME NULL','expires_at'=>'DATETIME NULL'] as $column=>$definition){
@@ -34,7 +34,18 @@ function hds_schema(): void {
                 }
                 $index=$pdo->query("SELECT COUNT(*) FROM information_schema.STATISTICS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='orders' AND INDEX_NAME='idx_dispatch_geo_expiry'")->fetchColumn();
                 if(!(int)$index)$pdo->exec('ALTER TABLE orders ADD KEY idx_dispatch_geo_expiry(delivery_geo_expires_at)');
-                hds_exec('INSERT INTO settings(setting_key,setting_value) VALUES(?,?) ON DUPLICATE KEY UPDATE setting_value=VALUES(setting_value)',['dispatch_schema_version','19.7.0']);
+                // Store partners list and poll their own store's orders by status.
+                $index=$pdo->query("SELECT COUNT(*) FROM information_schema.STATISTICS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='orders' AND INDEX_NAME='idx_orders_store_status'")->fetchColumn();
+                if(!(int)$index)$pdo->exec('ALTER TABLE orders ADD KEY idx_orders_store_status(dispatch_store_id,status,id)');
+                // A partner handing an order back is recorded with admin_id NULL, its partners.id and a reason.
+                if($pdo->query("SELECT IS_NULLABLE FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='dispatch_history' AND COLUMN_NAME='admin_id'")->fetchColumn()==='NO')$pdo->exec('ALTER TABLE dispatch_history MODIFY COLUMN admin_id BIGINT UNSIGNED NULL');
+                foreach(['partner_id'=>'BIGINT UNSIGNED NULL AFTER admin_id','reason'=>'VARCHAR(1000) NULL AFTER partner_id'] as $column=>$definition){
+                    $check=$pdo->prepare('SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME=? AND COLUMN_NAME=?');$check->execute(['dispatch_history',$column]);
+                    if(!(int)$check->fetchColumn())$pdo->exec("ALTER TABLE dispatch_history ADD COLUMN `$column` $definition");
+                }
+                $index=$pdo->query("SELECT COUNT(*) FROM information_schema.STATISTICS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='dispatch_history' AND INDEX_NAME='idx_dispatch_history_partner'")->fetchColumn();
+                if(!(int)$index)$pdo->exec('ALTER TABLE dispatch_history ADD KEY idx_dispatch_history_partner(partner_id)');
+                hds_exec('INSERT INTO settings(setting_key,setting_value) VALUES(?,?) ON DUPLICATE KEY UPDATE setting_value=VALUES(setting_value)',['dispatch_schema_version','19.17.0']);
             }
         }finally{$st=$pdo->prepare('SELECT RELEASE_LOCK(?)');$st->execute([$lock]);}
     }$done=true;

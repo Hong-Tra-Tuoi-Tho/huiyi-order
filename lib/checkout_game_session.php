@@ -47,9 +47,9 @@ function hcgs_schema(): void
 function hcgs_text(string $key, array $vars = []): string
 {
     static $text = [
-        'zh' => ['forfeit_title' => '您還有 {n} 次小遊戲機會', 'forfeit_body' => '現在送出訂單，未使用的機會將被取消，不會保留到下次。', 'play_now' => '立即遊玩', 'forfeit_submit' => '放棄機會並送出', 'forfeit_note' => '送出訂單時，未使用的機會將被取消。', 'opened' => '本訂單共 {qty} 杯飲料，您獲得 {chances} 次小遊戲機會。', 'locked' => '購物車已鎖定：此階段只能送出訂單、付款及遊玩小遊戲。', 'expires' => '每次機會有 {minutes} 分鐘，每玩完一次重新計時。逾時未送出訂單，未使用的機會將被取消；已獲得的獎品會保留。', 'expired' => '小遊戲階段已逾時：未使用的機會已取消，已獲得的獎品仍會折抵本訂單。', 'remaining' => '剩餘時間', 'cart_locked' => '您已開啟小遊戲階段，購物車暫時鎖定。請完成訂單。', 'group_locked' => '團購已鎖定：此階段團主只能送出訂單及遊玩小遊戲。', 'group_busy' => '您正在進行團購的小遊戲階段，請先完成團購訂單。'],
-        'vi' => ['forfeit_title' => 'Bạn còn {n} lượt chơi Mini Game', 'forfeit_body' => 'Nếu thanh toán bây giờ, các lượt chưa chơi sẽ bị huỷ và không được cộng cho lần sau.', 'play_now' => 'Chơi ngay', 'forfeit_submit' => 'Bỏ lượt & thanh toán', 'forfeit_note' => 'Quà trúng được tự áp dụng vào đơn này. Lượt chưa chơi sẽ bị huỷ khi gửi đơn.', 'opened' => 'Đơn có {qty} ly nước — bạn nhận {chances} lượt chơi Mini Game.', 'locked' => 'Giỏ hàng đã khoá: trong phiên này bạn chỉ có thể gửi đơn, thanh toán và chơi Mini Game.', 'expires' => 'Mỗi lượt có {minutes} phút, chơi xong một lượt sẽ tính lại {minutes} phút. Hết giờ mà chưa gửi đơn, lượt chưa chơi sẽ bị huỷ; quà đã trúng vẫn được giữ lại.', 'expired' => 'Phiên Mini Game đã hết hạn: lượt chưa chơi đã bị huỷ. Quà đã trúng vẫn được trừ vào đơn này.', 'remaining' => 'Thời gian còn lại', 'cart_locked' => 'Bạn đang trong phiên Mini Game nên giỏ hàng tạm khoá. Vui lòng hoàn tất đơn hàng.', 'group_locked' => 'Nhóm đã khoá: trong phiên này trưởng nhóm chỉ có thể gửi đơn, thanh toán và chơi Mini Game.', 'group_busy' => 'Bạn đang trong phiên Mini Game của đơn nhóm. Vui lòng hoàn tất đơn nhóm trước.'],
-        'en' => ['forfeit_title' => 'You still have {n} Mini Game chance(s)', 'forfeit_body' => 'If you pay now, unplayed chances are cancelled and will not be kept for later.', 'play_now' => 'Play now', 'forfeit_submit' => 'Skip and pay', 'forfeit_note' => 'Prizes you win are applied to this order. Unplayed chances are cancelled when you submit.', 'opened' => 'This order has {qty} drinks — you received {chances} Mini Game chances.', 'locked' => 'Your cart is locked: during this session you can only submit, pay and play the Mini Game.', 'expires' => 'Each chance has {minutes} minutes; the clock restarts after every finished play. If the order is not submitted in time, unplayed chances are cancelled; prizes already won are kept.', 'expired' => 'Your Mini Game session has expired: unplayed chances were cancelled. Prizes already won still apply to this order.', 'remaining' => 'Time remaining', 'cart_locked' => 'Your cart is locked while a Mini Game session is open. Please complete your order.', 'group_locked' => 'The group is locked: during this session the host can only submit, pay and play the Mini Game.', 'group_busy' => 'A group order Mini Game session is open. Please complete the group order first.'],
+        'zh' => ['plays_left' => '剩餘小遊戲機會：{n}', 'hold' => '保留訂單：{time} 分', 'add_drinks' => '回菜單加飲料', 'add_none' => '請選擇要增加的杯數。', 'add_confirm' => '確認增加', 'add_blocked' => '您已玩過小遊戲，無法再增加飲料，請完成訂單。', 'upsell' => '請再買 {more} 杯，即可多得 1 次機會', 'forfeit_title' => '您還有 {n} 次小遊戲機會', 'forfeit_body' => '現在送出訂單，未使用的機會將被取消，不會保留到下次。', 'play_now' => '立即遊玩', 'forfeit_submit' => '放棄機會並送出', 'forfeit_note' => '送出訂單時，未使用的機會將被取消。', 'opened' => '本訂單共 {qty} 杯飲料，您獲得 {chances} 次小遊戲機會。', 'locked' => '購物車已鎖定：此階段只能送出訂單、付款及遊玩小遊戲。', 'expires' => '每次機會有 {minutes} 分鐘，每玩完一次重新計時。逾時未送出訂單，未使用的機會將被取消；已獲得的獎品會保留。', 'expired' => '小遊戲階段已逾時：未使用的機會已取消，購物車已清空，請重新下單。', 'remaining' => '剩餘時間', 'cart_locked' => '您已開啟小遊戲階段，購物車暫時鎖定。請完成訂單。', 'group_locked' => '團購已鎖定：此階段團主只能送出訂單及遊玩小遊戲。', 'group_busy' => '您正在進行團購的小遊戲階段，請先完成團購訂單。'],
+        'vi' => ['plays_left' => 'Lượt chơi Mini Game còn lại: {n}', 'hold' => 'Giữ đơn: {time} phút', 'add_drinks' => 'Thêm nước vào đơn này', 'add_none' => 'Vui lòng chọn số ly muốn thêm.', 'add_confirm' => 'Xác nhận thêm', 'add_blocked' => 'Bạn đã chơi Mini Game nên không thể thêm nước nữa. Vui lòng hoàn tất đơn hàng.', 'upsell' => 'Hãy mua thêm {more} ly để nhận thêm 1 lượt', 'forfeit_title' => 'Bạn còn {n} lượt chơi Mini Game', 'forfeit_body' => 'Nếu thanh toán bây giờ, các lượt chưa chơi sẽ bị huỷ và không được cộng cho lần sau.', 'play_now' => 'Chơi ngay', 'forfeit_submit' => 'Bỏ lượt & thanh toán', 'forfeit_note' => 'Quà trúng được tự áp dụng vào đơn này. Lượt chưa chơi sẽ bị huỷ khi gửi đơn.', 'opened' => 'Đơn có {qty} ly nước — bạn nhận {chances} lượt chơi Mini Game.', 'locked' => 'Giỏ hàng đã khoá: trong phiên này bạn chỉ có thể gửi đơn, thanh toán và chơi Mini Game.', 'expires' => 'Mỗi lượt có {minutes} phút, chơi xong một lượt sẽ tính lại {minutes} phút. Hết giờ mà chưa gửi đơn, lượt chưa chơi sẽ bị huỷ; quà đã trúng vẫn được giữ lại.', 'expired' => 'Phiên Mini Game đã hết hạn: lượt chưa chơi đã bị huỷ. Giỏ hàng đã được xoá, vui lòng đặt lại.', 'remaining' => 'Thời gian còn lại', 'cart_locked' => 'Bạn đang trong phiên Mini Game nên giỏ hàng tạm khoá. Vui lòng hoàn tất đơn hàng.', 'group_locked' => 'Nhóm đã khoá: trong phiên này trưởng nhóm chỉ có thể gửi đơn, thanh toán và chơi Mini Game.', 'group_busy' => 'Bạn đang trong phiên Mini Game của đơn nhóm. Vui lòng hoàn tất đơn nhóm trước.'],
+        'en' => ['plays_left' => 'Mini Game plays left: {n}', 'hold' => 'Hold: {time} min', 'add_drinks' => 'Add more drinks to this order', 'add_none' => 'Please choose how many drinks to add.', 'add_confirm' => 'Confirm', 'add_blocked' => 'You have already played the Mini Game, so drinks can no longer be added. Please complete your order.', 'upsell' => 'Buy {more} more drink(s) to get 1 more chance', 'forfeit_title' => 'You still have {n} Mini Game chance(s)', 'forfeit_body' => 'If you pay now, unplayed chances are cancelled and will not be kept for later.', 'play_now' => 'Play now', 'forfeit_submit' => 'Skip and pay', 'forfeit_note' => 'Prizes you win are applied to this order. Unplayed chances are cancelled when you submit.', 'opened' => 'This order has {qty} drinks — you received {chances} Mini Game chances.', 'locked' => 'Your cart is locked: during this session you can only submit, pay and play the Mini Game.', 'expires' => 'Each chance has {minutes} minutes; the clock restarts after every finished play. If the order is not submitted in time, unplayed chances are cancelled; prizes already won are kept.', 'expired' => 'Your Mini Game session has expired: unplayed chances were cancelled. Your cart was cleared, please order again.', 'remaining' => 'Time remaining', 'cart_locked' => 'Your cart is locked while a Mini Game session is open. Please complete your order.', 'group_locked' => 'The group is locked: during this session the host can only submit, pay and play the Mini Game.', 'group_busy' => 'A group order Mini Game session is open. Please complete the group order first.'],
     ];
     $s = $text[current_lang()][$key] ?? $text['en'][$key] ?? $key;
     foreach ($vars as $k => $v) $s = str_replace('{' . $k . '}', (string)$v, $s);
@@ -69,6 +69,14 @@ function hcgs_list(?string $json): array
 /** A session lives HCGS_TTL seconds from opening or from its last finished play; reloads never extend it. */
 const HCGS_EXPIRED_SQL = 'COALESCE(clock_at,created_at)<=UTC_TIMESTAMP()-INTERVAL ' . HCGS_TTL . ' SECOND';
 
+/** The customer's ordinary cart (and its coupon) is emptied when the Mini Game time runs out. */
+function hcgs_clear_cart(): void
+{
+    $_SESSION['cart'] = [];
+    clear_coupon();
+    unset($_SESSION['promotion_mode']);
+}
+
 /** The open session of this browser session; an expired one is undone instead of returned. */
 function hcgs_current(bool $touch = false): ?array
 {
@@ -83,12 +91,19 @@ function hcgs_current(bool $touch = false): ?array
         $_SESSION['hcgs_flash'] = hcgs_text('expired');
         return null;
     }
-    // An expired session with prizes stays remembered so the next order still receives them (see hcgs_prize_row).
+    // Time ran out (found here or already ended by the sweep): the ordinary cart is deleted, the customer orders again from scratch.
+    if (in_array($row['status'], ['expired', 'released'], true) && hcgs_group_of($row) === '') {
+        hcgs_clear_cart();
+        $_SESSION['hcgs_flash'] = hcgs_text('expired');
+        return null;
+    }
+    // A group session that expired with prizes stays remembered so the host's order still receives them (see hcgs_prize_row).
     if ($row['status'] === 'expired') $_SESSION[HCGS_KEY] = $id;
     if ($row['status'] !== 'open') return null;
     if ((int)$row['expired'] === 1) {
         hcgs_expire($id);
-        if (hcgs_row($id)) $_SESSION[HCGS_KEY] = $id;
+        // A group session is deleted by hcgs_expire itself (room cancelled, drinks removed from the database).
+        if (hcgs_group_of($row) === '') hcgs_clear_cart();
         $_SESSION['hcgs_flash'] = hcgs_text('expired');
         return null;
     }
@@ -112,10 +127,10 @@ function hcgs_locked(): ?array
     // A paused campaign invalidates draw checkout, so the cart must stay editable to avoid a cart/checkout loop.
     if (!minigame_enabled()) return null;
     try {
-        // An expired session not yet submitted keeps the customer on the checkout page until the order is sent.
-        if ($row = hcgs_current()) return $row;
-        $row = hcgs_row(hcgs_session_id());
-        return $row && $row['status'] === 'expired' ? $row : null;
+        // Only an open session locks the cart: once the time runs out the customer can order again (won prizes still apply, see hcgs_prize_row).
+        $row = hcgs_current();
+        // A timer-only session (no chance granted) must not lock the room or the cart.
+        return $row && (int)$row['granted_chances'] > 0 ? $row : null;
     } catch (Throwable $e) {
         return null;
     }
@@ -140,6 +155,12 @@ function hcgs_guard_cart(): void
     $_SESSION['hcgs_flash'] = hcgs_text(hcgs_group_of($row) !== '' ? 'group_busy' : 'cart_locked');
     redirect(hcgs_checkout_url($row));
 }
+/** Adding drinks stays possible while a played session is open (add-only); every other cart edit is still refused. */
+function hcgs_guard_cart_add(): void
+{
+    if (!empty($_SESSION['hcgs_appending']) && hcgs_locked()) return;
+    hcgs_guard_cart();
+}
 /** Group room changes by the host are refused while that room's session is open. */
 function hcgs_guard_group(string $groupId): void
 {
@@ -159,7 +180,9 @@ function hcgs_open(int $drinkQty, int $chances, string $groupId = ''): ?array
     $flag = $_SESSION['hcgs_allow_open'] ?? null;
     unset($_SESSION['hcgs_allow_open']);
     $allowed = $groupId === '' ? $flag === true : (is_string($flag) && hash_equals($flag, $groupId));
-    if (!$allowed || !minigame_enabled() || $chances < 1) return null;
+    if (!$allowed) return null;
+    // A group checkout always gets a session, even with no chance (or no Mini Game): it carries the countdown that cancels the room.
+    if ($groupId === '' && (!minigame_enabled() || $chances < 1)) return null;
     $token = customer_game_wallet_token(true);
     if (preg_match('/^[a-f0-9]{32}$/D', $token) !== 1) return null;
     $id = bin2hex(random_bytes(16));
@@ -199,6 +222,46 @@ function hcgs_record_play_locked(string $token, string $couponCode): void
     $plays[] = (int)$st->fetchColumn();
     $pdo->prepare('UPDATE checkout_game_sessions SET played_chances=played_chances+1,coupon_codes=?,play_ids=?,clock_at=UTC_TIMESTAMP() WHERE id=?')
         ->execute([json_encode($codes), json_encode($plays), $id]);
+}
+
+/** The host added drinks to the locked group: the open session of this browser grows to the new drink count, never shrinks. */
+function hcgs_grow_group_session(string $groupId, int $drinkQty, int $chances): void
+{
+    $id = hcgs_session_id();
+    if ($id === '') return;
+    $pdo = db();
+    if ($pdo->inTransaction()) return;
+    $st = $pdo->prepare('SELECT wallet_token FROM checkout_game_sessions WHERE id=?');
+    $st->execute([$id]);
+    $token = $st->fetchColumn();
+    if ($token === false) return;
+    $pdo->beginTransaction();
+    try {
+        // Same lock order as the Mini Game: wallet, then session.
+        $st = $pdo->prepare('SELECT available_chances FROM game_wallets WHERE wallet_token=? FOR UPDATE');
+        $st->execute([$token]);
+        $st = $pdo->prepare("SELECT * FROM checkout_game_sessions WHERE id=? AND status='open' FOR UPDATE");
+        $st->execute([$id]);
+        $row = $st->fetch();
+        $grantedBefore = $row ? (int)$row['granted_chances'] : 0;
+        if (!$row || hcgs_group_of($row) !== $groupId || $grantedBefore < 1 || $drinkQty <= (int)$row['drink_qty']) {
+            $pdo->commit();
+            return;
+        }
+        // Facebook-share bonus chances sit inside granted_chances: only the part earned by drinks is compared with the new drink count.
+        $drinkChancesBefore = min($grantedBefore, game_chances_for_drink_qty((int)$row['drink_qty']));
+        $extra = max(0, $chances - $drinkChancesBefore);
+        if ($extra > 0) {
+            $pdo->prepare('UPDATE game_wallets SET available_chances=available_chances+?,total_earned=total_earned+? WHERE wallet_token=?')
+                ->execute([$extra, $extra, $token]);
+        }
+        $pdo->prepare('UPDATE checkout_game_sessions SET drink_qty=?,granted_chances=granted_chances+? WHERE id=?')
+            ->execute([$drinkQty, $extra, $id]);
+        $pdo->commit();
+    } catch (Throwable $e) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
+        error_log('[checkout_game] grow failed');
+    }
 }
 
 /** Called inside the Mini Game transaction: a share bonus chance joins the open session. */
@@ -404,12 +467,80 @@ function hcgs_expire(string $id): void
             $in = implode(',', array_fill(0, count($codes), '?'));
             $pdo->prepare("DELETE FROM game_matching_boards WHERE wallet_token=? AND coupon_code IN ($in)")->execute(array_merge([$token], $codes));
         }
-        // The session is kept (no chances left) until the order is sent: its prizes still apply and the cart stays on checkout.
-        $pdo->prepare("UPDATE checkout_game_sessions SET status='expired',granted_chances=played_chances WHERE id=?")->execute([$id]);
+        // The cart is unlocked either way. A session with plays is kept (no chances left) so its prizes still apply to the next order;
+        // nothing played = nothing to keep, so the session is deleted outright.
+        // A group session is always deleted: its room is cancelled below, so there is no order left to apply prizes to.
+        $group = hcgs_group_of($row);
+        $newStatus = (int)$row['played_chances'] > 0 && $group === '' ? 'expired' : 'released';
+        $pdo->prepare('UPDATE checkout_game_sessions SET status=?,granted_chances=played_chances WHERE id=?')->execute([$newStatus, $id]);
         $pdo->commit();
+        if ($group !== '') hcgs_drop_group($group);
     } catch (Throwable $e) {
         if ($pdo->inTransaction()) $pdo->rollBack();
         error_log('[checkout_game] expire failed');
+    }
+}
+
+/**
+ * The customer goes back to add drinks: an open session with no play yet is undone and the cart unlocks.
+ * Checkout opens a fresh session (recounting the chances) when they come back from the cart.
+ */
+function hcgs_release_for_edit(): bool
+{
+    $id = hcgs_session_id();
+    if ($id === '') return false;
+    $pdo = db();
+    if ($pdo->inTransaction()) return false;
+    $st = $pdo->prepare('SELECT wallet_token FROM checkout_game_sessions WHERE id=?');
+    $st->execute([$id]);
+    $token = $st->fetchColumn();
+    if ($token === false) return false;
+    $pdo->beginTransaction();
+    try {
+        // Same lock order as the Mini Game: wallet, then session.
+        $st = $pdo->prepare('SELECT available_chances FROM game_wallets WHERE wallet_token=? FOR UPDATE');
+        $st->execute([$token]);
+        $available = max(0, (int)$st->fetchColumn());
+        $st = $pdo->prepare("SELECT * FROM checkout_game_sessions WHERE id=? AND status='open' FOR UPDATE");
+        $st->execute([$id]);
+        $row = $st->fetch();
+        // A played session or a group room session is never released here: its prizes would be lost.
+        if (!$row || (int)$row['played_chances'] > 0 || hcgs_group_of($row) !== '') {
+            $pdo->commit();
+            return false;
+        }
+        $revoke = min($available, hcgs_remaining($row));
+        $pdo->prepare('UPDATE game_wallets SET available_chances=available_chances-?,total_earned=GREATEST(0,total_earned-?) WHERE wallet_token=?')
+            ->execute([$revoke, $revoke, $token]);
+        $pdo->prepare("UPDATE checkout_game_sessions SET status='released' WHERE id=?")->execute([$id]);
+        $pdo->commit();
+    } catch (Throwable $e) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
+        error_log('[checkout_game] release failed');
+        return false;
+    }
+    unset($_SESSION[HCGS_KEY]);
+    return true;
+}
+
+/**
+ * Mini Game time ran out on a group checkout: the room is cancelled ("Đã hủy") and its drinks are deleted from the database.
+ * When members already paid (payment work in progress) the drinks, members and payment history are kept for reconciliation.
+ */
+function hcgs_drop_group(string $publicId): void
+{
+    if (!function_exists('hyg_tx')) return;
+    try {
+        hyg_tx(function () use ($publicId) {
+            $room = hyg_room($publicId, true);
+            if (!in_array($room['status'], ['open', 'locked'], true) || !empty($room['order_id'])) return;
+            $members = hyg_all('SELECT * FROM group_members WHERE room_id=?', [$room['id']]);
+            if (!hyg_room_has_payment_work($members)) hyg_exec('DELETE FROM group_items WHERE room_id=?', [$room['id']]);
+            hyg_exec("UPDATE group_rooms SET status='cancelled',invite_token=NULL,lock_signature=NULL,settlement_json=NULL,revision=revision+1 WHERE id=?", [$room['id']]);
+        });
+        $GLOBALS['hcgs_group_dropped'] = $publicId;
+    } catch (Throwable $e) {
+        error_log('[checkout_game] group drop failed');
     }
 }
 
@@ -420,6 +551,10 @@ function hcgs_sweep(int $limit = 10): void
         $st = db()->prepare("SELECT id FROM checkout_game_sessions WHERE status='open' AND " . HCGS_EXPIRED_SQL . " LIMIT " . max(1, $limit));
         $st->execute();
         foreach ($st->fetchAll(PDO::FETCH_COLUMN) as $id) hcgs_expire((string)$id);
+        // Group rooms whose Mini Game session already ended but are still shown as "Đã chốt, chờ gửi đơn".
+        $st = db()->prepare("SELECT DISTINCT s.group_public_id FROM checkout_game_sessions s JOIN group_rooms r ON r.public_id=s.group_public_id WHERE s.group_public_id IS NOT NULL AND s.status IN ('expired','released') AND r.status IN ('open','locked') AND r.order_id IS NULL LIMIT " . max(1, $limit));
+        $st->execute();
+        foreach ($st->fetchAll(PDO::FETCH_COLUMN) as $groupId) hcgs_drop_group((string)$groupId);
     } catch (Throwable $e) {
         error_log('[checkout_game] sweep failed');
     }

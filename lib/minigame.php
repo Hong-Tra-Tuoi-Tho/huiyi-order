@@ -76,11 +76,62 @@ function hymg_payload(?array $row,?array $board,int $balance,string $event): arr
         'appearance'=>hymg_public_presentation($presentation),'share_bonus'=>hymg_share_offer($row,$board),
         'prizes'=>$pool?hgr_public_pool($pool):[]];
 }
-/** A 0đ prize earns one replay for sharing the website, once per board. */
+/** A 0đ prize earns one replay that always wins a configured share prize, once per board. */
 function hymg_share_offer(?array $row,?array $board): bool {
     if(!$row||$row['awarded_at']===null||!isset($row['reward_json'])||!is_array($board['reward_pool']??null))return false;
     $reward=hymg_saved_reward($row);
-    return $reward!==null&&hgr_reward_is_zero($reward)&&hgr_winning_pool($board['reward_pool'])!==null;
+    // Chưa cấu hình mức giá chia sẻ ở admin thì không mở lượt chia sẻ (không còn mức mặc định 52.000đ).
+    return $reward!==null&&hgr_reward_is_zero($reward)&&hymg_share_saved()!==[];
+}
+/** Quay ngẫu nhiên 1 mức giảm theo tỷ lệ đã cấu hình. */
+function hymg_share_amount(): int {
+    $list = hymg_share_saved();
+    if (!$list) hymg_fail('share_unavailable');
+    $total = array_sum(array_column($list, 'weight'));
+    $roll = random_int(1, max(1, $total));
+    foreach ($list as $choice) {
+        $roll -= $choice['weight'];
+        if ($roll <= 0) return $choice['amount'];
+    }
+    return $list[array_key_last($list)]['amount'];
+}
+/** The share prize: the board's own prize with the drawn amount when it has one, otherwise a discount of that amount built from another discount prize. */
+function hymg_share_prize(array $pool): array {
+    $amount = hymg_share_amount();
+    $prize = null;
+    $base = null;
+    foreach ($pool as $item) {
+        if (!is_array($item) || ($item['kind'] ?? '') !== 'discount') continue;
+        if ((float)($item['amount'] ?? 0) === (float)$amount) {
+            $prize = $item;
+            break;
+        }
+        $base ??= $item;
+    }
+    if (!$prize) {
+        $prize = $base ?? [
+            'id' => 'share-bonus',
+            'kind' => 'discount',
+            'valid_days' => 30,
+            'item_id' => 0,
+            'item_ids' => [],
+            'gift_qty' => 0,
+            'item_sizes' => [],
+            'cup_size' => '',
+            'min_spend' => 0,
+            'min_paid_cups' => 0,
+            'terms' => ['vi' => '', 'zh' => '', 'en' => ''],
+        ];
+        $prize['amount'] = $amount;
+        foreach (['vi', 'zh', 'en'] as $lang) {
+            $money = hgr_money_text($amount, $lang);
+            $prize['name'][$lang] = ['vi' => 'Giảm ' . $money, 'zh' => '折抵 ' . $money, 'en' => $money . ' off'][$lang];
+        }
+    }
+    $prize['weight'] = 10000;
+    // Marks the coupon as won from a 0đ prize, so the revenue report can tell it from a regular 52.000đ prize.
+    $prize['share_bonus'] = true;
+    return $prize;
 }
 function hymg_save_board(string $token,array $board): void {
     $statement=db()->prepare('UPDATE game_matching_boards SET state_json=? WHERE wallet_token=?');
@@ -154,16 +205,19 @@ function hymg_request(string $action,array $data=[]): array {
                 $row['reward_json']=json_encode($reward,JSON_THROW_ON_ERROR);$row['awarded_at']='awarded';$event='awarded';
             }
         }elseif($action==='share_bonus'){
-            // Sharing after a 0đ prize grants one more chance on a board whose pool has no 0đ prize.
+            // Sharing after a 0đ prize grants one more chance on a board whose only prize is 52.000đ (100%);
+            // the win joins the open checkout session, so it is taken off the current order like any money prize.
             $id=hymg_board_id($data);
             if(!$row)hymg_fail('board_missing');
             if(!hash_equals($row['board_id'],$id))hymg_fail('board_changed');
             if(!minigame_enabled())hymg_fail('campaign_disabled',403);
             if(!hymg_share_offer($row,$board))hymg_fail('share_unavailable');
-            $pool=hgr_winning_pool($board['reward_pool']);
-            $pdo->prepare('UPDATE game_wallets SET available_chances=available_chances+1,total_earned=total_earned+1 WHERE wallet_token=?')->execute([$token]);$balance++;
+            $pool = [hymg_share_prize($board['reward_pool'])];
+            $pdo->prepare('UPDATE game_wallets SET available_chances=available_chances+1,total_earned=total_earned+1 WHERE wallet_token=?')->execute([$token]);
+            $balance++;
             hcgs_add_chance_locked($token);
-            $board=hymg_create_board($token,true,$pool);$row=['board_id'=>$board['id'],'awarded_at'=>null];
+            $board = hymg_create_board($token, true, $pool);
+            $row = ['board_id' => $board['id'], 'awarded_at' => null];
         }else{
             if(!minigame_enabled())hymg_fail('campaign_disabled',403);
             if(($action==='next'||!$board)?!hgr_ready():!hymg_board_ready($board))hymg_fail('rewards_unavailable',403);

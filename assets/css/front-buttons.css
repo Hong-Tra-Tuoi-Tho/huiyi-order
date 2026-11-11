@@ -1,0 +1,165 @@
+/* Nút phía khách hàng (front_header) dùng chung 2 màu của "Đặt đơn nhóm" / "Đặt combo nhóm":
+   - nút chính (.btn.primary)  = đỏ đậm #B32424
+   - nút phụ   (.btn)          = vàng cam gradient
+   Nút nguy hiểm (.danger) giữ kiểu viền đỏ nhạt. Nạp sau cùng nên thắng các rule .btn trong app.css / member.css. */
+
+.front-body .btn.primary {
+    border-color: #B32424;
+    background: #B32424;
+    color: #fff;
+}
+
+.front-body .btn.primary:not(:disabled):hover,
+.front-body .btn.primary:not(:disabled):focus-visible {
+    border-color: #8F1D1D;
+    background: #8F1D1D;
+    color: #fff;
+}
+
+.front-body .btn:not(.primary):not(.danger) {
+    border: 2px solid #fff3c4;
+    background: linear-gradient(180deg, #ffe680 0%, #ffc21a 55%, #ffab00 100%);
+    color: #5a0f0f;
+    box-shadow: 0 4px 12px rgba(255, 171, 0, .35);
+}
+
+.front-body .btn:not(.primary):not(.danger):not(:disabled):hover,
+.front-body .btn:not(.primary):not(.danger):not(:disabled):focus-visible {
+    filter: brightness(1.04);
+    box-shadow: 0 6px 16px rgba(255, 171, 0, .5);
+}
+
+.front-body .btn:focus-visible {
+    outline: 3px solid #B32424;
+    outline-offset: 3px;
+}
+
+/* Nút bị khoá: xám, không màu nổi. */
+.front-body .btn:disabled,
+.front-body .btn[aria-disabled="true"] {
+    border-color: #d9dce2;
+    background: #d9dce2;
+    color: #8a91a0;
+    box-shadow: none;
+    cursor: not-allowed;
+    filter: none;
+}
+
+/* Nút dạng chip: chọn size / đá / đường (trang món), nút "+" trên thẻ món. Đang chọn = đỏ đậm. */
+.front-body .choice input:checked + span {
+    border-color: #B32424;
+    background: #B32424;
+    color: #fff;
+}
+
+.front-body .product-card:hover .product-arrow,
+.front-body .catalog-product-grid .product-card:hover .product-arrow {
+    background: #B32424;
+    color: #fff;
+}
+
+/* Danh mục đang chọn ở menu: máy tính nền đỏ, điện thoại chữ đỏ + vạch đỏ bên trái. */
+@media (min-width: 761px) {
+    .front-body .catalog-category-btn.active {
+        background: #B32424;
+        color: #fff;
+    }
+
+    .front-body .catalog-category-btn.active b {
+        background: #fff;
+        color: #B32424;
+    }
+}
+
+@media (max-width: 760px) {
+    .front-body .catalog-category-btn.active {
+        color: #B32424;
+    }
+
+    .front-body .catalog-category-btn.active::before {
+        background: #B32424;
+    }
+}
+
+/* Nút quay lại (← Quay lại menu / giỏ nhóm / đăng nhập): vàng cam nổi bật như nút "Đặt combo nhóm". */
+.front-body a.back {
+    min-height: 42px;
+    padding: 0 16px;
+    border: 2px solid #fff3c4;
+    border-radius: 12px;
+    background: linear-gradient(180deg, #ffe680 0%, #ffc21a 55%, #ffab00 100%);
+    color: #5a0f0f;
+    font-size: 14px;
+    font-weight: 800;
+    text-decoration: none;
+    box-shadow: 0 4px 12px rgba(255, 171, 0, .4);
+    transition: transform .15s, box-shadow .15s;
+}
+
+.front-body a.back:hover,
+.front-body a.back:focus-visible {
+    box-shadow: 0 6px 16px rgba(255, 171, 0, .55);
+    transform: translateY(-1px);
+}
+
+.front-body a.back:focus-visible {
+    outline: 3px solid #B32424;
+    outline-offset: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .front-body a.back {
+        transition: none;
+    }
+}
+
+/* Checkout nhóm combo: khối "Hủy nhóm" nằm dưới nút đặt hàng, tách hẳn ra cho khỏi bấm nhầm. */
+.front-body .checkout-cancel-group {
+    display: grid;
+    gap: 10px;
+    margin-top: 28px;
+    padding-top: 20px;
+    border-top: 1px dashed var(--line, #e5e7eb);
+}
+
+.front-body .checkout-cancel-group label {
+    display: grid;
+    gap: 6px;
+    font-weight: 700;
+}
+
+/* Dòng combo trong giỏ: nút "Chọn nước" nhỏ gọn; nút Xóa nằm cột phải, thẳng cột với các nút Xóa món thường. */
+.front-body .cart-combo-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 10px;
+}
+
+.front-body .cart-combo-actions .btn {
+    min-height: 38px;
+    padding: 0 14px;
+    font-size: 14px;
+    font-weight: 800;
+}
+
+/* Nút "Chọn nước" (combo chưa đủ nước): vàng nổi bật như nút chọn combo. */
+.front-body .cart-combo-actions .btn.primary,
+.front-body .cart-combo-actions .btn.primary:hover {
+    border: 2px solid #fff3c4;
+    background: linear-gradient(180deg, #ffe680 0%, #ffc21a 55%, #ffab00 100%);
+    color: #5a0f0f;
+    font-weight: 900;
+    box-shadow: 0 6px 16px rgba(255, 171, 0, .45);
+}
+
+.front-body .cart-combo .cart-side .cart-remove-btn {
+    grid-column: 1 / -1;
+    justify-self: end;
+}
+
+/* Giá combo sát nút Xóa: các hàng dồn lên trên, không bị kéo giãn theo chiều cao dòng combo. */
+.front-body .cart-combo .cart-side {
+    align-content: start;
+    row-gap: 4px;
+}

@@ -1,0 +1,333 @@
+/* Slider "Khám phá combo mới nhất" trên trang chủ (index.php + assets/js/home-combos.js).
+   Điện thoại: 1 thẻ (hé thẻ bên cạnh) · iPad: 2 thẻ · màn hình lớn: 3 thẻ. */
+
+.hcf-section {
+    --hcf-gap: 14px;
+    --hcf-peek: 7%;
+    position: relative;
+    min-width: 0;
+    max-width: 100%;
+    margin: 0 0 30px;
+}
+
+.hcf-heading h2 {
+    text-transform: uppercase;
+}
+
+.hcf-viewport {
+    position: relative;
+    min-width: 0;
+}
+
+/* Dải ngang cuộn bằng scroll-snap; JS chỉ lo nút ‹ › và chấm trang. */
+.hcf-track {
+    display: flex;
+    gap: var(--hcf-gap);
+    min-width: 0;
+    padding: 4px var(--hcf-peek) 14px;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    scroll-padding-inline: var(--hcf-peek);
+    scroll-behavior: smooth;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+}
+
+.hcf-track::-webkit-scrollbar {
+    display: none;
+}
+
+.hcf-card {
+    --hcf-bg: #1f3f6e;
+    position: relative;
+    flex: 0 0 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    aspect-ratio: 4 / 5;
+    min-height: 360px;
+    padding: 22px 20px 20px;
+    border-radius: 24px;
+    overflow: hidden;
+    background: var(--hcf-bg);
+    color: #fff;
+    scroll-snap-align: center;
+    box-shadow: 0 10px 28px rgba(16, 24, 40, .16);
+    isolation: isolate;
+}
+
+/* Màu nền xoay vòng, thấy rõ khi combo chưa có ảnh. */
+.hcf-card:nth-child(3n+1) {
+    --hcf-bg: #1f3f6e;
+}
+
+.hcf-card:nth-child(3n+2) {
+    --hcf-bg: #0f6b66;
+}
+
+.hcf-card:nth-child(3n) {
+    --hcf-bg: #e8661c;
+}
+
+.hcf-card-image {
+    position: absolute;
+    inset: 0;
+    z-index: -2;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform .5s ease;
+}
+
+.hcf-card:hover .hcf-card-image {
+    transform: scale(1.04);
+}
+
+/* Phủ tối trên + dưới để chữ trắng luôn đọc được trên mọi ảnh. */
+.hcf-card::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    background:
+        linear-gradient(180deg, rgba(0, 0, 0, .58) 0%, rgba(0, 0, 0, .12) 38%, rgba(0, 0, 0, 0) 55%),
+        linear-gradient(0deg, rgba(0, 0, 0, .72) 0%, rgba(0, 0, 0, .2) 32%, rgba(0, 0, 0, 0) 50%);
+}
+
+.hcf-card.no-image::before {
+    background:
+        radial-gradient(circle at 85% 30%, rgba(255, 255, 255, .16) 0 22%, transparent 23%),
+        radial-gradient(circle at 70% 75%, rgba(255, 255, 255, .1) 0 18%, transparent 19%);
+}
+
+.hcf-card-top {
+    max-width: 78%;
+}
+
+.hcf-card-name {
+    display: -webkit-box;
+    margin: 0;
+    overflow: hidden;
+    font-size: clamp(24px, 6.4vw, 32px);
+    font-weight: 900;
+    line-height: 1.08;
+    letter-spacing: -0.01em;
+    text-transform: uppercase;
+    text-shadow: 0 2px 10px rgba(0, 0, 0, .35);
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+}
+
+.hcf-card-price {
+    display: block;
+    margin-top: 12px;
+    font-size: 22px;
+    font-weight: 900;
+    color: #ffd54a;
+    text-shadow: 0 2px 8px rgba(0, 0, 0, .35);
+    font-variant-numeric: tabular-nums;
+}
+
+.hcf-card-bottom {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.hcf-card-meta {
+    min-width: 0;
+    margin: 0;
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 1.4;
+    color: rgba(255, 255, 255, .9);
+    text-shadow: 0 1px 6px rgba(0, 0, 0, .4);
+}
+
+/* Nút vàng phát sáng như mẫu. ".front-body ... button.hcf-order" thắng rule ".front-body .container :is(button, .btn)" của app.css. */
+.front-body .hcf-section button.hcf-order {
+    flex: 0 0 auto;
+    min-width: 0;
+    min-height: 0;
+    padding: 12px 22px;
+    border: 2px solid #fff3c4;
+    border-radius: 999px;
+    background: linear-gradient(180deg, #ffe680 0%, #ffc21a 100%);
+    color: #2b1b00;
+    font: inherit;
+    font-size: 17px;
+    font-weight: 900;
+    letter-spacing: .02em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    overflow-wrap: normal;
+    box-shadow: 0 0 0 4px rgba(255, 213, 74, .25), 0 6px 18px rgba(255, 194, 26, .55);
+    cursor: pointer;
+    transition: transform .15s ease, box-shadow .15s ease;
+}
+
+.front-body .hcf-section button.hcf-order:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 0 0 5px rgba(255, 213, 74, .32), 0 8px 22px rgba(255, 194, 26, .65);
+}
+
+.front-body .hcf-section button.hcf-order:active {
+    transform: translateY(1px);
+}
+
+.front-body .hcf-section button.hcf-order:focus-visible {
+    outline: 3px solid #fff;
+    outline-offset: 3px;
+}
+
+/* ‹ › chỉ hiện từ iPad trở lên, khi rê chuột / focus. */
+.front-body .hcf-section button.hcf-arrow {
+    position: absolute;
+    top: calc(50% - 7px);
+    z-index: 2;
+    display: none;
+    place-items: center;
+    width: 42px;
+    min-width: 0;
+    height: 42px;
+    min-height: 0;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, .9);
+    color: #101828;
+    font-size: 28px;
+    line-height: 1;
+    box-shadow: 0 4px 14px rgba(16, 24, 40, .2);
+    cursor: pointer;
+    opacity: 0;
+    transform: translateY(-50%);
+    transition: opacity .2s;
+}
+
+.front-body .hcf-section button.hcf-arrow:disabled {
+    visibility: hidden;
+}
+
+.hcf-arrow.is-prev {
+    left: -8px;
+}
+
+.hcf-arrow.is-next {
+    right: -8px;
+}
+
+.hcf-viewport:hover .hcf-arrow,
+.hcf-viewport:focus-within .hcf-arrow {
+    opacity: 1;
+}
+
+.hcf-dots {
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+    margin-top: 4px;
+}
+
+.hcf-dots[hidden] {
+    display: none;
+}
+
+.front-body .hcf-section button.hcf-dot {
+    width: 9px;
+    min-width: 0;
+    height: 9px;
+    min-height: 0;
+    padding: 0;
+    border: 0;
+    border-radius: 999px;
+    background: #d0d5dd;
+    cursor: pointer;
+    transition: width .25s ease, background .25s ease;
+}
+
+.front-body .hcf-section button.hcf-dot[aria-current="true"] {
+    width: 28px;
+    background: #667085;
+}
+
+/* iPad: 2 thẻ, không hé. */
+@media (min-width: 640px) {
+    .hcf-section {
+        --hcf-peek: 0px;
+    }
+
+    .hcf-card {
+        flex-basis: calc((100% - var(--hcf-gap)) / 2);
+        scroll-snap-align: start;
+    }
+
+    .hcf-card-name {
+        font-size: clamp(24px, 3.4vw, 32px);
+    }
+
+    .front-body .hcf-section button.hcf-arrow {
+        display: grid;
+    }
+}
+
+/* Màn hình lớn: 3 thẻ. */
+@media (min-width: 1024px) {
+    .hcf-section {
+        --hcf-gap: 18px;
+    }
+
+    .hcf-card {
+        flex-basis: calc((100% - 2 * var(--hcf-gap)) / 3);
+    }
+
+    .hcf-card-name {
+        font-size: clamp(24px, 2.2vw, 30px);
+    }
+}
+
+/* Thẻ hẹp (iPad dọc / desktop 3 cột) => nút xuống dòng dưới dòng phụ cho khỏi chật. */
+@media (min-width: 640px) and (max-width: 860px), (min-width: 1024px) and (max-width: 1240px) {
+    .hcf-card-bottom {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .front-body .hcf-section button.hcf-order {
+        text-align: center;
+    }
+
+    .hcf-order-form,
+    .hcf-order-form .hcf-order {
+        width: 100%;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .hcf-track {
+        scroll-behavior: auto;
+    }
+
+    .hcf-card-image,
+    .front-body .hcf-section button.hcf-order,
+    .front-body .hcf-section button.hcf-dot {
+        transition: none;
+    }
+}
+
+/* Chủ nhóm combo chọn combo (index.php?group=...): form bọc nút "Đặt ngay", dòng hướng dẫn. */
+.hcf-order-form {
+    flex: 0 0 auto;
+    margin: 0;
+}
+
+.hcf-pick-hint {
+    margin: 0 0 14px;
+    color: #475467;
+    font-weight: 600;
+}
+
+.hcf-card {
+    cursor: pointer;
+}

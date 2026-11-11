@@ -81,7 +81,7 @@ front_header($pn);
                         </div>
                     </details>
                 </div><?php endif; ?>
-            <div class="qty-row"><label><?= e(t('quantity')) ?> <input type="number" name="qty" min="1" max="20" value="<?= (int)($chosen['qty'] ?? 1) ?>"></label><button class="btn primary grow" type="submit"><?= e($groupContext ? gt($groupEdit ? 'save_item' : 'add_group') : t('add_cart')) ?></button></div>
+            <div class="qty-row"><label><?= e(t('quantity')) ?> <input type="number" name="qty" min="1" max="<?= order_qty_max() ?>" value="<?= (int)($chosen['qty'] ?? 1) ?>"></label><button class="btn primary grow" type="submit"><?= e($groupContext ? gt($groupEdit ? 'save_item' : 'add_group') : t('add_cart')) ?></button></div>
         </form>
     </div>
 </div>

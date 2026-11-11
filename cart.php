@@ -10,6 +10,7 @@ if (!promotion_cart_choice()['valid']) {
 }
 front_header(t('cart'));
 $cart = $_SESSION['cart'] ?? [];
+$comboState = hcc_state($cart);
 $coupon = cart_coupon_summary();
 $couponMsg = $_SESSION['coupon_message'] ?? '';
 $couponErr = $_SESSION['coupon_error'] ?? '';
@@ -30,13 +31,20 @@ try {
     <h1><?= e(t('cart')) ?></h1>
   </div>
 </div>
-<?php if (!hyg_in_active_group()): ?>
-<section class="hyg-entry">
+<?php
+// Already inside a group order (still choosing drinks, or closed and waiting to be sent): starting another one is locked.
+$inGroupOrder = hyg_has_live_group();
+?>
+<section class="hyg-entry<?= $inGroupOrder ? ' is-locked' : '' ?>">
   <div><strong><?= e(gt('share_cart')) ?></strong>
     <p><?= e(gt('copy_hint')) ?></p>
-  </div><a class="btn primary" href="<?= e(hym_login_gate_url('group')) ?>"><?= e(gt('create')) ?></a>
+  </div>
+  <?php if ($inGroupOrder): ?>
+    <button type="button" class="btn primary" disabled aria-disabled="true"><?= e(gt('create')) ?></button>
+  <?php else: ?>
+    <a class="btn primary" href="<?= e(hym_login_gate_url('group')) ?>"><?= e(gt('create')) ?></a>
+  <?php endif; ?>
 </section>
-<?php endif; ?>
 <?php if ($myRooms): ?>
   <section class="hyg-card">
     <h2><?= e(gt('my_groups')) ?></h2>
@@ -47,10 +55,28 @@ try {
 
         <!-- Chỉ hiện thị những đơn hàng đang chọn món và chờ gửi đơn -->
         <?php if (in_array($s, ['open', 'locked'], true)): ?>
-          <a href="<?= e(hyg_room_url($room['public_id'])) ?>">
-            <strong><?= e($room['title']) ?>
-            </strong>
-            <span class="hyg-status"><?= e(gt($s)) ?></span>
+          <?php
+          // A locked group that is ready to send (this device is the host, every payment confirmed) opens the
+          // "send order" form directly. checkout.php shows an error page for a group that is not ready, so any
+          // other group keeps the room page, which explains what is still missing.
+          $roomUrl = hyg_room_url($room['public_id']);
+          $readyToSend = false;
+          if ($s === 'locked') {
+            try {
+              hyg_checkout((string) $room['public_id']);
+              $roomUrl = base_url('checkout.php?group=' . rawurlencode((string) $room['public_id']));
+              $readyToSend = true;
+            } catch (Throwable $notReady) {
+              // Not the host, payments unconfirmed, empty room… (or any lookup error): keep the room page.
+            }
+          }
+          ?>
+          <a class="hyg-room-link<?= $readyToSend ? ' is-ready' : '' ?>" href="<?= e($roomUrl) ?>">
+            <strong><?= e($room['title']) ?></strong>
+            <span class="hyg-room-meta">
+              <span class="hyg-status is-<?= e($s) ?>"><?= e(gt($s)) ?></span>
+              <span class="hyg-room-cta"><?= e(gt($readyToSend ? 'room_cta_send' : 'room_cta_open')) ?> ›</span>
+            </span>
           </a>
         <?php endif; ?>
       <?php endforeach; ?>
@@ -67,6 +93,34 @@ try {
     <?= csrf_field() ?>
     <div class="cart-list">
       <?php foreach ($cart as $key => $r): ?>
+        <?php if (!empty($r['combo_drink'])) continue; // Ly nước của combo hiện ngay dưới dòng combo ?>
+        <?php if (!empty($r['is_combo'])): $cs = $comboState[(string)$key] ?? null; ?>
+          <article class="cart-item cart-combo">
+            <div class="cart-main">
+              <h3><span class="hyg-combo-badge"><?= e(hcc_t('combo_label')) ?></span> <?= e($r['name']) ?></h3>
+              <?php if ($cs): ?>
+                <p class="<?= $cs['complete'] ? '' : 'cart-combo-need' ?>"><?= e(hgc_t('progress', ['picked' => $cs['picked'], 'total' => $cs['total_cups']])) ?></p>
+                <?php foreach ($cs['drinks'] as $drink): ?>
+                  <p class="cart-combo-drink">
+                    <?= e($drink['name']) ?> × <?= (int)$drink['qty'] ?>
+                    <small><?= e(implode(' · ', array_filter([$drink['cup_size'] ?? '', $drink['ice'] ?? '', $drink['sugar'] ?? '']))) ?></small>
+                    <?php if (!empty($drink['toppings'])): ?><small><?= e(t('toppings')) ?>：<?= e(implode('、', array_map(fn($top) => $top['display_name'] ?? $top['name'] ?? '', $drink['toppings']))) ?> (+<?= e(currency()) ?><?= money($drink['unit_price']) ?>)</small><?php endif; ?>
+                  </p>
+                <?php endforeach; ?>
+                <div class="cart-combo-actions">
+                  <a class="btn<?= $cs['complete'] ? '' : ' primary' ?>" href="<?= e(base_url('combo.php?key=' . rawurlencode((string)$key))) ?>"><?= e(hcc_t($cs['picked'] > 0 ? 'change_drinks' : 'pick_drinks')) ?></a>
+                </div>
+              <?php endif; ?>
+            </div>
+            <div class="cart-side">
+              <strong><?= e(currency()) ?><?= money($r['unit_price']) ?></strong>
+              <button class="cart-remove-btn" type="submit" name="remove_key" value="<?= e($key) ?>" aria-label="<?= e(hcc_t('remove_combo')) ?> <?= e($r['name']) ?>"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M4 7h16M9 7V4h6v3m-8 0 1 13h8l1-13M10 11v5m4-5v5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+                </svg><span><?= e(t('remove')) ?></span></button>
+            </div>
+          </article>
+          <?php continue; ?>
+        <?php endif; ?>
         <article class="cart-item">
           <div class="cart-main">
             <h3><?= e($r['name']) ?></h3>
@@ -76,7 +130,7 @@ try {
           </div>
           <div class="cart-side">
             <strong><?= e(currency()) ?><?= money($r['unit_price'] * $r['qty']) ?></strong>
-            <label class="cart-qty-field"><span><?= e(t('quantity')) ?></span><input aria-label="<?= e(t('quantity')) ?>" type="number" name="qty[<?= e($key) ?>]" min="0" max="20" value="<?= $r['qty'] ?>"></label>
+            <label class="cart-qty-field"><span><?= e(t('quantity')) ?></span><input aria-label="<?= e(t('quantity')) ?>" type="number" name="qty[<?= e($key) ?>]" min="0" max="<?= order_qty_max() ?>" value="<?= $r['qty'] ?>"></label>
             <button class="cart-remove-btn" type="submit" name="remove_key" value="<?= e($key) ?>" aria-label="<?= e(t('remove')) ?> <?= e($r['name']) ?>"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true">
                 <path d="M4 7h16M9 7V4h6v3m-8 0 1 13h8l1-13M10 11v5m4-5v5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
               </svg><span><?= e(t('remove')) ?></span></button>
@@ -97,7 +151,9 @@ try {
     <?php if (cart_discount() > 0): ?><div class="discount-line"><span><?= e(t('coupon_discount')) ?><?php if ($coupon['code']): ?> · <?= e($coupon['code']) ?><?php endif; ?></span><strong>-<?= e(currency()) ?><?= money(cart_discount()) ?></strong></div><?php endif; ?>
     <div class="total-line"><span><?= e(t('total')) ?></span><strong><?= e(currency()) ?><?= money(cart_total()) ?></strong></div>
   </div>
-  <div class="cart-actions checkout-action"><button class="btn primary" type="submit" form="cart-promotion-selector" name="continue_to_checkout" value="1"><?= e(t('checkout_info')) ?></button></div>
+  <?php $combosReady = hcc_all_complete($cart); ?>
+  <?php if (!$combosReady): ?><p class="alert danger" role="status"><?= e(hcc_t('need_drinks')) ?></p><?php endif; ?>
+  <div class="cart-actions checkout-action"><button class="btn primary" type="submit" form="cart-promotion-selector" name="continue_to_checkout" value="1" <?= $combosReady ? '' : 'disabled aria-disabled="true"' ?>><?= e(t('checkout_info')) ?></button></div>
 <?php endif; ?>
 
 <!-- Footer website -->

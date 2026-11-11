@@ -1,0 +1,779 @@
+/* Nhóm combo: trang chọn nước theo combo (group/combo.php) + nhãn combo trong giỏ nhóm (lib/group_views.php). */
+
+.hgc-title {
+    margin: 4px 0 16px;
+    font-size: 24px;
+}
+
+.hyg-combo-badge {
+    display: inline-block;
+    padding: 2px 10px;
+    border-radius: 999px;
+    background: linear-gradient(180deg, #ffe680 0%, #ffc21a 100%);
+    color: #5a0f0f;
+    font-size: 12px;
+    font-weight: 900;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+    vertical-align: middle;
+}
+
+.hyg-combo-progress {
+    color: #b54708;
+    font-weight: 700;
+}
+
+.hyg-combo-progress.is-complete {
+    color: #067647;
+}
+
+.hyg-combo-of {
+    color: #b54708;
+}
+
+.hgc-combo.is-complete {
+    border-color: #abefc6;
+}
+
+.hgc-combo-head {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 14px;
+}
+
+.hgc-combo-thumb {
+    flex: 0 0 auto;
+    width: 72px;
+    height: 72px;
+    border-radius: 14px;
+    object-fit: cover;
+}
+
+.hgc-combo-heading {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.hgc-combo-heading h2 {
+    margin: 4px 0 2px;
+    font-size: 20px;
+}
+
+.hgc-combo-progress {
+    margin: 0;
+    color: #b54708;
+    font-weight: 700;
+}
+
+.hgc-combo.is-complete .hgc-combo-progress {
+    color: #067647;
+}
+
+.hgc-full {
+    flex: 0 0 auto;
+    padding: 2px 10px;
+    border-radius: 999px;
+    background: #f2f4f7;
+    color: #475467;
+    font-size: 13px;
+    font-weight: 700;
+}
+
+.hgc-group {
+    padding: 14px 0;
+    border-top: 1px solid var(--line, #e5e7eb);
+}
+
+.hgc-group-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px 10px;
+    margin-bottom: 10px;
+}
+
+.hgc-rule {
+    color: #667085;
+    font-size: 14px;
+}
+
+.hgc-drinks {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr));
+    gap: 10px;
+}
+
+.hgc-drink {
+    border: 1px solid var(--line, #e5e7eb);
+    border-radius: 14px;
+    background: #fff;
+    overflow: hidden;
+}
+
+.hgc-drink[open] {
+    grid-column: 1 / -1;
+    border-color: #f2c4c4;
+}
+
+.hgc-drink[data-disabled] {
+    opacity: .55;
+}
+
+.hgc-drink summary {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    cursor: pointer;
+    list-style: none;
+}
+
+.hgc-drink summary::-webkit-details-marker {
+    display: none;
+}
+
+.hgc-drink summary img,
+.hgc-drink-placeholder {
+    flex: 0 0 auto;
+    width: 48px;
+    height: 48px;
+    border-radius: 10px;
+    object-fit: cover;
+}
+
+.hgc-drink-placeholder {
+    display: grid;
+    place-items: center;
+    background: #f2f4f7;
+    color: #98a2b3;
+    font-size: 10px;
+    font-weight: 800;
+}
+
+.hgc-drink-name {
+    flex: 1 1 auto;
+    min-width: 0;
+    font-weight: 700;
+}
+
+.hgc-drink summary small {
+    color: #667085;
+}
+
+.hgc-drink-form {
+    display: grid;
+    gap: 12px;
+    padding: 4px 12px 14px;
+}
+
+.hgc-options {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 0;
+    padding: 0;
+    border: 0;
+}
+
+.hgc-options legend {
+    width: 100%;
+    margin-bottom: 6px;
+    font-weight: 700;
+}
+
+.hgc-submit {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 10px;
+}
+
+.hgc-submit label {
+    display: grid;
+    gap: 4px;
+    max-width: 120px;
+}
+
+.hgc-submit .btn {
+    flex: 1 1 180px;
+}
+
+/* Thanh nút dính đáy của nhóm combo: "Chọn combo" + "Chọn nước" chia đôi một hàng, "Chốt món" full ngang bên dưới. */
+.hyg-page .hyg-join-actions.hyg-combo-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+}
+
+.hyg-page .hyg-combo-actions > :not(a),
+.hyg-page .hyg-combo-actions > a:only-of-type {
+    grid-column: 1 / -1;
+}
+
+.hyg-page .hyg-combo-actions > form {
+    margin: 0;
+}
+
+.hyg-page .hyg-combo-actions .btn.primary {
+    min-height: 48px;
+    padding: 0 10px;
+    font-size: 15px;
+}
+
+/* Nút chọn combo: vàng như nút "Đặt combo nhóm" ở trang chủ. */
+.hyg-page .hyg-join-actions .btn.primary.hyg-combo-choose,
+.hyg-page .hyg-join-actions .btn.primary.hyg-combo-choose:hover {
+    border: 2px solid #fff3c4;
+    background: linear-gradient(180deg, #ffe680 0%, #ffc21a 55%, #ffab00 100%);
+    color: #5a0f0f;
+    font-weight: 900;
+    box-shadow: 0 8px 22px rgba(255, 171, 0, .45);
+}
+
+/* Chữ nhắc nằm trên thanh nút dính nên cần nền để không lẫn với nội dung phía sau. */
+.hyg-page .hyg-combo-actions small,
+.hyg-page .hyg-combo-actions p {
+    margin: 0;
+    padding: 6px 10px;
+    border-radius: 10px;
+    background: #fff;
+    text-align: center;
+    box-shadow: 0 4px 14px rgba(16, 24, 40, .1);
+}
+
+/* Nhắc chủ nhóm chọn đủ nước trước khi chốt món: in đậm cho dễ thấy. */
+.hyg-page .hyg-combo-actions small.hgc-lock-hint {
+    color: #5a0f0f;
+    font-weight: 800;
+}
+
+/* Thông báo thành viên chờ chủ nhóm chọn combo: nền vàng, chữ đậm cho nổi bật, cùng tông nút chọn combo. */
+.hyg-page .hgc-wait-host,
+.hyg-page .hyg-combo-actions p.hgc-wait-host {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 12px 14px;
+    border: 2px solid #ffc21a;
+    border-radius: 12px;
+    background: #fff8db;
+    color: #5a0f0f;
+    font-weight: 800;
+    line-height: 1.5;
+    text-align: center;
+    box-shadow: 0 6px 18px rgba(255, 171, 0, .3);
+}
+
+.hyg-page .hgc-wait-host::before {
+    content: "⏳";
+    flex-shrink: 0;
+    font-size: 18px;
+}
+
+/* Nút xoá combo: thùng rác ở góc phải trên của thẻ combo. */
+.hgc-combo {
+    position: relative;
+}
+
+.hgc-combo-head {
+    padding-right: 44px;
+}
+
+.hgc-remove-form {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    margin: 0;
+}
+
+.front-body .hgc-remove-form button.hgc-remove-btn {
+    display: grid;
+    place-items: center;
+    width: 36px;
+    min-width: 0;
+    height: 36px;
+    min-height: 0;
+    padding: 0;
+    border: 1px solid #fecdca;
+    border-radius: 10px;
+    background: #fff;
+    color: #B32424;
+    cursor: pointer;
+    box-shadow: none;
+    transition: background .15s, color .15s;
+}
+
+.front-body .hgc-remove-form button.hgc-remove-btn:hover,
+.front-body .hgc-remove-form button.hgc-remove-btn:focus-visible {
+    background: #B32424;
+    color: #fff;
+}
+
+.hgc-drink-remove {
+    flex: 0 0 auto;
+    margin: 0;
+}
+
+.front-body .hgc-drink-remove button.hgc-drink-remove-btn {
+    display: grid;
+    place-items: center;
+    width: 30px;
+    min-width: 0;
+    height: 30px;
+    min-height: 0;
+    padding: 0;
+    border: 1px solid #fecdca;
+    border-radius: 8px;
+    background: #fff;
+    color: #B32424;
+    font-size: 14px;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.front-body .hgc-drink-remove button.hgc-drink-remove-btn:hover,
+.front-body .hgc-drink-remove button.hgc-drink-remove-btn:focus-visible {
+    background: #B32424;
+    color: #fff;
+}
+
+.hgc-toppings {
+    display: grid;
+    gap: 6px;
+}
+
+.hgc-toppings-label small {
+    color: #667085;
+    font-weight: 500;
+}
+
+
+/* Món có thể bấm: viền đỏ nhạt + bóng, nút "Chọn ›" đỏ bên phải; rê chuột nổi lên, mở ra thì mũi tên quay xuống. */
+.hgc-drink:not([data-disabled]) {
+    border-color: #f2c4c4;
+    box-shadow: 0 2px 8px rgba(179, 36, 36, .08);
+    transition: border-color .15s, box-shadow .15s, transform .15s;
+}
+
+.hgc-drink:not([data-disabled]):hover {
+    border-color: #B32424;
+    box-shadow: 0 6px 16px rgba(179, 36, 36, .16);
+    transform: translateY(-1px);
+}
+
+.hgc-drink:not([data-disabled]) summary:focus-visible {
+    outline: 3px solid #B32424;
+    outline-offset: -3px;
+    border-radius: 14px;
+}
+
+.hgc-drink-cta {
+    display: inline-flex;
+    flex: 0 0 auto;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 10px 6px 14px;
+    border: 2px solid #fff3c4;
+    border-radius: 999px;
+    background: linear-gradient(180deg, #ffe680 0%, #ffc21a 55%, #ffab00 100%);
+    color: #5a0f0f;
+    font-size: 14px;
+    font-weight: 900;
+    line-height: 1;
+    box-shadow: 0 3px 8px rgba(255, 171, 0, .4);
+}
+
+.hgc-drink-cta i {
+    width: 7px;
+    height: 7px;
+    border-right: 2px solid #5a0f0f;
+    border-bottom: 2px solid #5a0f0f;
+    transform: rotate(-45deg);
+    transition: transform .2s;
+}
+
+.hgc-drink[open] .hgc-drink-cta i {
+    transform: rotate(45deg);
+}
+
+.hgc-drink[open] {
+    box-shadow: 0 6px 18px rgba(179, 36, 36, .14);
+    transform: none;
+}
+
+.hgc-drink[open] summary {
+    background: #fff7f7;
+}
+
+/* Món đã hết lượt chọn: nhạt, không nút "Chọn". */
+.hgc-drink[data-disabled] summary {
+    cursor: default;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .hgc-drink:not([data-disabled]),
+    .hgc-drink-cta i {
+        transition: none;
+    }
+}
+
+/* Chọn nhiều topping làm dòng tên topping rất dài: không cho nội dung kéo giãn khung món ra ngoài màn hình
+   (trước đó chữ các ô đá / đường bị đẩy ra ngoài, nhìn như ô trống). */
+.hgc-drink,
+.hgc-drink-form,
+.hgc-drink-form > *,
+.hgc-toppings > * {
+    min-width: 0;
+    max-width: 100%;
+}
+
+/* Dòng topping đã chọn: 1 dòng, dài thì cắt "…" (flex không cắt được chữ nên đổi sang block, mũi tên đặt tuyệt đối). */
+.hgc-toppings .multi-check summary {
+    position: relative;
+    display: block;
+    padding-right: 36px;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+.hgc-toppings .multi-check summary::after {
+    position: absolute;
+    top: 50%;
+    right: 14px;
+    transform: translateY(-50%);
+}
+
+.hgc-drink summary small {
+    flex: 0 0 auto;
+    white-space: nowrap;
+}
+
+/* Ly đã chọn: nằm ngay dưới tên nhóm món, thẻ viền vàng; nút ✕ ở góc phải trên để bỏ chọn lại. */
+.hgc-picked {
+    display: grid;
+    gap: 8px;
+    margin: 0 0 12px;
+    padding: 0;
+    list-style: none;
+}
+
+.hgc-picked > li {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 44px 10px 12px;
+    border: 2px solid #ffc21a;
+    border-radius: 14px;
+    background: #fffbea;
+}
+
+.hgc-picked-text {
+    display: grid;
+    flex: 1 1 auto;
+    gap: 2px;
+    min-width: 0;
+}
+
+.hgc-picked-text small {
+    color: #667085;
+}
+
+.hgc-picked .hgc-drink-remove {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+}
+
+/* Topping của ly đã chọn: thẻ gấp / sổ xuống. */
+.hgc-picked-toppings {
+    margin-top: 4px;
+}
+
+.hgc-picked-toppings summary {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 2px 10px;
+    border: 1px solid #ffc21a;
+    border-radius: 999px;
+    background: #fff;
+    color: #5a0f0f;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    list-style: none;
+}
+
+.hgc-picked-toppings summary::-webkit-details-marker {
+    display: none;
+}
+
+.hgc-picked-toppings summary::after {
+    content: "▾";
+    font-size: 12px;
+    transition: transform .2s;
+}
+
+.hgc-picked-toppings[open] summary::after {
+    transform: rotate(180deg);
+}
+
+.hgc-picked-toppings ul {
+    margin: 6px 0 0;
+    padding: 0 0 0 4px;
+    list-style: none;
+    color: #475467;
+    font-size: 14px;
+}
+
+.hgc-picked-toppings li {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 2px 0;
+    border: 0;
+    background: none;
+}
+
+.hgc-picked-toppings li b {
+    color: #5a0f0f;
+    white-space: nowrap;
+}
+
+/* "Đã chọn 2/2": số lượng nổi bật dạng huy hiệu để khách chú ý; đủ ly thì đổi sang màu xanh. */
+.hgc-rule {
+    font-weight: 700;
+    color: #101828;
+}
+.hgc-rule .hgc-count {
+    display: inline-block;
+    margin-left: 2px;
+    padding: 2px 10px;
+    border-radius: 999px;
+    background: #b32424;
+    color: #fff;
+    font-size: 1.2em;
+    font-weight: 900;
+    line-height: 1.3;
+    letter-spacing: .02em;
+    vertical-align: middle;
+}
+.hgc-rule .hgc-count.is-full {
+    background: #067647;
+}
+
+/* Tên nhóm và "Đã chọn 2/2" luôn cùng một hàng, căn giữa theo chiều dọc (không để huy hiệu đẩy chữ lên). */
+.hgc-group-head {
+    flex-wrap: nowrap;
+}
+.hgc-group-head > strong {
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+.hgc-group-head .hgc-rule {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    flex: 0 0 auto;
+    white-space: nowrap;
+}
+.hgc-group-head .hgc-rule .hgc-count {
+    margin-left: 0;
+    vertical-align: baseline;
+}
+.hgc-group-head .hgc-full {
+    flex: 0 0 auto;
+    white-space: nowrap;
+}
+
+/* Thông báo nổi sau thao tác (gửi form ngầm): thẻ nổi giống khung "Có đơn hàng mới" ở admin, nằm ở đáy màn hình. */
+.hgc-toast {
+    position: fixed;
+    left: 50%;
+    bottom: max(150px, calc(env(safe-area-inset-bottom) + 144px));
+    z-index: 200;
+    transform: translateX(-50%);
+    width: max-content;
+    min-width: min(300px, calc(100vw - 28px));
+    max-width: min(480px, calc(100vw - 28px));
+    padding: 22px 28px;
+    border: 2px solid #f79009;
+    border-radius: 20px;
+    background: #fff4d6;
+    color: #7a2e0e;
+    font-size: 18px;
+    font-weight: 800;
+    line-height: 1.45;
+    text-align: center;
+    box-shadow:
+        0 0 0 6px rgba(247, 144, 9, 0.22),
+        0 22px 60px rgba(17, 24, 39, 0.4);
+    animation: hgcToastIn 0.22s ease-out;
+}
+
+@keyframes hgcToastIn {
+    from {
+        opacity: 0;
+        transform: translate(-50%, 14px);
+    }
+    to {
+        opacity: 1;
+        transform: translate(-50%, 0);
+    }
+}
+
+/* Vị trí cuộn do group-combo-live.js tự giữ; tắt neo mặc định của trình duyệt để 2 bên không cộng dồn. */
+.hgc-live {
+    overflow-anchor: none;
+}
+
+/* Chừa chỗ cho thanh đầu trang khi cuộn tới nhóm món. */
+.hgc-group {
+    scroll-margin-top: 90px;
+}
+
+
+/* Thanh hành động dưới đáy trang chọn nước: báo combo nào đủ / còn thiếu và nút đi tiếp theo vai trò. */
+.hgc-bar {
+    position: sticky;
+    bottom: max(10px, env(safe-area-inset-bottom));
+    z-index: 20;
+    display: grid;
+    gap: 6px;
+    margin-top: 12px;
+    padding: 12px 14px 14px;
+    border: 1px solid #ead8d8;
+    border-radius: 18px;
+    background: rgba(255, 255, 255, .97);
+    box-shadow: 0 -6px 30px rgba(60, 30, 30, .16);
+}
+
+.hgc-bar-msg {
+    display: flex;
+    align-items: center;
+    flex-wrap: nowrap;
+    gap: 6px;
+    font-weight: 800;
+    font-size: 18px;
+    line-height: 1.3;
+    color: #1d1a1a;
+}
+
+.hgc-bar-tick {
+    flex: none;
+    display: grid;
+    place-items: center;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: #12a150;
+    color: #fff;
+    font-size: 13px;
+    font-weight: 900;
+}
+
+.hgc-bar-tick.is-todo {
+    background: #ffb800;
+    color: #3d1010;
+}
+
+.hgc-bar-sub {
+    padding-left: 31px;
+    font-size: 12px;
+    color: #6b6262;
+}
+
+.hgc-bar-cta {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    margin-top: 2px;
+    min-height: 46px;
+    padding: 8px 14px;
+    line-height: 1.25;
+    border-radius: 12px;
+    background: linear-gradient(180deg, #ee4040 0%, #d92b2b 55%, #c21f1f 100%);
+    color: #fff;
+    font-size: 15px;
+    font-weight: 800;
+    text-align: center;
+    text-decoration: none;
+    box-shadow: 0 8px 18px rgba(217, 43, 43, .35);
+}
+
+.hgc-bar-cta.is-alt {
+    background: #ffb800;
+    color: #3d1010;
+    box-shadow: 0 8px 18px rgba(255, 184, 0, .35);
+}
+
+.hgc-combo {
+    scroll-margin-top: 90px;
+}
+
+/* Số ly còn thiếu trên thanh dưới đáy: nổi bật để khách chú ý. */
+.hgc-missing {
+    display: inline-block;
+    margin-left: 0;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: #d92b2b;
+    color: #fff;
+    font-size: 18px;
+    line-height: 1.4;
+    font-weight: 900;
+    white-space: nowrap;
+    animation: hgcMissingPulse 1.8s ease-in-out infinite;
+}
+
+@keyframes hgcMissingPulse {
+    0%, 100% {
+        box-shadow: 0 0 0 0 rgba(217, 43, 43, .45);
+    }
+    50% {
+        box-shadow: 0 0 0 6px rgba(217, 43, 43, 0);
+    }
+}
+
+/* Gợi ý mua thêm cho đủ 10 ly chơi mini-game (cũng dùng ở nút Chốt món đơn nhóm). */
+.hgc-bar-upsell,
+.hyg-lock-upsell {
+    margin: 4px 0 0;
+    padding: 8px 12px;
+    border-radius: 10px;
+    background: #fff6d6;
+    color: #7a4b00;
+    font-size: 14px;
+    font-weight: 700;
+    line-height: 1.4;
+    text-align: center;
+}
+
+.hgc-bar-lock {
+    margin: 0;
+}
+
+button.hgc-bar-cta {
+    width: 100%;
+    border: 0;
+    font-family: inherit;
+    cursor: pointer;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .hgc-missing {
+        animation: none;
+    }
+}
+
+/* Ly nước của combo xếp ngay dưới dòng combo: thụt vào, có vạch vàng bên trái để nhìn ra là một cụm. */
+.hyg-page .hyg-item.is-combo-child {
+    margin-left: 14px;
+    padding-left: 12px;
+    border-left: 3px solid #ffc21a;
+}

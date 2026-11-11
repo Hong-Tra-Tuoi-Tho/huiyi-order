@@ -6,7 +6,7 @@
 .front-body .cart-symbol{width:21px;height:21px;flex:0 0 21px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
 .hym-page{max-width:1080px;margin:auto;min-width:0;overflow-wrap:anywhere}
 .hym-page-head{display:flex;justify-content:space-between;align-items:flex-start;gap:18px;margin:6px 0 24px}
-.hym-page-head>div{min-width:0}.hym-page-head>form{flex-shrink:0}
+.hym-page-head>div{min-width:0;flex:1}.hym-page-head>form{flex-shrink:0}
 .hym-page-head h1{font-size:clamp(30px,4vw,40px);line-height:1.2;letter-spacing:-.035em;margin:7px 0 12px}
 .hym-page-head p{margin:0;color:var(--muted);line-height:1.7}
 .hym-eyebrow{font-size:14px;font-weight:800;color:var(--muted)}
@@ -27,10 +27,19 @@
 .hym-note,.hym-updated,.hym-empty{font-size:15px;line-height:1.75;color:var(--muted);margin:12px 0 18px}
 .hym-form{display:grid;gap:16px;margin-top:20px}
 .hym-form label{display:grid;gap:8px;font-size:17px;font-weight:700;line-height:1.45}
-.hym-form input,.hym-form textarea{font-size:17px;min-width:0;width:100%;max-width:100%;line-height:1.5}
+.hym-form input,.hym-form textarea{font-size:17px;font-weight:400;min-width:0;width:100%;max-width:100%;line-height:1.5}
 .hym-form small{font-size:15px;line-height:1.65;color:var(--muted);margin-top:-8px}
 .hym-form .btn{justify-self:start;min-height:48px;font-size:17px;max-width:100%;white-space:normal}
 .hym-form .btn.block{justify-self:stretch}
+.hym-required{color:var(--danger,#b42318)}
+/* Ô mật khẩu có nút con mắt hiện/ẩn */
+.hym-pass{position:relative;display:block}
+.hym-form .hym-pass input{padding-right:52px}
+.hym-pass-toggle{position:absolute;top:50%;right:6px;transform:translateY(-50%);display:grid;place-items:center;width:40px;height:40px;padding:0;border:0;border-radius:8px;background:transparent;color:var(--muted);cursor:pointer}
+.hym-pass-toggle:hover,.hym-pass-toggle:focus-visible{color:var(--text,#222)}
+.hym-pass-toggle svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.hym-pass-toggle .hym-pass-eye-off,.hym-pass-toggle[aria-pressed="true"] .hym-pass-eye{display:none}
+.hym-pass-toggle[aria-pressed="true"] .hym-pass-eye-off{display:block}
 .hym-optional{font-size:14px;font-weight:500;color:var(--muted)}
 .hym-facts{display:grid;gap:14px;margin:20px 0}
 .hym-facts>div{display:grid;grid-template-columns:minmax(0,.9fr) minmax(0,1.1fr);gap:12px;align-items:baseline}
@@ -40,6 +49,7 @@
 .hym-verification-note,.hym-sync-message{font-size:16px;line-height:1.7;padding:15px;border:1px solid #dfe6ef;border-radius:14px;background:#f7f9fc;color:#344054;margin:16px 0}
 .hym-updated{font-size:14px;margin-bottom:16px}
 .hym-order-list,.hym-transaction-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:15px;margin-top:20px}
+.hym-order-list.is-capped{overflow-y:auto;overscroll-behavior:contain;padding-right:6px;align-content:start}
 .hym-order,.hym-transaction{padding:18px;border:1px solid var(--line);border-radius:16px;background:#fafbfc;min-width:0}
 .hym-record-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
 .hym-record-head>div{min-width:0}
@@ -94,14 +104,32 @@
 }
 .hym-auth-divider{display:flex;align-items:center;gap:12px;margin:18px 0 14px;color:var(--muted);font-size:15px}
 .hym-auth-divider::before,.hym-auth-divider::after{content:"";flex:1;height:1px;background:var(--line)}
-.btn-zalo-login{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;min-height:48px;font-size:17px;font-weight:750;background:#0068FF;border-color:#0068FF;color:#fff;text-decoration:none;white-space:normal}
-.btn-zalo-login:hover{background:#0057d6;border-color:#0057d6;color:#fff}
-.btn-zalo-login:focus-visible{outline:3px solid #0068FF;outline-offset:3px}
+.btn-zalo-login{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;min-height:48px;font-size:17px;font-weight:750;background:#B32424;border-color:#B32424;color:#fff;text-decoration:none;white-space:normal}
+.btn-zalo-login:hover{background:#8F1D1D;border-color:#8F1D1D;color:#fff}
+.btn-zalo-login:focus-visible{outline:3px solid #B32424;outline-offset:3px}
 .btn-zalo-login svg{width:26px;height:26px;flex:0 0 26px}
+/* QR mở Zalo Mini App cho khách đăng nhập trên máy tính */
+.hym-zalo-qr{display:flex;flex-direction:column;align-items:center;gap:8px;margin-top:18px;text-align:center}
+.hym-zalo-qr canvas{width:200px;height:200px;image-rendering:pixelated;border:1px solid var(--line);border-radius:12px}
 /* Sign-in and registration: one centered column. */
 .hym-page-auth{max-width:560px}
 .hym-page-auth .hym-page-head{justify-content:center;text-align:center}
 .hym-page-auth .hym-auth-single{margin-inline:auto}
+/* Nút Đăng ký: tông đỏ #B32424 (cùng màu nút giỏ hàng). */
+#member-register .btn.primary {
+  background: #B32424;
+  border-color: #B32424;
+  color: #fff;
+}
+#member-register .btn.primary:hover {
+  background: #8F1D1D;
+  border-color: #8F1D1D;
+  color: #fff;
+}
+#member-register .btn.primary:focus-visible {
+  outline: 3px solid #B32424;
+  outline-offset: 3px;
+}
 /* Group referral points strip on the member page. */
 .hym-points{display:flex;align-items:center;gap:16px;margin:18px 0 6px;padding:18px 20px;border-radius:18px;background:linear-gradient(135deg,#fff7e6 0%,#ffe9c7 55%,#ffd9a0 100%);border:1px solid #f3c77a;box-shadow:0 6px 18px rgba(214,140,30,.16);min-width:0}
 .hym-points-icon{flex:0 0 48px;width:48px;height:48px;display:flex;align-items:center;justify-content:center;border-radius:50%;background:linear-gradient(135deg,#f59e0b,#d9480f);color:#fff;font-size:24px;box-shadow:0 4px 10px rgba(217,72,15,.3)}

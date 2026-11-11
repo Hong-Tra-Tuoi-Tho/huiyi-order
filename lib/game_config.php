@@ -70,7 +70,7 @@ function hgr_validate_config(array $input): array {
     $config=hgr_normalize_config($input);$total=0;
     foreach($config['prizes'] as $prize){
         if(!$prize['enabled'])continue;
-        // A money prize may be 0đ: winning it offers a guaranteed replay for sharing the website.
+        // A money prize may be 0đ: winning it offers a replay that always wins a configured share prize (admin: Quà khi khách chia sẻ Facebook).
         if($prize['kind']!=='discount')hgr_config_catalog_items($prize);
         if($prize['weight']>0)$total+=$prize['weight'];
     }

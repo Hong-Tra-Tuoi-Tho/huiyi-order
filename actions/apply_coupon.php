@@ -13,6 +13,14 @@ if($action==='remove'){
 try{
     if($action!=='apply')throw new RuntimeException('promotion_invalid');
     $choice=promotion_selection_from_post($_POST);
+
+    // "Mua 4 tặng 1" chỉ áp dụng khi giỏ đủ số ly tối thiểu (giao diện cũng khóa lựa chọn này).
+    $drinkQty = promotion_drink_qty($_SESSION['cart'] ?? []);
+    if ($choice['mode'] === 'buy4get1' && $drinkQty < promotion_buy4_min_qty()) {
+        $_SESSION['coupon_error'] = pt('buy4_need_qty', ['min' => promotion_buy4_min_qty(), 'qty' => $drinkQty]);
+        redirect(base_url('cart.php'));
+    }
+
     $_SESSION['promotion_mode']=$choice['mode'];
     if($choice['code']!=='')$_SESSION['coupon_code']=$choice['code'];else unset($_SESSION['coupon_code']);
     if(($_POST['continue_to_checkout']??'')==='1'){

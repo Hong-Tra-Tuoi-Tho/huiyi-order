@@ -44,7 +44,12 @@ function hym_zalo_http(string $url,array $headers,?array $post=null): array {
     if($post!==null){$options[CURLOPT_POST]=true;$options[CURLOPT_POSTFIELDS]=http_build_query($post,'','&');}
     curl_setopt_array($curl,$options);
     $body=curl_exec($curl);
-    if(!is_string($body)||(int)curl_getinfo($curl,CURLINFO_RESPONSE_CODE)!==200)hym_fail('member_zalo_failed');
+    $status=(int)curl_getinfo($curl,CURLINFO_RESPONSE_CODE);
+    if(!is_string($body)||$status!==200){
+        // Only the path is logged; the query and headers carry tokens.
+        error_log('zalo_http '.parse_url($url,PHP_URL_PATH).' status='.$status.' curl='.curl_error($curl).' body='.substr((string)$body,0,500));
+        hym_fail('member_zalo_failed');
+    }
     try{$result=json_decode($body,true,32,JSON_THROW_ON_ERROR|JSON_BIGINT_AS_STRING);}catch(Throwable $e){hym_fail('member_zalo_failed');}
     if(!is_array($result))hym_fail('member_zalo_failed');return $result;
 }
@@ -95,9 +100,45 @@ function hym_zalo_miniapp_secret(): string {
     if($secret==='')hym_fail('member_zalo_unavailable');
     return $secret;
 }
+/** Mini App ID from mini.zalo.me; empty = the website does not link to the Mini App. */
+function hym_zalo_miniapp_id(): string {
+    return defined('ZALO_MINIAPP_ID') ? (string)ZALO_MINIAPP_ID : '';
+}
+/** Opens the live Mini App, or the Testing version set in ZALO_MINIAPP_TEST_VERSION (admin/tester only). */
+function hym_zalo_miniapp_url(): string {
+    $url = 'https://zalo.me/s/' . rawurlencode(hym_zalo_miniapp_id()) . '/';
+    $testVersion = defined('ZALO_MINIAPP_TEST_VERSION') ? (string)ZALO_MINIAPP_TEST_VERSION : '';
+    if ($testVersion !== '') $url .= '?env=TESTING&version=' . rawurlencode($testVersion);
+    return $url;
+}
+/**
+ * Chế độ test đăng nhập Zalo Mini App trên web live, không ảnh hưởng khách thường.
+ * Vào member/index.php?zalotest=<ZALO_TEST_KEY> để bật cho session này, ?zalotest=off để tắt.
+ * Chưa khai báo ZALO_TEST_KEY thì chế độ này không bao giờ bật.
+ */
+function hym_zalo_test_mode(): bool {
+    $key = defined('ZALO_TEST_KEY') ? (string)ZALO_TEST_KEY : '';
+    if ($key === '' || hym_zalo_miniapp_id() === '') return false;
+    $param = $_GET['zalotest'] ?? null;
+    if (is_string($param) && $param !== '') {
+        if (hash_equals($key, $param)) {
+            $_SESSION['zalo_test'] = true;
+        } elseif ($param === 'off') {
+            unset($_SESSION['zalo_test']);
+        }
+    }
+    return ($_SESSION['zalo_test'] ?? false) === true;
+}
+/** Customers sign in only through the Mini App: password sign-in and registration are closed. */
+function hym_zalo_only(): bool {
+    return defined('MEMBER_ZALO_ONLY') && MEMBER_ZALO_ONLY === true && hym_zalo_miniapp_id() !== '';
+}
 function hym_zalo_graph(string $url,array $headers): array {
     $result=hym_zalo_http($url,$headers);
-    if((int)($result['error']??0)!==0)hym_fail('member_zalo_failed');
+    if((int)($result['error']??0)!==0){
+        error_log('zalo_graph '.parse_url($url,PHP_URL_PATH).' error='.(int)$result['error'].' message='.(string)($result['message']??''));
+        hym_fail('member_zalo_failed');
+    }
     return $result;
 }
 /** Returns the member id for a Mini App user, creating a phone-verified account on first use. */
@@ -117,11 +158,10 @@ function hym_zalo_miniapp_member(string $accessToken,string $phoneToken): int {
         $st=db()->prepare('SELECT id FROM members WHERE phone=?');$st->execute([$phone]);$memberId=(int)$st->fetchColumn();
     }
     if($memberId<1){
-        // No password is known to the customer; they sign in through Zalo or reset it with staff.
-        $hash=password_hash(bin2hex(random_bytes(24)),PASSWORD_DEFAULT);
+        // An empty hash marks a Zalo-only account: password_verify() never accepts it.
         try{
-            $st=db()->prepare('INSERT INTO members(phone,password_hash,display_name,delivery_address,created_at,updated_at) VALUES(?,?,?,\'\',UTC_TIMESTAMP(),UTC_TIMESTAMP())');
-            $st->execute([$phone,$hash,$name]);$memberId=(int)db()->lastInsertId();
+            $st=db()->prepare('INSERT INTO members(phone,password_hash,display_name,delivery_address,created_at,updated_at) VALUES(?,\'\',?,\'\',UTC_TIMESTAMP(),UTC_TIMESTAMP())');
+            $st->execute([$phone,$name]);$memberId=(int)db()->lastInsertId();
         }catch(PDOException $e){
             if($e->getCode()!=='23000')throw $e;
             $st=db()->prepare('SELECT id FROM members WHERE phone=?');$st->execute([$phone]);$memberId=(int)$st->fetchColumn();
@@ -150,4 +190,103 @@ function hym_login_token_consume(string $token): int {
     // Only the request that removed the row may use it.
     if($memberId<1||$delete->rowCount()!==1)hym_fail('member_form_expired');
     return $memberId;
+}
+
+/*
+ * Đăng nhập máy tính bằng QR (giống Zalo Web).
+ * 1. Máy tính tạo mã riêng, lưu trong session của máy tính và gắn vào link Mini App trong QR.
+ * 2. Điện thoại quét QR, khách bấm xác nhận trong Mini App → server gắn member_id vào mã.
+ * 3. Máy tính hỏi server định kỳ (member/qr-status.php); thấy mã đã xác nhận thì đăng nhập session của máy tính.
+ * Chỉ lưu hash của mã trong DB; mã gốc chỉ có trong QR và session của máy tính.
+ */
+const HYM_QR_LOGIN_TTL = 180;
+
+function hym_qr_login_schema(): void {
+    static $done = false;
+    if ($done) return;
+
+    db()->exec('CREATE TABLE IF NOT EXISTS member_qr_logins (
+ code_hash CHAR(64) CHARACTER SET ascii COLLATE ascii_bin PRIMARY KEY,
+ member_id BIGINT UNSIGNED NULL,
+ expires_at BIGINT UNSIGNED NOT NULL,
+ KEY idx_member_qr_login_expiry(expires_at),
+ CONSTRAINT fk_member_qr_login FOREIGN KEY(member_id) REFERENCES members(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4');
+
+    $done = true;
+}
+
+/** Mã QR của session máy tính hiện tại; tạo mã mới khi chưa có hoặc sắp hết hạn. */
+function hym_qr_login_code(bool $renew = false): string {
+    $current = $_SESSION['qr_login'] ?? null;
+    $stillValid = is_array($current)
+        && is_string($current['code'] ?? null)
+        && (int)($current['expires_at'] ?? 0) > time() + 20;
+    if (!$renew && $stillValid) return $current['code'];
+
+    hym_qr_login_schema();
+    db()->prepare('DELETE FROM member_qr_logins WHERE expires_at<?')->execute([time()]);
+    if (is_array($current) && is_string($current['code'] ?? null)) {
+        db()->prepare('DELETE FROM member_qr_logins WHERE code_hash=?')->execute([hash('sha256', $current['code'])]);
+    }
+
+    $code = hym_zalo_b64url(random_bytes(32));
+    $expiresAt = time() + HYM_QR_LOGIN_TTL;
+    db()->prepare('INSERT INTO member_qr_logins(code_hash,member_id,expires_at) VALUES(?,NULL,?)')
+        ->execute([hash('sha256', $code), $expiresAt]);
+
+    $_SESSION['qr_login'] = ['code' => $code, 'expires_at' => $expiresAt];
+    return $code;
+}
+
+/** Link Mini App kèm mã QR của máy tính. */
+function hym_zalo_miniapp_qr_url(string $code): string {
+    $url = hym_zalo_miniapp_url();
+    $separator = str_contains($url, '?') ? '&' : '?';
+    return $url . $separator . 'qr=' . rawurlencode($code);
+}
+
+/** Điện thoại (Mini App) xác nhận đăng nhập cho máy tính đang giữ mã này. */
+function hym_qr_login_approve(string $code, int $memberId): void {
+    if (!preg_match('/^[A-Za-z0-9_-]{43}$/D', $code)) hym_fail('member_qr_expired');
+    if ($memberId < 1) hym_fail('member_zalo_failed');
+
+    hym_qr_login_schema();
+    $st = db()->prepare('UPDATE member_qr_logins SET member_id=? WHERE code_hash=? AND member_id IS NULL AND expires_at>=?');
+    $st->execute([$memberId, hash('sha256', $code), time()]);
+
+    // Mã đã dùng, hết hạn hoặc không tồn tại.
+    if ($st->rowCount() !== 1) hym_fail('member_qr_expired');
+}
+
+/**
+ * Máy tính hỏi trạng thái mã QR của mình.
+ * Trả về 'pending' (chưa quét), 'expired' (cần mã mới) hoặc 'ok' (đã đăng nhập session này).
+ */
+function hym_qr_login_poll(): string {
+    $current = $_SESSION['qr_login'] ?? null;
+    if (!is_array($current) || !is_string($current['code'] ?? null)) return 'expired';
+
+    hym_qr_login_schema();
+    $hash = hash('sha256', $current['code']);
+    $st = db()->prepare('SELECT member_id,expires_at FROM member_qr_logins WHERE code_hash=?');
+    $st->execute([$hash]);
+    $row = $st->fetch();
+
+    if (!$row) return 'expired';
+
+    $memberId = (int)($row['member_id'] ?? 0);
+    if ($memberId < 1) {
+        return (int)$row['expires_at'] < time() ? 'expired' : 'pending';
+    }
+
+    $delete = db()->prepare('DELETE FROM member_qr_logins WHERE code_hash=?');
+    $delete->execute([$hash]);
+    // Chỉ request xoá được dòng mới được đăng nhập (chặn 2 request song song).
+    if ($delete->rowCount() !== 1) return 'expired';
+
+    unset($_SESSION['qr_login']);
+    hym_session_login($memberId);
+    $_SESSION['member_flash'] = ['type' => 'success', 'key' => 'member_logged_in'];
+    return 'ok';
 }

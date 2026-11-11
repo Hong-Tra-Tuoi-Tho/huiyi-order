@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__.'/admin_accounts.php';
+require_once __DIR__.'/partner.php';
 function admin_logged_in(): bool { return haa_current()!==null; }
 function admin_is_operator(): bool {return (haa_current()['role']??'')==='operator';}
 function haa_order_route_allowed(string $path): bool {

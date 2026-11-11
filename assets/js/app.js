@@ -1,3 +1,15 @@
+// After a Facebook share the customer can land on another page: return once to the page that shared (game.js).
+(function () {
+  try {
+    const saved = JSON.parse(sessionStorage.getItem('kyucPendingShare') || 'null');
+    if (!saved?.back || saved.back === location.href || Date.now() - saved.at > 600000) return;
+    const back = saved.back;
+    delete saved.back;
+    sessionStorage.setItem('kyucPendingShare', JSON.stringify(saved));
+    location.replace(back);
+  } catch (_) {}
+})();
+
 // Keep the root service worker fresh even when this script is loaded from /admin/.
 if ('serviceWorker' in navigator && !document.body.classList.contains('admin-body')) {
   window.addEventListener('load', () => {
@@ -250,3 +262,100 @@ document.querySelectorAll('[data-multi-check]').forEach(box => {
   document.addEventListener('click', e => { if (!box.contains(e.target)) box.open = false; });
   sync();
 });
+
+// Member login/register: eye button shows or hides the password.
+document.querySelectorAll('[data-pass-toggle]').forEach(btn => {
+  const input = document.getElementById(btn.getAttribute('aria-controls'));
+  if (!input) return;
+  btn.addEventListener('click', () => {
+    const show = input.type === 'password';
+    input.type = show ? 'text' : 'password';
+    btn.setAttribute('aria-pressed', String(show));
+    btn.setAttribute('aria-label', show ? btn.dataset.hideLabel : btn.dataset.showLabel);
+  });
+});
+
+// Add to cart (product/topping): the quantity flies into the cart icon, then the form submits as usual.
+document.addEventListener('submit', event => {
+  const form = event.target;
+  if (!form.matches('form.option-form') || event.defaultPrevented || form.dataset.cartFlying) {
+    return;
+  }
+  // Editing an existing group item ("Lưu món") does not add anything new.
+  const editing = Number(form.querySelector('input[name="group_item_id"]')?.value || 0) > 0;
+  if (editing) {
+    return;
+  }
+  const target = document.querySelector('.floating-cart') || document.querySelector('.topbar .cart-link');
+  const button = event.submitter || form.querySelector('[type="submit"]');
+  const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (!target || !button || reduce || typeof Element.prototype.animate !== 'function') {
+    return;
+  }
+  event.preventDefault();
+  form.dataset.cartFlying = '1';
+
+  const qty = Math.max(1, parseInt(form.querySelector('input[name="qty"]')?.value, 10) || 1);
+  const from = button.getBoundingClientRect();
+  const to = target.getBoundingClientRect();
+  const bubble = document.createElement('span');
+  bubble.className = 'cart-fly';
+  bubble.textContent = '+' + qty;
+  bubble.setAttribute('aria-hidden', 'true');
+  document.body.append(bubble);
+
+  const startX = from.left + from.width / 2 - bubble.offsetWidth / 2;
+  const startY = from.top + from.height / 2 - bubble.offsetHeight / 2;
+  const endX = to.left + to.width / 2 - bubble.offsetWidth / 2;
+  const endY = to.top + to.height / 2 - bubble.offsetHeight / 2;
+  // Arc: rise above the higher of the two points, then drop into the cart.
+  const midX = (startX + endX) / 2;
+  const midY = Math.min(startY, endY) - 90;
+
+  const submit = () => HTMLFormElement.prototype.submit.call(form);
+  const flight = bubble.animate([
+    { transform: `translate(${startX}px, ${startY}px) scale(1)`, opacity: 1 },
+    { transform: `translate(${midX}px, ${midY}px) scale(1.15)`, opacity: 1, offset: .45 },
+    { transform: `translate(${endX}px, ${endY}px) scale(.45)`, opacity: .2 }
+  ], { duration: 700, easing: 'cubic-bezier(.45, 0, .55, 1)', fill: 'forwards' });
+
+  flight.onfinish = () => {
+    bubble.remove();
+    const count = target.querySelector('.floating-cart-count, .cart-count');
+    if (count && /^\d+$/.test(count.textContent.trim())) {
+      count.textContent = String(parseInt(count.textContent, 10) + qty);
+    }
+    target.classList.remove('cart-bump');
+    void target.offsetWidth;
+    target.classList.add('cart-bump');
+    setTimeout(submit, 250);
+  };
+  // Never block adding to cart if the animation is interrupted.
+  setTimeout(() => {
+    if (document.body.contains(bubble)) {
+      bubble.remove();
+      submit();
+    }
+  }, 1500);
+});
+
+window.addEventListener('pageshow', () => {
+  document.querySelectorAll('form.option-form[data-cart-flying]').forEach(form => delete form.dataset.cartFlying);
+});
+
+// Nút quay lại dính dưới thanh trên cùng: đo chiều cao thanh (đổi theo màn hình, ngôn ngữ) vào biến CSS.
+(() => {
+  const topbar = document.querySelector('.front-body .topbar');
+  if (!topbar) {
+    return;
+  }
+  const setHeight = () => {
+    document.documentElement.style.setProperty('--front-topbar-h', topbar.offsetHeight + 'px');
+  };
+  setHeight();
+  if ('ResizeObserver' in window) {
+    new ResizeObserver(setHeight).observe(topbar);
+  } else {
+    window.addEventListener('resize', setHeight);
+  }
+})();

@@ -3,3 +3,27 @@
 .hgra-admin .hgra-back-preview>img{object-fit:cover}
 @media(max-width:760px){.hgra-admin .hgra-theme{padding:12px 7px;font-size:10px}.hgra-admin .hgra-theme input{left:7px;top:7px}.hgra-admin .hgra-theme-sample{padding:22px 5px 14px;gap:4px}.hgra-admin .hgra-theme-sample i{width:22px;height:35px}.hgra-admin .hgra-themes{gap:7px}.hgra-admin .hgra-media-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.hgra-admin .hgra-media-preview{height:120px}.hgra-admin .hgra-prize{padding:14px}.hgra-admin .hgra-prize-head{gap:8px}.hgra-admin .hgra-prize-head>div{gap:9px}.hgra-admin .hgra-prize-fields{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px 9px}.hgra-admin .hgra-name-grid{grid-template-columns:1fr;gap:10px}.hgra-admin .hgra-prize-toolbar{align-items:flex-start;flex-direction:column;gap:11px}.hgra-admin .hgra-section>legend{font-size:16px}.hgra-admin .hgra-prize-fields input,.hgra-admin .hgra-prize-fields select{font-size:12px;padding:9px 7px}}
 .hgra-admin .hgra-prize-fields>.hgra-field{display:flex;flex-direction:column;gap:6px;font-size:11px;font-weight:650;min-width:0}.hgra-admin .hgra-multi{position:relative;min-width:0}.hgra-admin .hgra-prize-fields select.hgra-multi-native{position:absolute;left:0;bottom:0;width:100%;height:1px;padding:0;border:0;opacity:0;pointer-events:none}.hgra-admin .hgra-multi-toggle{display:block;width:100%;min-width:0;padding:9px 30px 9px 10px;border:1px solid #d1d5db;border-radius:8px;background:#fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M2.5 4.5 6 8l3.5-3.5' fill='none' stroke='%23374151' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 10px center;font:inherit;font-size:12px;font-weight:500;color:#374151;text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer}.hgra-admin .hgra-multi-toggle.hgra-multi-empty{color:#6b7280}.hgra-admin .hgra-multi-toggle[aria-expanded="true"]{border-color:#b91f29;outline:2px solid #b91f2940;outline-offset:1px}.hgra-admin .hgra-multi-panel{position:absolute;z-index:30;top:calc(100% + 4px);left:0;min-width:100%;width:max-content;max-width:min(340px,80vw);max-height:260px;overflow:auto;padding:6px;background:#fff;border:1px solid #d1d5db;border-radius:10px;box-shadow:0 12px 28px rgba(16,24,40,.14)}.hgra-admin .hgra-multi-option{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:4px 8px;border-radius:6px;min-height:38px}.hgra-admin .hgra-multi-option>label{display:flex;align-items:center;gap:9px;flex:1;min-width:0;padding:4px 0;font-size:12px;font-weight:500;line-height:1.35;cursor:pointer}.hgra-admin .hgra-prize-fields .hgra-multi-option>select.hgra-multi-size{width:auto;min-width:70px;height:30px;min-height:0;padding:3px 8px;font-size:12px;flex:none}.hgra-admin .hgra-prize-fields .hgra-multi-option>select.hgra-multi-size:disabled{opacity:.4}.hgra-admin .hgra-multi-option:hover{background:#fff6e9}.hgra-admin .hgra-prize-fields .hgra-multi-option input[type=checkbox]{width:18px;min-width:18px;height:18px;min-height:0;margin:0;padding:0;flex:none;border-radius:5px;background-color:#fff;background-repeat:no-repeat;background-position:center;background-size:11px 11px;accent-color:#b91f29}.hgra-admin .hgra-prize-fields .hgra-multi-option input[type=checkbox]:checked{background-color:#b91f29;border-color:#b91f29}
+
+/* Quà khi khách chia sẻ Facebook: mỗi dòng gồm số tiền, tỷ lệ và nút xoá. */
+.hgra-share-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+    gap: 10px;
+    align-items: end;
+    margin-bottom: 10px;
+}
+
+.hgra-share-row label {
+    display: grid;
+    gap: 4px;
+}
+
+@media (max-width: 560px) {
+    .hgra-share-row {
+        grid-template-columns: 1fr 1fr;
+    }
+
+    .hgra-share-row .btn {
+        grid-column: 1 / -1;
+    }
+}

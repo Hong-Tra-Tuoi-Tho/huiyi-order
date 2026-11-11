@@ -24,7 +24,10 @@ CREATE TABLE IF NOT EXISTS dispatch_history (
  name VARCHAR(160) NULL,
  address VARCHAR(500) NULL,
  map_url VARCHAR(2048) NULL,
- admin_id BIGINT UNSIGNED NOT NULL,
+ admin_id BIGINT UNSIGNED NULL,
+ partner_id BIGINT UNSIGNED NULL,
+ reason VARCHAR(1000) NULL,
  created_at DATETIME NOT NULL,
- UNIQUE KEY uq_dispatch_history_revision (order_id,revision)
+ UNIQUE KEY uq_dispatch_history_revision (order_id,revision),
+ KEY idx_dispatch_history_partner (partner_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

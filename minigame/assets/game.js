@@ -45,11 +45,11 @@
   // Checkout dialog: prizes apply to the order being placed, not to a later one.
   const inCheckout = root.dataset.checkout === '1';
   const appliedNow = { vi: 'Quà đã được áp dụng trực tiếp vào đơn hàng hiện tại.', zh: '獎品已直接套用於目前這筆訂單。', en: 'This prize has been applied to your current order.' }[language];
-  // A 0đ prize offers one guaranteed replay for sharing the website on Facebook.
+  // A 0đ prize offers one replay for sharing the website on Facebook; that replay always wins 52.000đ.
   Object.assign(t, {
-    vi: { zero: 'Tiếc quá, lượt này trúng 0đ!', share_offer: 'Chia sẻ website lên Facebook để nhận thêm 1 lượt chơi — lượt này chắc chắn trúng quà.', share_button: 'Chia sẻ & nhận lượt chơi', share_bonus: 'Cảm ơn bạn đã chia sẻ! Lượt chơi mới này chắc chắn trúng quà.' },
-    zh: { zero: '可惜，這次抽到 0đ！', share_offer: '把網站分享到 Facebook，即可再獲得 1 次遊戲機會，這次保證中獎。', share_button: '分享並領取機會', share_bonus: '感謝分享！這次新的遊戲機會保證中獎。' },
-    en: { zero: 'So close — this play won 0đ!', share_offer: 'Share the website on Facebook to get 1 more play — that play is guaranteed to win a prize.', share_button: 'Share & get a play', share_bonus: 'Thanks for sharing! This new play is guaranteed to win a prize.' }
+    vi: { zero: 'Tiếc quá, lượt này trúng 0đ!', share_offer: '<strong>Chia sẻ chúng tôi</strong> lên Facebook để nhận được một lượt chơi miễn phí với tỉ lệ trúng 100%.', share_button: 'Chia sẻ', share_bonus: 'Cảm ơn bạn đã chia sẻ! Bạn nhận được 1 lượt chơi miễn phí, lượt này chắc chắn trúng quà.', share_failed: 'Chưa nhận được xác nhận chia sẻ nên chưa cộng lượt. Hãy đăng nhập Facebook, bấm Đăng rồi thử lại.' },
+    zh: { zero: '可惜，這次抽到 0đ！', share_offer: '<strong>把我們分享</strong>到 Facebook，即可獲得 1 次免費遊戲機會，中獎率 100%。', share_button: '分享', share_bonus: '感謝分享！您獲得 1 次免費遊戲機會，這次保證中獎。', share_failed: '尚未收到分享確認，因此未增加遊戲次數。請登入 Facebook，按「發佈」後再試一次。' },
+    en: { zero: 'So close — this play won 0đ!', share_offer: '<strong>Share us</strong> on Facebook to get 1 free play with a 100% chance to win.', share_button: 'Share', share_bonus: 'Thanks for sharing! You got 1 free play, and it is guaranteed to win a prize.', share_failed: 'We could not confirm your share, so no play was added. Log in to Facebook, tap Post, then try again.' }
   }[language]);
   if (inCheckout) t.saved = { vi: 'Hoàn thành! Quà đã được áp dụng vào đơn hàng này.', zh: '配對完成！獎品已套用於這筆訂單。', en: 'Complete! Your prize has been applied to this order.' }[language];
   const paths = [
@@ -67,6 +67,25 @@
   const next = root.querySelector('[data-game-next]');
   const rewardElement = root.querySelector('[data-game-reward]');
   const shareBox = root.querySelector('[data-game-share-bonus]');
+  // Shown inside the share box too, because the reward popup covers the page notice.
+  const shareNote = document.createElement('p');
+  shareNote.hidden = true;
+  shareNote.textContent = t.share_failed;
+  shareBox?.querySelector('p').after(shareNote);
+  // Checkout dialog: the reward is shown in a popup; the standalone page keeps it inline.
+  const popup = root.querySelector('[data-game-reward-popup]');
+  const reopen = root.querySelector('[data-game-reward-reopen]');
+  const outsideNext = root.querySelector('[data-game-next-outside]');
+  const outsideShare = root.querySelector('[data-game-share-outside]');
+  const popupText = {
+    vi: { win: 'Chúc mừng bạn!', lose: 'Tiếc quá!', luck: 'Chúc bạn may mắn lần sau!', view: 'Xem phần thưởng', next: 'Chơi tiếp' },
+    zh: { win: '恭喜你！', lose: '可惜！', luck: '祝你下次好運！', view: '查看獎品', next: '繼續遊戲' },
+    en: { win: 'Congratulations!', lose: 'So close!', luck: 'Better luck next time!', view: 'View prize', next: 'Play next' }
+  }[language];
+  // The popup opens once per prize; after "Đóng" the reopen button brings it back.
+  let popupShownFor = '';
+  const popupHost = popup?.parentElement?.closest('dialog') || null;
+  const shareKey = 'kyucPendingShare';
   let board = null, reward = null, busy = false, blocked = true, balance = 0, shareBonus = false;
   let appearance = { faces: [] }, appearanceKey = '';
   let elapsedAt = Date.now(), waitUntil = 0, retryAt = 0, hideTimer = null, finishTimer = null, freshTimer = null, rateTimer = null;
@@ -77,6 +96,8 @@
   function message(text, error = false) {
     if (!notice) return;
     notice.textContent = text;
+    // The "0đ" result notice is not shown at all (the reward popup already tells the customer).
+    notice.hidden = text === t.zero;
     errorNotice = error;
     notice.classList.toggle('kyuc-error', error);
   }
@@ -220,8 +241,42 @@
     if (retry) retry.disabled = busy || Date.now() < retryAt;
     if (next) { next.hidden = !reward || balance < 1; next.disabled = busy; }
     if (rewardElement) rewardElement.hidden = !reward;
+    // A 0đ prize offers a free replay for sharing on Facebook, even while chances remain.
     if (shareBox) { shareBox.hidden = !reward || !shareBonus; shareBox.querySelector('button').disabled = busy; }
+    syncPopup();
     root.querySelector('[data-game-cleared]')?.toggleAttribute('hidden', !board?.complete || freshMatches.length > 0);
+  }
+
+  function rewardKey() {
+    return reward ? String(reward.coupon_code || '') + '|' + String(board?.id || '') : '';
+  }
+
+  function syncPopup() {
+    if (!popup) {
+      return;
+    }
+    const key = rewardKey();
+    // A modal popup inside the closed minigame dialog is invisible but still blocks the whole page.
+    const hostOpen = !popupHost || popupHost.open;
+    if (!reward || !hostOpen) {
+      if (!reward) popupShownFor = '';
+      if (popup.open) popup.close();
+    } else if (key !== popupShownFor && !popup.open && typeof popup.showModal === 'function') {
+      popupShownFor = key;
+      popup.showModal();
+      popup.querySelector('[data-game-next]:not([hidden]), .kyuc-fb-btn, [data-game-reward-close]')?.focus({ preventScroll: true });
+    }
+    if (reopen) reopen.hidden = !reward || popup.open;
+    // Same actions outside the popup, so they stay reachable after "Đóng".
+    if (outsideNext) {
+      outsideNext.hidden = !reward || balance < 1;
+      outsideNext.disabled = busy;
+      outsideNext.textContent = '▶ ' + popupText.next + ' (' + ({ vi: 'còn ', zh: '剩 ', en: '' }[language] || '') + balance + ({ vi: ' lượt', zh: ' 次', en: ' left' }[language] || '') + ')';
+    }
+    if (outsideShare) {
+      outsideShare.hidden = !reward || !shareBonus;
+      outsideShare.disabled = busy;
+    }
   }
 
   function updateClock() {
@@ -229,6 +284,34 @@
     if (!element) return;
     const additional = board?.started && !board.complete ? Math.floor((Date.now() - elapsedAt) / 1000) : 0;
     element.textContent = formatTime((board?.elapsed_seconds || 0) + Math.max(0, additional));
+  }
+
+  // Gift prizes are named "Tặng 1 ly mỗi món: A + B"; the popup lists each gifted item on its own row with its quantity.
+  function parseGift(text) {
+    const match = /^Tặng\s+(\d+)\s+(?:ly|topping)(?:\s+mỗi món)?:\s*(.+)$/u.exec(text);
+    if (!match) return null;
+    return { qty: match[1], items: match[2].split(' + ').map(item => item.trim()).filter(Boolean) };
+  }
+
+  function renderGift(target, gift) {
+    const intro = document.createElement('span');
+    intro.className = 'kyuc-gift-intro';
+    intro.textContent = 'Nhận được';
+    const list = document.createElement('span');
+    list.className = 'kyuc-gift-list';
+    gift.items.forEach(item => {
+      const row = document.createElement('span');
+      row.className = 'kyuc-gift-item';
+      const label = document.createElement('span');
+      label.className = 'kyuc-gift-name';
+      label.textContent = item;
+      const qty = document.createElement('b');
+      qty.className = 'kyuc-gift-qty';
+      qty.textContent = '×' + gift.qty;
+      row.append(label, qty);
+      list.append(row);
+    });
+    target.replaceChildren(intro, list);
   }
 
   function showReward() {
@@ -241,9 +324,14 @@
     const expiry = root.querySelector('[data-game-reward-expiry]');
     // A 0đ prize wins nothing: show a better-luck message instead of "Giảm 0đ".
     const zero = reward.kind === 'discount' && !(Number(reward.amount) > 0);
+    rewardElement?.classList.toggle('is-zero', zero);
+    const head = root.querySelector('[data-game-reward-head]');
+    if (head && popup) head.textContent = zero ? popupText.lose : popupText.win;
     if (name) name.textContent = zero
-      ? { vi: 'Chúc bạn may mắn lần sau! Hãy chia sẻ để nhận thêm lượt chơi', zh: '祝你下次好運！分享即可獲得再玩一次的機會', en: 'Better luck next time! Share to get another play' }[language]
+      ? (popup ? popupText.luck : { vi: 'Rất tiếc bạn đã không may mắn, xin hãy chia sẻ chúng tôi lên Facebook để nhận được một lượt chơi miễn phí với tỉ lệ trúng 100%.', zh: '很遺憾這次沒有中獎，請把我們分享到 Facebook，即可獲得 1 次免費遊戲機會，中獎率 100%。', en: 'Sorry, you were not lucky this time. Share us on Facebook to get 1 free play with a 100% chance to win.' }[language])
       : reward.name?.[language] || reward.name?.vi || '';
+    const gift = !zero && popup && language === 'vi' ? parseGift(reward.name?.vi || '') : null;
+    if (name && gift) renderGift(name, gift);
     if (terms) { terms.textContent = zero ? '' : inCheckout ? appliedNow : reward.terms?.[language] || reward.terms?.vi || ''; terms.hidden = zero; }
     if (expiry) {
       const date = new Date(reward.expires_at || '');
@@ -252,12 +340,13 @@
         timeZone: 'Asia/Ho_Chi_Minh', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit'
       }).format(date) + ' (UTC+7)';
     }
-    if (code) { code.textContent = reward.coupon_code || ''; code.hidden = !reward.coupon_code; }
+    // At checkout the prize is applied straight to the order, so its code and amount are not shown.
+    if (code) { code.textContent = reward.coupon_code || ''; code.hidden = inCheckout || !reward.coupon_code; }
     if (amount) {
       const locale = { vi: 'vi-VN', zh: 'zh-TW', en: 'en-US' }[language];
       const formatted = new Intl.NumberFormat(locale, { maximumFractionDigits: 2 }).format(Number(reward.coupon_amount) || 0);
       amount.textContent = `${root.dataset.currency || ''}${formatted}`;
-      amount.hidden = !reward.coupon_code || reward.kind !== 'discount';
+      amount.hidden = inCheckout || !reward.coupon_code || reward.kind !== 'discount';
     }
     if (copy) { copy.hidden = !reward.coupon_code; copy.setAttribute('aria-label', t.copy); }
   }
@@ -283,7 +372,11 @@
     list.replaceChildren(...rewards.map((item, index) => {
       const li = document.createElement('li');
       const label = document.createElement('span');
-      label.textContent = `${({ vi: 'Lượt', zh: '第', en: 'Play' }[language])} ${index + 1}: ${item.name?.[language] || item.name?.vi || ''}`;
+      label.textContent = `${({ vi: 'Lượt', zh: '第', en: 'Play' }[language])} ${index + 1}: `;
+      const prize = document.createElement('strong');
+      prize.className = 'kyuc-session-prize';
+      prize.textContent = item.name?.[language] || item.name?.vi || '';
+      label.append(prize);
       const code = document.createElement('code');
       code.textContent = item.coupon_code || '';
       li.append(label, code);
@@ -298,6 +391,12 @@
     const checkout = document.querySelector('[data-checkout-form]');
     const session = response.checkout_session;
     if (checkout && session) checkout.dataset.gameRemaining = String(Math.max(0, (Number(session.granted) || 0) - (Number(session.played) || 0)));
+    // Keep the "you still have X plays" line on the checkout page current after every play or bonus chance.
+    const remainingLine = document.querySelector('[data-game-remaining-text]');
+    if (remainingLine && session) {
+      const left = Math.max(0, (Number(session.granted) || 0) - (Number(session.played) || 0));
+      remainingLine.querySelector('strong').textContent = remainingLine.dataset.gameRemainingText.replace('{n}', String(left));
+    }
     if (session && typeof window.hcgsSetClock === 'function') window.hcgsSetClock(session.remaining);
     if (response.event === 'awarded') root.dataset.awarded = '1';
     const oldMatched = board?.matched || [];
@@ -415,6 +514,7 @@
   // A new play starts from a clean board: the previous prize, completion banner and stats are cleared at once.
   function resetRound() {
     reward = null; board = null; freshMatches = []; shareBonus = false;
+    shareNote.hidden = true;
     ['name', 'terms', 'code', 'amount', 'expiry'].forEach(key => {
       const element = root.querySelector(`[data-game-reward-${key}]`);
       if (element) element.textContent = '';
@@ -430,17 +530,96 @@
     resetRound();
     run('next', false, { board_id: id });
   });
+  // Zalo opens Facebook over this page, so Back reloads it: the share in progress must outlive the page.
+  function rememberShare(id) {
+    try {
+      sessionStorage.setItem(shareKey, JSON.stringify({ id, at: Date.now(), back: location.href }));
+    } catch (_) {}
+  }
+  // Sending the order ends the visit to this page, so app.js must not bring the customer back to it.
+  document.addEventListener('submit', takeShare);
+  function takeShare() {
+    try {
+      const saved = JSON.parse(sessionStorage.getItem(shareKey) || 'null');
+      sessionStorage.removeItem(shareKey);
+      return saved;
+    } catch (_) {
+      return null;
+    }
+  }
+  function resumeShare() {
+    const saved = takeShare();
+    if (!saved || !shareBonus || saved.id !== board?.id) return;
+    window.openMinigameModal?.();
+    if (Date.now() - saved.at < (window.kyucShareMinMs || 0)) return;
+    resetRound();
+    run('share_bonus', false, { board_id: saved.id });
+  }
   if (shareBox) {
-    shareBox.querySelector('p').textContent = t.share_offer;
-    shareBox.querySelector('button').textContent = t.share_button;
+    shareBox.querySelector('p').innerHTML = t.share_offer;
+    const shareLabel = shareBox.querySelector('button span') || shareBox.querySelector('button');
+    shareLabel.textContent = t.share_button;
     shareBox.querySelector('button').addEventListener('click', () => {
       if (busy || !reward || !shareBonus || !board) return;
-      // Open the Facebook share inside this click so the pop-up is allowed, then claim the guaranteed play.
-      document.querySelector('[data-fb-share-open]')?.click();
+      shareNote.hidden = true;
       const id = board.id;
-      resetRound();
-      run('share_bonus', false, { board_id: id });
+      rememberShare(id);
+      // Open the Facebook share inside this click so the pop-up is allowed; the 52.000đ replay waits for Facebook's answer.
+      window.kyucFbShare?.(function claim(shared) {
+        // Coming back from Facebook refreshes the game state; wait for it so the share is not dropped.
+        if (busy) {
+          window.setTimeout(() => claim(shared), 200);
+          return;
+        }
+        takeShare();
+        // The customer may have moved on while the Facebook window was open.
+        if (!shareBonus || board?.id !== id) return;
+        if (!shared) {
+          shareNote.hidden = false;
+          message(t.share_failed, true);
+          return;
+        }
+        resetRound();
+        run('share_bonus', false, { board_id: id });
+      });
     });
+  }
+  if (popup) {
+    root.querySelectorAll('[data-game-reward-close]').forEach(button => {
+      button.addEventListener('click', () => {
+        popup.close();
+        // Out of plays at checkout: close the game too, so the customer lands back on the checkout page.
+        if (inCheckout && balance < 1) {
+          if (typeof window.closeMinigameModal === 'function') window.closeMinigameModal();
+          else if (root.dataset.exitUrl) location.href = root.dataset.exitUrl;
+        }
+      });
+    });
+    // Forward to the popup buttons so the claim logic (and the Facebook pop-up permission) stays in one place.
+    outsideNext?.addEventListener('click', () => next?.click());
+    if (outsideShare) {
+      outsideShare.querySelector('span').textContent = t.share_button;
+      outsideShare.addEventListener('click', () => shareBox?.querySelector('button')?.click());
+    }
+    if (reopen) {
+      reopen.textContent = '🎁 ' + popupText.view;
+      reopen.addEventListener('click', () => {
+        if (reward && !popup.open) popup.showModal();
+        syncPopup();
+      });
+    }
+    // Clicks inside the popup must not reach the outer minigame dialog, which closes on outside clicks.
+    popup.addEventListener('click', event => {
+      event.stopPropagation();
+      if (event.target === popup) popup.close();
+    });
+    popup.addEventListener('close', () => {
+      if (reopen) reopen.hidden = !reward;
+    });
+    // Show the pending prize once the minigame dialog is opened; close the popup with it.
+    if (popupHost) {
+      new MutationObserver(syncPopup).observe(popupHost, { attributes: true, attributeFilter: ['open'] });
+    }
   }
   root.querySelector('[data-game-reward-copy]')?.addEventListener('click', async () => {
     if (!reward?.coupon_code) return;
@@ -450,8 +629,8 @@
   if (notice) { notice.setAttribute('role', 'status'); notice.setAttribute('aria-live', 'polite'); }
   if (retry) retry.textContent = t.retry;
   window.setInterval(updateClock, 1000);
-  window.addEventListener('pageshow', event => { if (event.persisted && !busy) run('state'); });
+  window.addEventListener('pageshow', event => { if (event.persisted && !busy) run('state').then(resumeShare); });
   document.addEventListener('visibilitychange', () => { if (!document.hidden && !busy) run('state'); });
   render();
-  run('state');
+  run('state').then(resumeShare);
 })();

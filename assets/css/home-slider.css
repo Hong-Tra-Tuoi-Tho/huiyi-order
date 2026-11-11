@@ -1,0 +1,153 @@
+/* Home page banner slider (index.php + assets/js/home-slider.js). Slides keep app.css's .home-banner look (16:9, rounded). */
+
+.home-slider {
+    position: relative;
+}
+
+/* Horizontal strip; native scroll-snap gives swipe on phones, the script drives autoplay and the controls. */
+.home-slider-track {
+    display: flex;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    scroll-behavior: smooth;
+    border-radius: 24px;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+}
+
+.home-slider-track::-webkit-scrollbar {
+    display: none;
+}
+
+.home-slider .home-slide {
+    flex: 0 0 100%;
+    scroll-snap-align: start;
+    scroll-snap-stop: always;
+    box-shadow: none;
+}
+
+.home-slider .home-slide img {
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    object-fit: cover;
+}
+
+/* ‹ › buttons: show on hover/focus with a mouse, always on touch screens.
+   "button.home-slider-arrow" outranks app.css's 44px min-height rule for buttons. */
+.home-slider button.home-slider-arrow {
+    min-width: 0;
+    min-height: 0;
+    padding: 0;
+}
+
+.home-slider-arrow {
+    position: absolute;
+    top: 50%;
+    z-index: 2;
+    display: grid;
+    place-items: center;
+    width: 42px;
+    height: 42px;
+    border: 0;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, .85);
+    color: #101828;
+    font-size: 28px;
+    line-height: 1;
+    box-shadow: 0 4px 14px rgba(16, 24, 40, .18);
+    cursor: pointer;
+    opacity: 0;
+    transform: translateY(-50%);
+    transition: opacity .2s, background .2s;
+}
+
+.home-slider-arrow.is-prev {
+    left: 14px;
+}
+
+.home-slider-arrow.is-next {
+    right: 14px;
+}
+
+.home-slider:hover .home-slider-arrow,
+.home-slider:focus-within .home-slider-arrow {
+    opacity: 1;
+}
+
+.home-slider-arrow:hover {
+    background: #fff;
+}
+
+@media (hover: none) {
+    .home-slider-arrow {
+        opacity: .9;
+    }
+}
+
+/* Dots */
+.home-slider-dots {
+    position: absolute;
+    left: 50%;
+    bottom: 12px;
+    z-index: 2;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 8px;
+    border-radius: 999px;
+    background: rgba(16, 24, 40, .28);
+    transform: translateX(-50%);
+}
+
+/* [data-slider-dot] raises specificity above app.css ".front-body .container :is(button,.btn){min-height:44px}",
+   which otherwise stretches every dot into a tall pill. */
+.home-slider .home-slider-dots button[data-slider-dot] {
+    flex: 0 0 auto;
+    width: 7px;
+    height: 7px;
+    min-width: 0;
+    min-height: 0;
+    padding: 0;
+    border: 0;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, .6);
+    font-size: 0;
+    line-height: 0;
+    cursor: pointer;
+    transition: width .25s, background .25s;
+}
+
+.home-slider .home-slider-dots button[data-slider-dot][aria-current="true"] {
+    width: 18px;
+    background: #fff;
+}
+
+@media (max-width: 720px) {
+    .home-slider-track {
+        border-radius: 17px;
+    }
+
+    .home-slider-arrow {
+        width: 34px;
+        height: 34px;
+        font-size: 22px;
+    }
+
+    .home-slider-arrow.is-prev {
+        left: 8px;
+    }
+
+    .home-slider-arrow.is-next {
+        right: 8px;
+    }
+
+    .home-slider-dots {
+        bottom: 8px;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .home-slider-track {
+        scroll-behavior: auto;
+    }
+}

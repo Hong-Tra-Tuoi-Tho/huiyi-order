@@ -323,7 +323,7 @@
   .site-footer-main {
     grid-template-columns: 1fr;
     row-gap: 20px;
-    padding: 28px 16px;
+    padding: 16px 16px 24px;
   }
 
   .site-footer-main > * {
@@ -334,6 +334,16 @@
   .site-footer-main > * + * {
     padding-top: 20px;
     border-top: 1px solid var(--sf-line);
+  }
+
+  .site-footer {
+    margin-top: 0;
+  }
+
+  /* Điện thoại: ẩn Liên hệ, Theo dõi chúng tôi, Chính sách */
+  .site-footer-main > .site-footer-col,
+  .site-footer-main > .site-footer-social {
+    display: none;
   }
 
   .site-footer .social-media-link {

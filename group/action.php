@@ -16,12 +16,26 @@ try {
             exit;
         }
         $account = htp_group_input($_POST, $_FILES);
-        $r = hyg_create($_POST['title'] ?? '', $_POST['nickname'] ?? '', !empty($_POST['copy_cart']), (string)($_POST['request_key'] ?? ''), $account);
-        // dd('create', $r);
+        // order_type=combo: tạo từ nút "Đặt combo nhóm" (group/?mode=combo).
+        $orderType = ($_POST['order_type'] ?? '') === 'combo' ? 'combo' : 'drink';
+        $r = hyg_create($_POST['title'] ?? '', $_POST['nickname'] ?? '', !empty($_POST['copy_cart']), (string)($_POST['request_key'] ?? ''), $account, $orderType);
+        // Tạo nhóm từ nút "Đặt ngay" của slider combo: đưa combo khách chọn vào giỏ nhóm vừa tạo.
+        $comboId = (int)($_POST['combo_id'] ?? 0);
+        unset($_SESSION['hyg_pending_combo']);
+        if ($comboId > 0) {
+            try {
+                hgc_add_combo($r['public_id'], ['combo_id' => $comboId, 'request_key' => bin2hex(random_bytes(16))]);
+                $r = hyg_room($r['public_id']);
+            } catch (Throwable $e) {
+                // Combo không còn bán: vẫn tạo nhóm, chủ nhóm chọn lại combo trong nhóm.
+                error_log('create group with combo: ' . $e->getMessage());
+            }
+        }
     } elseif ($action === 'join') {
         // dd('join', $r);
-        // Only signed-in members may join; guests sign in first and come back to this invite.
+        // Members join without signing in: guests can join straight from the invite link.
         $invite = (string)($_POST['invite'] ?? '');
+        /* TODO: Tạm bỏ yêu cầu đăng nhập khi tham gia nhóm (bỏ comment để yêu cầu lại).
         if (!hym_current_member()) {
             // Keep the name the guest typed so the invite form shows it again after sign-in.
             $typed = $_POST['nickname'] ?? '';
@@ -29,6 +43,7 @@ try {
             header('Location: ' . hym_login_gate_url(preg_match('/^[a-f0-9]{64}$/D', $invite) ? 'invite-' . $invite : 'group'), true, 303);
             exit;
         }
+        */
         $r = hyg_join((string)($_POST['invite'] ?? ''), $_POST['nickname'] ?? '');
     } else {
         // -- Khi nhấn btn chốt món thì sẽ chạy vô đây
@@ -44,7 +59,38 @@ try {
             header('Location: ' . base_url('checkout.php?group=' . rawurlencode($r['room']['public_id'])), true, 303);
             exit;
         }
+        // Nhóm combo: chủ nhóm thêm combo (index.php?group=...), thành viên chọn nước (group/combo.php).
+        if ($action === 'add_combo') {
+            hgc_add_combo($id, $_POST);
+            $_SESSION['hyg_message'] = hgc_t('combo_added');
+            header('Location: ' . hyg_room_url($id), true, 303);
+            exit;
+        }
+        if ($action === 'combo_drink') {
+            hgc_add_drink($id, $_POST);
+            // Ly vừa thêm làm combo đủ nước (đủ số ly và mỗi nhóm đạt yêu cầu) thì báo riêng.
+            $message = hgc_t('drink_added');
+            $comboState = hgc_state(hyg_cart(hyg_room($id), false))[(int)($_POST['combo_item'] ?? 0)] ?? null;
+            if ($comboState && !empty($comboState['full']) && !empty($comboState['complete'])) {
+                $message = hgc_t('combo_complete');
+            }
+            $_SESSION['hyg_message'] = $message;
+            header('Location: ' . base_url('group/combo.php?id=' . $id), true, 303);
+            exit;
+        }
         hyg_mutate($id, $action, $_POST);
+        if ($action === 'remove' && ($_POST['back'] ?? '') === 'combo') {
+            // Xoá combo hay chỉ bỏ 1 ly nước: phân biệt theo dòng vừa xoá (đã bị xoá nên đọc từ form gửi lên).
+            $_SESSION['hyg_message'] = hgc_t(($_POST['removed'] ?? '') === 'drink' ? 'drink_removed' : 'combo_removed');
+            header('Location: ' . base_url('group/combo.php?id=' . $id), true, 303);
+            exit;
+        }
+        if ($action === 'cancel') {
+            // A cancelled group is deleted right away and the host goes back to the menu.
+            hyg_delete_cancelled_room($id);
+            header('Location: ' . base_url('index.php'), true, 303);
+            exit;
+        }
         $r = hyg_room($id);
         if ($action === 'coupon' && ($_POST['lock_after'] ?? '') === '1') {
             // "Lock" submits the offer form: save the offer, then lock at the revision it produced.
@@ -80,7 +126,6 @@ try {
             }
         }
         if ($action === 'payment_confirm') {
-            dd('payment_confirm', $r);
             $quote = hyg_locked_quote($r);
             $hasInvalid = false;
             foreach ($quote['cart'] as $item) {
@@ -114,6 +159,11 @@ try {
                 $r = hyg_room(hyg_code($_POST['room_id']));
                 hyg_member($r);
                 $return = hyg_room_url($r['public_id']);
+                // Lỗi từ trang chọn nước (thêm nước, xoá combo) quay lại trang đó.
+                $fromComboPage = ($_POST['action'] ?? '') === 'combo_drink' || ($_POST['back'] ?? '') === 'combo';
+                if ($fromComboPage) {
+                    $return = base_url('group/combo.php?id=' . $r['public_id']);
+                }
             } elseif (!empty($_POST['invite']) && preg_match('/^[a-f0-9]{64}$/D', (string)$_POST['invite'])) $return = base_url('group/?invite=' . $_POST['invite']);
         } catch (Throwable $ignored) {
         }

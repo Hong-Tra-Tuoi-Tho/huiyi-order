@@ -8,7 +8,7 @@ function front_header(string $title = ''): void
     $frontMember = function_exists('hym_current_member') ? hym_current_member() : null;
     $memberName = trim((string)($frontMember['display_name'] ?? ''));
     $memberLabel = $memberName !== '' ? mt('member_entry_named', ['name' => $memberName]) : mt('member_entry');
-    $assetVersion = '19.15.2';
+    $assetVersion = '19.15.23';
     $gameBalance = minigame_enabled() ? game_wallet_balance() : 0;
     $groupContext = $GLOBALS['hyg_context'] ?? null;
     // Group checkout sets only hyg_header_room, so the header cart shows the group cart without full group mode.
@@ -23,13 +23,18 @@ function front_header(string $title = ''): void
         }
     }
     $GLOBALS['front_cart_room'] = $cartRoom;
-    $frontCartUrl = $cartRoom ? hyg_room_url($cartRoom['public_id']) : base_url('cart.php');
+    // After "Thêm nước vào đơn này" the cart button goes straight back to checkout (Mini Game chances are recounted there).
+    $frontCartUrl = $cartRoom ? hyg_room_url($cartRoom['public_id']) : base_url(!empty($_SESSION['hcgs_adding']) ? 'actions/game_back_checkout.php' : 'cart.php');
     // The logo keeps an open group's menu (and its cart); a locked group goes back to the ordinary menu.
     $brandUrl = $cartRoom && ($cartRoom['status'] ?? '') === 'open' ? base_url('index.php?group=' . rawurlencode($cartRoom['public_id'])) : base_url('index.php');
     $frontCartCount = cart_count();
     if ($cartRoom) {
         $frontCartCount = 0;
-        foreach (hyg_cart($cartRoom, false) as $row) $frontCartCount += (int)$row['qty'];
+        // Dòng combo không cộng vào số ly nước (khách dễ hiểu nhầm); chỉ đếm nước.
+        foreach (hyg_cart($cartRoom, false) as $row) {
+            if (!empty($row['is_combo'])) continue;
+            $frontCartCount += (int)$row['qty'];
+        }
     }
 
 ?>
@@ -44,10 +49,11 @@ function front_header(string $title = ''): void
         <link rel="apple-touch-icon" href="<?= e(base_url('assets/icons/apple-touch-icon.png?v=19')) ?>">
         <link rel="manifest" href="<?= e(base_url('manifest.webmanifest?v=19')) ?>">
         <link rel="stylesheet" href="<?= e(base_url('assets/css/app.css?v=' . $assetVersion)) ?>">
-        <link rel="stylesheet" href="<?= e(base_url('assets/css/group-order.css?v=19.8.3')) ?>">
-        <link rel="stylesheet" href="<?= e(base_url('assets/css/member.css?v=19.8.1')) ?>">
+        <link rel="stylesheet" href="<?= e(base_url('assets/css/group-order.css?v=19.8.34')) ?>">
+        <link rel="stylesheet" href="<?= e(base_url('assets/css/member.css?v=19.8.9')) ?>">
         <link rel="stylesheet" href="<?= e(base_url('assets/css/footer.css?v=1.0.4')) ?>">
-        <link rel="stylesheet" href="<?= e(base_url('assets/css/header.css?v=1.0.1')) ?>">
+        <link rel="stylesheet" href="<?= e(base_url('assets/css/header.css?v=1.0.8')) ?>">
+        <link rel="stylesheet" href="<?= e(base_url('assets/css/front-buttons.css?v=9')) ?>">
         <title><?= e($title ? $title . '｜' . $store : $store) ?></title><?php $ogDesc = ['vi' => '🎁 Mua 4 tặng 1 · 🎮 Mua 10 ly nhận 1 lượt Mini Game – cơ hội trúng giải đến 145K · 👥 Đặt đơn nhóm cùng bạn bè, giao tận nơi.', 'zh' => '🎁 買4送1 · 🎮 買10杯送1次小遊戲機會，最高抽中145K好禮 · 👥 揪團點單，外送到府。', 'en' => '🎁 Buy 4 get 1 free · 🎮 Buy 10 drinks for a Mini Game chance to win up to 145K · 👥 Group orders, delivered to your door.'][current_lang()] ?? ''; ?>
         <meta name="description" content="<?= e($ogDesc) ?>">
         <meta property="og:type" content="website">
@@ -55,7 +61,7 @@ function front_header(string $title = ''): void
         <meta property="og:title" content="<?= e(['vi' => '🧋 Hồng Trà Tuổi Thơ – Mua 4 tặng 1 · Mua 10 ly chơi Mini Game trúng đến 145K', 'zh' => '🧋 回憶紅茶 – 買4送1 · 買10杯玩小遊戲最高抽145K', 'en' => '🧋 Hong Tra Tuoi Tho – Buy 4 get 1 · Buy 10 drinks, win up to 145K'][current_lang()] ?? $store) ?>">
         <meta property="og:description" content="<?= e($ogDesc) ?>"><?php
                                                                     // Share previews use the homepage banner (even while it is hidden on the page), otherwise the app icon.
-                                                                    $ogFile = basename(trim(setting('home_banner_image', '')));
+                                                                    $ogFile = basename(function_exists('hbn_preview_image') ? hbn_preview_image() : ''); // first home slider banner (lib/home_banners.php)
                                                                     $ogPath = $ogFile !== '' ? __DIR__ . '/../uploads/' . $ogFile : '';
                                                                     if ($ogPath === '' || !is_file($ogPath)) {
                                                                         $ogFile = '';
@@ -75,14 +81,56 @@ function front_header(string $title = ''): void
     <body class="front-body <?= e(theme_body_class()) ?>">
         <header class="topbar">
             <div class="topbar-inner"><a class="brand" href="<?= e($brandUrl) ?>"><span class="brand-mark brand-mark-image" aria-hidden="true"><img src="<?= e(base_url('assets/icons/order-icon-192.png?v=19')) ?>" alt=""></span><span class="brand-text"><?= e($store) ?></span></a>
-                <div class="topbar-actions"><?= language_switcher() ?><?php if (minigame_enabled() && $gameBalance > 0): ?><a class="game-link" href="<?= e(base_url('minigame/')) ?>" aria-label="<?= e(t('game_center')) ?>"><span aria-hidden="true">🎮</span><span class="game-link-label"><?= e(t('game_center')) ?></span><?php if ($gameBalance > 0): ?><b><?= $gameBalance ?></b><?php endif; ?></a><?php endif; ?><a class="member-link" href="<?= e(base_url('member/index.php')) ?>" aria-label="<?= e($memberLabel) ?>"><svg viewBox="0 0 24 24" aria-hidden="true">
-                        <circle cx="12" cy="8" r="4" />
-                        <path d="M4 21v-2a8 8 0 0 1 16 0v2" />
-                    </svg><span><?= e($memberLabel) ?></span></a><a class="cart-link" href="<?= e($frontCartUrl) ?>" aria-label="<?= e($cartRoom ? gt('cart_short') : t('cart')) ?>"><svg class="cart-symbol" viewBox="0 0 24 24" aria-hidden="true">
+                <div class="topbar-actions"><?= language_switcher() ?><?php if (minigame_enabled() && $gameBalance > 0): ?><a class="game-link" href="<?= e(base_url('minigame/')) ?>" aria-label="<?= e(t('game_center')) ?>"><svg class="game-link-icon" viewBox="0 0 24 24" aria-hidden="true">
+                            <path class="pad" d="M7 7h10a5 5 0 0 1 4.9 6l-.7 3.5a2.6 2.6 0 0 1-4.6 1.1L14.8 15H9.2l-1.8 2.6a2.6 2.6 0 0 1-4.6-1.1L2.1 13A5 5 0 0 1 7 7z" />
+                            <path class="dpad" d="M7.5 9.5v4M5.5 11.5h4" />
+                            <circle cx="16" cy="10.4" r="1.15" />
+                            <circle cx="18.2" cy="12.6" r="1.15" />
+                        </svg><span class="game-link-label"><?= e(t('game_center')) ?></span><?php if ($gameBalance > 0): ?><b><?= $gameBalance ?></b><?php endif; ?></a><?php endif; ?><?php if ($frontMember): ?><div class="member-menu"><button type="button" class="member-link member-menu-toggle" aria-haspopup="true" aria-expanded="false" aria-label="<?= e($memberLabel) ?>"><svg viewBox="0 0 24 24" aria-hidden="true">
+                                <circle cx="12" cy="8" r="4" />
+                                <path d="M4 21v-2a8 8 0 0 1 16 0v2" />
+                            </svg><span><?= e($memberLabel) ?></span><svg class="member-menu-caret" viewBox="0 0 24 24" aria-hidden="true">
+                                <path d="M6 9l6 6 6-6" />
+                            </svg></button>
+                        <div class="member-menu-panel" hidden><a class="member-menu-name" href="<?= e(base_url('member/index.php')) ?>"><?= e($memberName !== '' ? $memberName : (string)($frontMember['phone'] ?? '')) ?></a>
+                            <form method="post" action="<?= e(base_url('member/action.php')) ?>"><?= csrf_field() ?><input type="hidden" name="action" value="logout"><button type="submit" class="member-menu-item"><svg viewBox="0 0 24 24" aria-hidden="true">
+                                        <path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3" />
+                                        <path d="M10 17l-5-5 5-5" />
+                                        <path d="M5 12h11" />
+                                    </svg><?= e(mt('member_logout')) ?></button></form>
+                        </div>
+                    </div>
+                    <script>
+                        // Nhấn nút thành viên để mở/đóng menu; nhấn ra ngoài để đóng
+                        (function() {
+                            var menu = document.currentScript.previousElementSibling;
+                            var toggle = menu.querySelector('.member-menu-toggle');
+                            var panel = menu.querySelector('.member-menu-panel');
+
+                            function setOpen(open) {
+                                panel.hidden = !open;
+                                toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+                                menu.classList.toggle('is-open', open);
+                            }
+                            toggle.addEventListener('click', function() {
+                                setOpen(panel.hidden);
+                            });
+                            document.addEventListener('click', function(event) {
+                                if (!menu.contains(event.target)) setOpen(false);
+                            });
+                            document.addEventListener('keydown', function(event) {
+                                if (event.key === 'Escape') setOpen(false);
+                            });
+                        })();
+                    </script><?php else: ?><a class="member-link" href="<?= e(base_url('member/index.php')) ?>" aria-label="<?= e($memberLabel) ?>"><svg viewBox="0 0 24 24" aria-hidden="true">
+                            <circle cx="12" cy="8" r="4" />
+                            <path d="M4 21v-2a8 8 0 0 1 16 0v2" />
+                        </svg><span><?= e($memberLabel) ?></span></a><?php endif; ?><a class="cart-link" href="<?= e($frontCartUrl) ?>" aria-label="<?= e($cartRoom ? gt('cart_short') : t('cart')) ?>"><svg class="cart-symbol" viewBox="0 0 24 24" aria-hidden="true">
                         <path d="M3 4h2l1.8 9.1a2 2 0 0 0 2 1.6h7.9a2 2 0 0 0 1.9-1.4L20 8H7" />
                         <circle cx="9" cy="19" r="1.5" />
                         <circle cx="17" cy="19" r="1.5" />
-                    </svg><span class="cart-label"><?= e($cartRoom ? gt('cart_short') : t('cart')) ?></span><span class="cart-count"><?= $frontCartCount ?></span></a></div>
+                    </svg><span class="cart-label"><?= e($cartRoom ? gt('cart_short') : t('cart')) ?></span><span class="cart-count"><?= $frontCartCount ?></span></a>
+                </div>
             </div>
         </header>
         <main class="container"><?php
@@ -101,10 +149,13 @@ function front_header(string $title = ''): void
                                 $groupContext = $GLOBALS['hyg_context'] ?? null;
                                 // Same cart as the header: the group being browsed, or the host's unsent group checkout.
                                 $floatingRoom = $groupContext['room'] ?? ($GLOBALS['front_cart_room'] ?? null);
-                                $floatingUrl = $floatingRoom ? hyg_room_url($floatingRoom['public_id']) : base_url('cart.php');
+                                $floatingUrl = $floatingRoom ? hyg_room_url($floatingRoom['public_id']) : base_url(!empty($_SESSION['hcgs_adding']) ? 'actions/game_back_checkout.php' : 'cart.php');
                                 if ($floatingRoom) {
                                     $count = 0;
-                                    foreach (hyg_cart($floatingRoom, false) as $row) $count += (int)$row['qty'];
+                                    foreach (hyg_cart($floatingRoom, false) as $row) {
+                                        if (!empty($row['is_combo'])) continue;
+                                        $count += (int)$row['qty'];
+                                    }
                                 }
 
                                 $page = basename($_SERVER['SCRIPT_NAME'] ?? '');
@@ -235,8 +286,8 @@ function front_header(string $title = ''): void
         </footer>
 
 
-        <script src="<?= e(base_url('assets/js/app.js?v=19.15.0')) ?>"></script><?php if (!empty($GLOBALS['hyg_qr_page'])): ?><script src="<?= e(base_url('assets/vendor/huiyi-qrcode.js?v=19.8.0')) ?>"></script>
-            <script src="<?= e(base_url('assets/js/group-qr.js?v=19.8.0')) ?>"></script><?php endif; ?><script src="<?= e(base_url('assets/js/group-order.js?v=19.8.5')) ?>"></script>
+        <script src="<?= e(base_url('assets/js/app.js?v=19.15.5')) ?>"></script><?php if (!empty($GLOBALS['hyg_qr_page'])): ?><script src="<?= e(base_url('assets/vendor/huiyi-qrcode.js?v=19.8.0')) ?>"></script>
+            <script src="<?= e(base_url('assets/js/group-qr.js?v=19.8.5')) ?>"></script><?php endif; ?><script src="<?= e(base_url('assets/js/group-order.js?v=19.8.6.8')) ?>"></script>
         <script src="<?= e(base_url('assets/js/promotion.js?v=19.9.2')) ?>"></script>
         <script src="<?= e(base_url('assets/js/game-entry.js?v=19.9.1')) ?>"></script>
     </body>
@@ -247,12 +298,19 @@ function front_header(string $title = ''): void
                                 return in_array(basename($_SERVER['SCRIPT_NAME'] ?? ''), $files, true) ? ' active' : '';
                             }
 
+                            /** ?embed=1: the page is shown inside an admin popup (iframe), so no shell, alerts or push prompt. */
+                            function admin_is_embed(): bool
+                            {
+                                return ($_GET['embed'] ?? '') === '1';
+                            }
+
                             function admin_header(string $title = ''): void
                             {
                                 require_once __DIR__ . '/admin_shell.php';
                                 $title = $title ?: t('hq_admin');
+                                $embed = admin_is_embed();
                                 $latest = latest_order_id();
-                                $alertEnabled = setting('order_alert_enabled', '1') === '1' ? '1' : '0';
+                                $alertEnabled = !$embed && setting('order_alert_enabled', '1') === '1' ? '1' : '0';
                                 $alertMode = setting('order_alert_mode', 'seconds');
                                 if (!in_array($alertMode, ['seconds', 'minutes', 'until_accepted'], true)) $alertMode = 'seconds';
                                 $duration = (int)setting('order_alert_duration', '20');
@@ -273,8 +331,8 @@ function front_header(string $title = ''): void
         <link rel="icon" type="image/png" href="<?= e(base_url('assets/icons/favicon.png?v=19')) ?>">
         <link rel="apple-touch-icon" href="<?= e(base_url('assets/icons/apple-touch-icon.png?v=19')) ?>">
         <link rel="manifest" href="<?= e(base_url('admin/manifest.webmanifest?v=19.1')) ?>">
-        <link rel="stylesheet" href="<?= e(base_url('assets/css/app.css?v=19.15.2')) ?>">
-        <link rel="stylesheet" href="<?= e(base_url('assets/css/group-order.css?v=19.8.3')) ?>">
+        <link rel="stylesheet" href="<?= e(base_url('assets/css/app.css?v=19.15.3')) ?>">
+        <link rel="stylesheet" href="<?= e(base_url('assets/css/group-order.css?v=19.8.34')) ?>">
         <link rel="stylesheet" href="<?= e(base_url('assets/css/dispatch.css?v=19.8.0')) ?>">
         <link rel="stylesheet" href="<?= e(base_url('assets/css/admin-shell.css?v=19.14.3')) ?>">
         <link rel="stylesheet" href="<?= e(base_url('assets/css/admin-ui.css?v=19.14.4')) ?>">
@@ -283,25 +341,42 @@ function front_header(string $title = ''): void
         <title><?= e($title) ?></title>
     </head>
 
-    <body class="admin-body admin-shell <?= e(theme_body_class()) ?>" data-order-alert-enabled="<?= e($alertEnabled) ?>" data-order-alert-latest="<?= $latest ?>" data-order-alert-url="<?= e(base_url('admin/api_new_orders.php')) ?>" data-order-alert-sound="<?= e($soundUrl) ?>" data-order-alert-custom-sound="<?= e($customSoundUrl) ?>" data-order-alert-sound-source="<?= e($soundSource) ?>" data-order-alert-mode="<?= e($alertMode) ?>" data-order-alert-duration="<?= $duration ?>" data-order-view-base="<?= e(base_url('admin/order.php?id=')) ?>" data-push-public-key="<?= e(webpush_public_key()) ?>" data-push-subscribe-url="<?= e(base_url('admin/push_subscription.php')) ?>">
-        <?php has_sidebar($title); ?>
-        <div class="order-alert-toast" id="order-alert-toast" hidden>
-            <div><span class="eyebrow"><?= e(t('new_order_alert')) ?></span><strong data-alert-title></strong><small data-alert-meta></small></div>
-            <div class="order-alert-actions"><a class="btn small primary" data-alert-view href="#"><?= e(t('view_order')) ?></a><button class="btn small" type="button" data-alert-stop><?= e(t('stop_sound')) ?></button></div>
-        </div>
-        <main class="admin-container" id="admin-main">
+    <body class="admin-body admin-shell <?= $embed ? 'admin-embed ' : '' ?><?= e(theme_body_class()) ?>" data-order-alert-enabled="<?= e($alertEnabled) ?>" data-order-alert-latest="<?= $latest ?>" data-order-alert-url="<?= e(base_url('admin/api_new_orders.php')) ?>" data-order-alert-sound="<?= e($soundUrl) ?>" data-order-alert-custom-sound="<?= e($customSoundUrl) ?>" data-order-alert-sound-source="<?= e($soundSource) ?>" data-order-alert-mode="<?= e($alertMode) ?>" data-order-alert-duration="<?= $duration ?>" data-order-view-base="<?= e(base_url('admin/order.php?id=')) ?>" data-push-public-key="<?= e(webpush_public_key()) ?>" data-push-subscribe-url="<?= e(base_url('admin/push_subscription.php')) ?>">
+        <?php if ($embed): ?>
+            <style>
+                .admin-shell.admin-embed {
+                    --shell-sidebar: 0px;
+                    min-height: 0
+                }
+
+                .admin-shell.admin-embed .admin-container {
+                    margin-left: 0;
+                    padding: 16px;
+                    min-height: 0
+                }
+            </style>
+            <main class="admin-container" id="admin-main"><?php return;
+                                                        endif; ?>
+            <?php has_sidebar($title); ?>
+            <div class="order-alert-toast" id="order-alert-toast" hidden>
+                <div><span class="eyebrow"><?= e(t('new_order_alert')) ?></span><strong data-alert-title></strong><small data-alert-meta></small></div>
+                <div class="order-alert-actions"><a class="btn small primary" data-alert-view href="#"><?= e(t('view_order')) ?></a><button class="btn small" type="button" data-alert-stop><?= e(t('stop_sound')) ?></button></div>
+            </div>
+            <main class="admin-container" id="admin-main">
+                <?php /* Ẩn kiểm tra tối ưu màn hình: tạm bỏ khung tiêu đề (Trụ sở / tên trang / Xem trang đặt hàng) trên mọi trang admin.
             <div class="page-title">
                 <div><span class="page-kicker"><?= e(t('headquarters')) ?></span>
                     <h1><?= e($title) ?></h1>
                 </div><a class="view-store-link" href="<?= e(base_url('index.php')) ?>" target="_blank" rel="noopener"><?= e(t('view_store')) ?></a>
-            </div><?php
+            </div>
+            */ ?><?php
                             }
                             function admin_footer(): void
                             { ?>
-        </main>
-        <script src="<?= e(base_url('assets/js/app.js?v=19.15.1')) ?>"></script>
-        <script src="<?= e(base_url('assets/js/admin-shell.js?v=19.14.5')) ?>"></script>
-        <script src="<?= e(base_url('assets/js/admin-tables.js?v=19.14.5')) ?>" defer></script><?php hqp_ui_config('admin'); ?>
+            </main>
+            <script src="<?= e(base_url('assets/js/app.js?v=19.15.5')) ?>"></script>
+            <script src="<?= e(base_url('assets/js/admin-shell.js?v=19.14.5')) ?>"></script>
+            <script src="<?= e(base_url('assets/js/admin-tables.js?v=19.14.5')) ?>" defer></script><?php if (!admin_is_embed()) hqp_ui_config('admin'); ?>
     </body>
 
     </html><?php }

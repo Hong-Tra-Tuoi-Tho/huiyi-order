@@ -3,7 +3,7 @@ require __DIR__.'/../lib/bootstrap.php';
 if($_SERVER['REQUEST_METHOD']!=='POST') exit;
 verify_csrf();
 $id=(int)($_POST['product_id']??0);
-$qty=max(1,min(20,(int)($_POST['qty']??1)));
+$qty=max(1,min(order_qty_max(),(int)($_POST['qty']??1)));
 $st=db()->prepare('SELECT * FROM products WHERE id=? AND active=1');
 $st->execute([$id]);
 $p=$st->fetch();
@@ -50,7 +50,7 @@ if(!empty($_POST['group_id'])){
     try{
         hyg_csrf();
         $groupQty=filter_var($_POST['qty']??'',FILTER_VALIDATE_INT);
-        if($groupQty===false||$groupQty<1||$groupQty>20)hyg_fail('invalid_quantity');
+        if($groupQty===false||$groupQty<1||$groupQty>order_qty_max())hyg_fail('invalid_quantity');
         hyg_save_item(hyg_code($_POST['group_id']),$newCartRow,(int)($_POST['group_item_id']??0),(int)($_POST['group_item_version']??0),(string)($_POST['group_request']??''));
         if(!empty($_POST['group_item_id'])){
             $_SESSION['hyg_message']=gt('added');
@@ -60,7 +60,7 @@ if(!empty($_POST['group_id'])){
         header('Location: '.base_url('product.php?id='.$id.'&group='.$_POST['group_id'].'#customize'),true,303);exit;
     }catch(Throwable $e){hyg_error_page($e);}
 }
-hcgs_guard_cart();
+hcgs_guard_cart_add();
 $_SESSION['cart'][$key]=$newCartRow;
 $_SESSION['cart_flash']=t('cart_added');
 redirect(base_url('product.php?id='.$id.'#customize'));

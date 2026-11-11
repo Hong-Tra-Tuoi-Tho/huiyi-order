@@ -19,6 +19,15 @@ function e($v): string
 {
     return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8');
 }
+
+/**
+ * Highest quantity of one cart / group line. There is no business limit any more (it used to be 20);
+ * this only guards against typos and keeps totals inside the DECIMAL(12,2) money columns.
+ */
+function order_qty_max(): int
+{
+    return 9999;
+}
 function money($v): string
 {
     return number_format((float)$v, 0);
@@ -44,6 +53,42 @@ function base_url(string $path = ''): string
 {
     $base = defined('APP_BASE_URL') ? rtrim(APP_BASE_URL, '/') : '';
     return $base . '/' . ltrim($path, '/');
+}
+/** Cloudflare edge ranges (https://www.cloudflare.com/ips/); update when Cloudflare publishes new ones. */
+function cloudflare_ip_ranges(): array
+{
+    return [
+        '173.245.48.0/20', '103.21.244.0/22', '103.22.200.0/22', '103.31.4.0/22', '141.101.64.0/18', '108.162.192.0/18',
+        '190.93.240.0/20', '188.114.96.0/20', '197.234.240.0/22', '198.41.128.0/17', '162.158.0.0/15', '104.16.0.0/13',
+        '104.24.0.0/14', '172.64.0.0/13', '131.0.72.0/22',
+        '2400:cb00::/32', '2606:4700::/32', '2803:f800::/32', '2405:b500::/32', '2405:8100::/32', '2a06:98c0::/29', '2c0f:f248::/32',
+    ];
+}
+function ip_in_cidr(string $ip, string $cidr): bool
+{
+    [$subnet, $bits] = explode('/', $cidr) + [1 => ''];
+    $ipBin = @inet_pton($ip);
+    $subnetBin = @inet_pton($subnet);
+    if ($ipBin === false || $subnetBin === false || strlen($ipBin) !== strlen($subnetBin)) return false;
+    $bits = (int)$bits;
+    $bytes = intdiv($bits, 8);
+    if (strncmp($ipBin, $subnetBin, $bytes) !== 0) return false;
+    if ($bits % 8 === 0) return true;
+    $mask = chr((0xFF << (8 - $bits % 8)) & 0xFF);
+    return ($ipBin[$bytes] & $mask) === ($subnetBin[$bytes] & $mask);
+}
+/**
+ * The visitor's IP. Behind Cloudflare every request arrives from an edge IP, so CF-Connecting-IP is used,
+ * but only when the request really came from Cloudflare; anyone else could send that header themselves.
+ */
+function client_ip(): string
+{
+    $remote = (string)($_SERVER['REMOTE_ADDR'] ?? '');
+    $forwarded = trim((string)($_SERVER['HTTP_CF_CONNECTING_IP'] ?? ''));
+    if ($forwarded !== '' && filter_var($forwarded, FILTER_VALIDATE_IP)) {
+        foreach (cloudflare_ip_ranges() as $range) if (ip_in_cidr($remote, $range)) return $forwarded;
+    }
+    return $remote !== '' ? $remote : 'local';
 }
 function redirect(string $url): never
 {
@@ -205,18 +250,6 @@ function product_price_text(array $product): string
     }
     return currency() . money($product['price'] ?? 0);
 }
-function homepage_banner(): ?array
-{
-    if (setting('home_banner_active', '0') !== '1') return null;
-    $image = trim(setting('home_banner_image', ''));
-    if ($image === '') return null;
-    $type = setting('home_banner_link_type', 'product');
-    $id = (int)setting('home_banner_target_id', '0');
-    $url = base_url('index.php');
-    if ($id > 0 && $type === 'topping') $url = base_url('topping.php?id=' . $id);
-    elseif ($id > 0) $url = base_url('product.php?id=' . $id);
-    return ['image' => $image, 'url' => $url, 'type' => $type, 'target_id' => $id];
-}
 function coupon_enabled(): bool
 {
     return setting('buy4get1_enabled', '1') === '1';
@@ -286,7 +319,7 @@ function calculate_cart_coupon_summary(array $cart, ?array $record, ?array $gift
     if ($record['type'] === 'buy4get1') {
         $units = [];
         foreach ($cart as $key => $row) {
-            if (empty($row['product_id']) || !empty($row['standalone_topping_id'])) continue;
+            if (empty($row['product_id']) || !empty($row['standalone_topping_id']) || !empty($row['combo_drink'])) continue;
             $qty = max(0, (int)($row['qty'] ?? 0));
             $base = max(0, (float)($row['base_price'] ?? 0));
             $result['eligible_qty'] += $qty;
@@ -306,7 +339,7 @@ function calculate_cart_coupon_summary(array $cart, ?array $record, ?array $gift
     if ($record['type'] === 'fixed_drink') {
         $remaining = max(0, (float)$record['amount']);
         foreach ($cart as $key => $row) {
-            if (empty($row['product_id']) || !empty($row['standalone_topping_id'])) continue;
+            if (empty($row['product_id']) || !empty($row['standalone_topping_id']) || !empty($row['combo_drink'])) continue;
             $qty = max(0, (int)($row['qty'] ?? 0));
             $base = max(0, (float)($row['base_price'] ?? 0));
             $result['eligible_qty'] += $qty;
@@ -507,7 +540,11 @@ function send_order_notification(array $order, array $cart): bool
 function cart_count(): int
 {
     $n = 0;
-    foreach (($_SESSION['cart'] ?? []) as $row) $n += (int)$row['qty'];
+    // Dòng combo chỉ là "vỏ" chứa các ly nước: không tính là 1 ly, tránh đếm dư (5 ly + 3 ly = 8, không phải 9).
+    foreach (($_SESSION['cart'] ?? []) as $row) {
+        if (!empty($row['is_combo'])) continue;
+        $n += (int)$row['qty'];
+    }
     return $n;
 }
 function order_no(): string

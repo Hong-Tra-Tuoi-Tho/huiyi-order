@@ -122,10 +122,13 @@
         item.add(option);
       });
       picker.render();
-      row.querySelector('[data-prize-item-field]').hidden = kind.value === 'discount';
-      row.querySelector('[data-prize-qty-field]').hidden = kind.value === 'discount';
+      // 'luck' = "Chúc bạn may mắn lần sau": không món, không tiền, không điều kiện; chỉ còn tỷ lệ và tên.
+      const gift = kind.value === 'topping' || kind.value === 'tea';
+      row.querySelector('[data-prize-item-field]').hidden = !gift;
+      row.querySelector('[data-prize-qty-field]').hidden = !gift;
       row.querySelector('[data-prize-amount-field]').hidden = kind.value !== 'discount';
-      item.required = kind.value !== 'discount' && row.querySelector('[data-prize-enabled]').checked;
+      row.querySelectorAll('[data-prize-cond]').forEach(field => { field.hidden = kind.value === 'luck'; });
+      item.required = gift && row.querySelector('[data-prize-enabled]').checked;
       if (kind.value !== 'discount') { if (Number(amount.value) > 0) discountAmount = amount.value; amount.value = '0'; }
       else { amount.value = discountAmount; [...item.options].forEach(option => { option.selected = false; }); picker.render(); }
       validateItem();
@@ -135,7 +138,7 @@
     amount.addEventListener('input', () => { if (kind.value === 'discount') discountAmount = amount.value; });
     row.querySelector('[data-prize-weight]').addEventListener('input', updateTotal);
     row.querySelector('[data-prize-enabled]').addEventListener('change', () => {
-      item.required = kind.value !== 'discount' && row.querySelector('[data-prize-enabled]').checked;
+      item.required = (kind.value === 'topping' || kind.value === 'tea') && row.querySelector('[data-prize-enabled]').checked;
       validateItem();
       updateTotal();
     });
@@ -144,6 +147,41 @@
   }
 
   rows().forEach(bindPrize);
+
+  // Quà khi khách chia sẻ Facebook: nhiều mức giá + tỷ lệ (tổng 100%) hoặc để trống dùng mặc định.
+  const shareList = form.querySelector('[data-share-list]');
+  const shareTemplate = form.querySelector('[data-share-template]');
+  const shareAdd = form.querySelector('[data-share-add]');
+  const shareTotal = form.querySelector('[data-share-total-number]');
+  const shareError = form.querySelector('[data-share-error]');
+  const shareRows = () => [...shareList.querySelectorAll('[data-share-row]')];
+  let shareIndex = shareRows().length;
+  function updateShareTotal() {
+    let total = 0;
+    shareRows().forEach(row => {
+      const basis = percent(row.querySelector('[data-share-weight]').value);
+      if (basis !== null) total += basis;
+    });
+    shareTotal.textContent = `${(total / 100).toFixed(2)}%`;
+    const bad = shareRows().length > 0 && total !== 10000;
+    shareTotal.parentElement.classList.toggle('hgra-invalid-total', bad);
+    shareError.hidden = !bad;
+    return !bad;
+  }
+  function bindShareRow(row) {
+    row.querySelector('[data-share-weight]').addEventListener('input', updateShareTotal);
+    row.querySelector('[data-share-delete]').addEventListener('click', () => { row.remove(); updateShareTotal(); });
+  }
+  shareRows().forEach(bindShareRow);
+  shareAdd.addEventListener('click', () => {
+    if (shareRows().length >= 10) return;
+    const fragment = shareTemplate.content.cloneNode(true);
+    fragment.querySelectorAll('[name]').forEach(element => { element.name = element.name.replace('__SINDEX__', String(shareIndex)); });
+    const row = fragment.querySelector('[data-share-row]');
+    shareList.append(fragment); shareIndex++;
+    bindShareRow(row); updateShareTotal();
+    row.querySelector('input').focus();
+  });
   add.addEventListener('click', () => {
     if (rows().length >= 12) { errorElement.textContent = form.dataset.limitError; errorElement.hidden = false; return; }
     const fragment = template.content.cloneNode(true);
@@ -203,7 +241,8 @@
   }
   form.querySelectorAll('[name="theme"]').forEach(input => input.addEventListener('change', updateTheme));
   form.addEventListener('submit', event => {
+    if (!updateShareTotal()) { event.preventDefault(); shareError.scrollIntoView({ block: 'center' }); return; }
     if (updateTotal() !== 10000) { event.preventDefault(); errorElement.textContent = form.dataset.totalError || form.dataset.weightError; errorElement.hidden = false; errorElement.scrollIntoView({ block:'center', behavior:window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' }); }
   });
-  updateTheme(); updateTotal();
+  updateTheme(); updateTotal(); updateShareTotal();
 })();

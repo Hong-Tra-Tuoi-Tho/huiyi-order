@@ -3,18 +3,6 @@ require __DIR__.'/../lib/bootstrap.php';
 require __DIR__.'/../lib/layout.php';
 require_admin();
 $msg='';$error='';$mailTestDetail='';
-function banner_upload(string $current=''): string {
-    if(!isset($_FILES['home_banner_image']) || $_FILES['home_banner_image']['error']!==UPLOAD_ERR_OK) return $current;
-    $f=$_FILES['home_banner_image'];
-    if($f['size']>8*1024*1024) exit(e(t('image_too_large')));
-    $info=getimagesize($f['tmp_name']); $allow=['image/jpeg'=>'jpg','image/png'=>'png','image/webp'=>'webp'];
-    if(!$info || !isset($allow[$info['mime']])) exit(e(t('image_type_error')));
-    $dir=__DIR__.'/../uploads'; if(!is_dir($dir)) @mkdir($dir,0755,true);
-    $fn='banner-'.date('YmdHis').'-'.bin2hex(random_bytes(4)).'.'.$allow[$info['mime']];
-    if(!move_uploaded_file($f['tmp_name'],$dir.'/'.$fn)) exit(e(t('image_upload_failed')));
-    if($current && is_file($dir.'/'.$current)) @unlink($dir.'/'.$current);
-    return $fn;
-}
 function alert_sound_upload(string $current=''): string {
     if(!isset($_FILES['order_alert_sound']) || $_FILES['order_alert_sound']['error']!==UPLOAD_ERR_OK) return $current;
     $f=$_FILES['order_alert_sound'];
@@ -55,11 +43,7 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
         set_setting('theme_scheme',$themeScheme);
         set_setting('show_product_sales_count',isset($_POST['show_product_sales_count'])?'1':'0');
 
-        $banner=banner_upload(setting('home_banner_image',''));
-        if(isset($_POST['remove_banner']) && $banner){ if(is_file(__DIR__.'/../uploads/'.$banner)) @unlink(__DIR__.'/../uploads/'.$banner); $banner=''; }
-        set_setting('home_banner_active',isset($_POST['home_banner_active'])?'1':'0'); set_setting('home_banner_image',$banner);
-        $linkType=in_array($_POST['home_banner_link_type']??'product',['product','topping'],true)?$_POST['home_banner_link_type']:'product';
-        set_setting('home_banner_link_type',$linkType); set_setting('home_banner_target_id',(string)max(0,(int)($_POST['home_banner_target_id']??0)));
+        // Home banners moved to admin/banners.php (slider, lib/home_banners.php).
 
         set_setting('buy4get1_enabled',isset($_POST['buy4get1_enabled'])?'1':'0');
         $code=strtoupper(trim($_POST['buy4get1_code']??'MUA4TANG1')); set_setting('buy4get1_code',$code?:'MUA4TANG1');
@@ -86,6 +70,7 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
         set_setting('order_alert_mode',$alertMode);
         set_setting('order_alert_duration',(string)$alertDuration);
 
+        require_once __DIR__.'/../lib/promo_popup.php'; promo_popup_save($_POST);
         set_setting('minigame_enabled',isset($_POST['minigame_enabled'])?'1':'0');
         set_setting('game_cups_per_chance','10');
         // Random game prizes are configured in admin/game.php; preserve legacy coupon settings.
@@ -131,12 +116,9 @@ admin_header(t('system_settings'));
 </div>
 <label class="toggle-row"><input type="checkbox" name="show_product_sales_count" value="1" <?=show_product_sales_count()?'checked':''?>><span><strong><?=e(t('show_sales_count'))?></strong><small><?=e(t('show_sales_count_help'))?></small></span></label>
 
-<div class="settings-block"><h2><?=e(t('homepage_banner'))?></h2><p class="field-hint"><?=e(t('homepage_banner_help'))?></p>
-<label class="toggle-row"><input type="checkbox" name="home_banner_active" value="1" <?=setting('home_banner_active','0')==='1'?'checked':''?>><span><strong><?=e(t('enable_banner'))?></strong></span></label>
-<label><?=e(t('banner_image'))?><input type="file" name="home_banner_image" accept="image/jpeg,image/png,image/webp"><small class="field-hint"><?=e(t('banner_ratio_help'))?></small></label>
-<?php if(setting('home_banner_image','')):?><div><img class="banner-admin-preview" src="<?=e(base_url('uploads/'.setting('home_banner_image','')))?>" alt=""><label class="check-row"><input type="checkbox" name="remove_banner"> <span><?=e(t('remove_current_image'))?></span></label></div><?php endif;?>
-<label><?=e(t('banner_link_type'))?><select name="home_banner_link_type" id="banner-link-type"><option value="product" <?=setting('home_banner_link_type','product')==='product'?'selected':''?>><?=e(t('drink'))?></option><option value="topping" <?=setting('home_banner_link_type','product')==='topping'?'selected':''?>><?=e(t('standalone_toppings'))?></option></select></label>
-<label><?=e(t('banner_link_product'))?><select name="home_banner_target_id" id="banner-target"><option value="0">—</option><?php $cur=(int)setting('home_banner_target_id','0'); foreach($products as $r):?><option data-kind="product" value="<?=$r['id']?>" <?=$cur===$r['id']&&setting('home_banner_link_type','product')==='product'?'selected':''?>><?=e(localized_name($r))?></option><?php endforeach;?><?php foreach($toppings as $r):?><option data-kind="topping" value="<?=$r['id']?>" <?=$cur===$r['id']&&setting('home_banner_link_type','product')==='topping'?'selected':''?>><?=e(localized_name($r))?></option><?php endforeach;?></select></label>
+<div class="settings-block"><h2><?=e(t('homepage_banner'))?></h2>
+<p class="field-hint"><?=e(hbn_t('intro'))?></p>
+<a class="btn" href="<?=e(base_url('admin/banners.php'))?>"><?=e(hbn_t('title'))?> →</a>
 </div>
 
 <div class="settings-block"><h2><?=e(t('coupon_system'))?></h2><p class="field-hint"><?=e(t('buy4get1_help'))?></p><label class="toggle-row"><input type="checkbox" name="buy4get1_enabled" value="1" <?=setting('buy4get1_enabled','1')==='1'?'checked':''?>><span><strong><?=e(t('enable_buy4get1'))?></strong></span></label><label><?=e(t('coupon_code'))?><input name="buy4get1_code" maxlength="80" value="<?=e(setting('buy4get1_code','MUA4TANG1'))?>"></label><p class="field-hint"><?=e(t('single_coupon_only'))?></p></div>
@@ -144,6 +126,7 @@ admin_header(t('system_settings'));
 <?php $pushDiag=push_runtime_diagnostics(); ?>
 <div class="settings-block mobile-push-settings"><h2><?=e(t('mobile_push_settings'))?> <small>v19.1</small></h2><p class="field-hint"><?=e(t('mobile_push_help'))?></p><div class="email-diagnostics"><div><span><?=e(t('push_server_status'))?></span><strong><?=($pushDiag['openssl']&&$pushDiag['curl']&&$pushDiag['vapid']&&empty($pushDiag['schema_error']))?e(t('push_ready')):e(t('push_unavailable'))?></strong></div><div><span><?=e(t('push_devices'))?></span><strong><?=e((string)$pushDiag['active'])?></strong></div></div><button class="btn" type="button" id="admin-push-enable-settings"><?=e(current_lang()==='zh'?'通知設定／伺服器推播測試':(current_lang()==='en'?'Notification settings / server test':'Cài đặt thông báo / thử từ máy chủ'))?></button><p class="field-hint"><?=e(t('install_android_help'))?><br><?=e(t('install_ios_help'))?></p></div>
 
+<?php require_once __DIR__.'/../lib/promo_popup.php'; promo_popup_admin_block(); ?>
 <div class="settings-block"><h2><?=e(t('game_settings'))?></h2>
 <label class="toggle-row"><input type="checkbox" name="minigame_enabled" value="1" <?=minigame_enabled()?'checked':''?>><span><strong><?=e(t('enable_minigame'))?></strong><small><?=e(t('game_pending_note',['cups'=>game_cups_per_chance()]))?></small></span></label>
 <label><?=e(t('game_cups_per_chance'))?><input type="number" value="10" readonly></label>

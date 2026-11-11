@@ -3,6 +3,7 @@
 require_once __DIR__.'/group_i18n.php';
 require_once __DIR__.'/group_payments.php';
 require_once __DIR__.'/group_payment_audit.php';
+require_once __DIR__.'/group_combo.php';
 class GroupOrderError extends RuntimeException {}
 function hyg_fail(string $key): never { throw new GroupOrderError($key); }
 function hyg_schema(): void {
@@ -51,6 +52,8 @@ function hyg_schema(): void {
     }
     hyg_apply_four_hour_lifetime();
     hyg_payment_audit_schema();
+    // Nhóm combo: cột group_rooms.order_type (lib/group_combo.php).
+    hgc_schema();
     $done=true;
 }
 
@@ -166,7 +169,7 @@ function hyg_profile_signature(string $kind,string $code): string {
     return hash('sha256',json_encode($parts));
 }
 function hyg_selection(array $row): array {
-    $qty=(int)($row['qty']??0);if($qty<1||$qty>20)hyg_fail('invalid_quantity');
+    $qty=(int)($row['qty']??0);if($qty<1||$qty>order_qty_max())hyg_fail('invalid_quantity');
     if(!empty($row['standalone_topping_id']))return ['kind'=>'topping','id'=>(int)$row['standalone_topping_id'],'qty'=>$qty];
     $p=hyg_catalog_one('SELECT * FROM products WHERE id=? AND active=1',[(int)($row['product_id']??0)]);
     if(!$p)hyg_fail('item_unavailable');
@@ -178,7 +181,10 @@ function hyg_selection(array $row): array {
         'topping_ids'=>array_values(array_unique(array_map(fn($t)=>(int)$t['id'],$row['toppings']??[])))];
 }
 function hyg_resolve(array $s): array {
-    $qty=(int)($s['qty']??0);if($qty<1||$qty>20)hyg_fail('invalid_quantity');
+    $qty=(int)($s['qty']??0);if($qty<1||$qty>order_qty_max())hyg_fail('invalid_quantity');
+    // Nhóm combo: dòng combo và ly nước chọn theo combo (lib/group_combo.php).
+    if(($s['kind']??'')==='combo')return hgc_resolve_combo($s);
+    if(($s['kind']??'')==='combo_drink')return hgc_resolve_drink($s);
     if(($s['kind']??'')==='topping'){
         $p=hyg_catalog_one('SELECT * FROM toppings WHERE id=? AND active=1 AND sell_separately=1',[(int)$s['id']]);
         if(!$p)hyg_fail('item_unavailable');$price=(float)$p['retail_price'];
@@ -259,19 +265,22 @@ function hyg_coupon(array $r,array $cart,bool $validate=true): array {
     }
     return hyg_calculate_group_coupon($cart,$record,$r,hyg_all('SELECT * FROM group_members WHERE room_id=? ORDER BY id',[$r['id']]));
 }
-function hyg_create(string $title,string $nickname,bool $copy,string $request,?array $hostAccount=null): array {
+function hyg_create(string $title,string $nickname,bool $copy,string $request,?array $hostAccount=null,string $orderType='drink'): array {
     hyg_schema();$owner=hyg_device(true);$title=hyg_text($title,80);$nickname=hyg_text($nickname,32);
     if($title===''||$nickname==='')hyg_fail('required_fields');
     if(!preg_match('/^[a-f0-9]{32}$/D',$request))hyg_fail('expired_form');
-    return hyg_tx(function()use($owner,$title,$nickname,$copy,$request,$hostAccount){
+    // Đơn nhóm gộp: combo và nước lẻ cùng một nhóm, nên không còn kiểu nhóm riêng cho combo ($orderType giữ để tương thích).
+    $isCombo=false;
+    return hyg_tx(function()use($owner,$title,$nickname,$copy,$request,$hostAccount,$isCombo){
         $previous=hyg_one('SELECT * FROM group_rooms WHERE owner_hash=? AND create_key=?',[$owner,$request]);if($previous)return $previous;
         $n=hyg_one('SELECT COUNT(*) n FROM group_rooms WHERE owner_hash=? AND created_at>DATE_SUB(NOW(),INTERVAL 1 DAY)',[$owner]);if((int)$n['n']>=20)hyg_fail('too_many');
         $public=bin2hex(random_bytes(16));$invite=bin2hex(random_bytes(32));
         $account=(int)($_SESSION['member_id']??0)?:null; // The signed-in member who creates the group is its owner.
-        hyg_exec('INSERT INTO group_rooms(public_id,invite_token,owner_hash,create_key,title,promotion_mode,owner_member_id,expires_at) VALUES(?,?,?,?,?,?,?,DATE_ADD(UTC_TIMESTAMP(),INTERVAL 4 HOUR))',[$public,$invite,$owner,$request,$title,minigame_enabled()?'draw':'none',$account]);$id=(int)db()->lastInsertId();
+        hyg_exec('INSERT INTO group_rooms(public_id,invite_token,owner_hash,create_key,title,promotion_mode,owner_member_id,expires_at) VALUES(?,?,?,?,?,?,?,DATE_ADD(UTC_TIMESTAMP(),INTERVAL 4 HOUR))',[$public,$invite,$owner,$request,$title,!$isCombo&&minigame_enabled()?'draw':'none',$account]);$id=(int)db()->lastInsertId();
+        if($isCombo)hyg_exec("UPDATE group_rooms SET order_type='combo' WHERE id=?",[$id]);
         if($hostAccount!==null){htp_group_save($id,$hostAccount);hyg_exec("UPDATE group_rooms SET checkout_mode='split' WHERE id=?",[$id]);}
         hyg_exec('INSERT INTO group_members(room_id,device_hash,nickname,member_id) VALUES(?,?,?,?)',[$id,$owner,$nickname,$account]);$mid=(int)db()->lastInsertId();
-        if($copy){$cart=$_SESSION['cart']??[];if(count($cart)>200)hyg_fail('room_full');foreach($cart as $row){$selection=hyg_selection($row);$resolved=hyg_resolve($selection);hyg_insert_item($id,$mid,$selection,$resolved,bin2hex(random_bytes(16)));}}
+        if($copy){$cart=$_SESSION['cart']??[];if(count($cart)>200)hyg_fail('room_full');foreach($cart as $row){if(!empty($row['is_combo'])||!empty($row['combo_drink']))continue;$selection=hyg_selection($row);$resolved=hyg_resolve($selection);hyg_insert_item($id,$mid,$selection,$resolved,bin2hex(random_bytes(16)));}}
         return hyg_room($public);
     });
 }
@@ -290,11 +299,61 @@ function hyg_join(string $invite,string $nickname): array {
 function hyg_insert_item(int $rid,int $mid,array $selection,array $row,string $request): void {
     hyg_exec('INSERT INTO group_items(room_id,member_id,request_key,selection_json,snapshot_json) VALUES(?,?,?,?,?)',[$rid,$mid,$request,json_encode($selection,JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR),json_encode($row,JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR)]);
 }
+/** The host may keep adding new drinks to a locked room (checkout Mini Game); editing or removing stays blocked. */
+function hyg_host_may_append(array $r): bool {
+    if($r['status']!=='locked'||!empty($r['order_id'])||!hyg_host($r))return false;
+    $members=hyg_all('SELECT * FROM group_members WHERE room_id=?',[$r['id']]);
+    return hyg_room_payment_active($r,$members);
+}
+/** A drink was added to a locked room: reprice the frozen quote and make payers whose amount changed confirm again. */
+function hyg_reprice_after_append(array $r,array $host,array $quote): void {
+    $cart=hyg_cart($r,false);
+    $members=$quote['members'];
+    $record=hyg_frozen_coupon_record($r,$quote['settlement']);
+    $coupon=hyg_calculate_group_coupon($cart,$record,$r,$members);
+    $payment=hyg_build_payment_summary($r,$members,$cart,$coupon);
+    $payment['frozen']=true;
+    $summary=$quote['payment'];
+    foreach($members as $member){
+        $id=(int)$member['id'];
+        $before=$summary['members'][$id];
+        $after=$payment['members'][$id];
+        if(!hyg_payment_amount_changed($before,$after))continue;
+        if(in_array($member['payment_status'],['requested','paid'],true))hyg_exec("UPDATE group_members SET payment_status='requested',payment_requested_at=COALESCE(payment_requested_at,payment_completed_at),payment_requested_amount=COALESCE(payment_requested_amount,?),payment_invalidated_at=UTC_TIMESTAMP(),payment_invalidation_reason='amount_changed' WHERE id=?",[$before['due'],$id]);
+        hyg_payment_event($r,$member,(int)$host['id'],'amount_changed',(float)$after['due']-(float)$before['due'],'item_added',['due'=>$before['due'],'receipt'=>hyg_member_ledger_amounts($member)],['due'=>$after['due'],'receipt'=>hyg_member_ledger_amounts($member)]);
+    }
+    $settlement=['version'=>2,'payment'=>$payment,'coupon'=>$coupon,'coupon_record'=>$record,'coupon_rule'=>'group_min_base_per_5_v1'];
+    $promotion=$quote['settlement']['promotion']??null;
+    if($promotion!==null){
+        $promotion['eligible_qty']=promotion_game_qty($cart);
+        if($promotion['mode']==='draw'&&minigame_enabled())$promotion['expected_chances']=max((int)$promotion['expected_chances'],game_chances_for_drink_qty($promotion['eligible_qty']));
+        $settlement['promotion']=$promotion;
+    }
+    hyg_exec('UPDATE group_rooms SET lock_signature=?,settlement_json=? WHERE id=?',[hyg_fingerprint($cart,$coupon,$payment,$promotion),json_encode($settlement,JSON_UNESCAPED_UNICODE|JSON_PRESERVE_ZERO_FRACTION|JSON_THROW_ON_ERROR),$r['id']]);
+}
+/** After the host adds drinks, the host's own share needs no review: confirm it again, like the Chốt món button does. */
+function hyg_reconfirm_host_share(string $public): void {
+    $r=hyg_room($public);
+    $quote=hyg_locked_quote($r);
+    $hostId=(int)($quote['payment']['host_member_id']??0);
+    $hostPay=hyg_member_payment($quote['payment'],$hostId);
+    if(!$hostPay||empty($hostPay['can_confirm'])||(float)$hostPay['outstanding']<=0)return;
+    hyg_mutate($public,'payment_confirm',[
+        'revision'=>(int)$r['revision'],
+        'quote_signature'=>$r['lock_signature']??'',
+        'member_id'=>$hostId,
+        'payment_amount'=>(string)hyg_money((float)$hostPay['outstanding']),
+    ]);
+}
 function hyg_save_item(string $public,array $row,int $edit,int $version,string $request): void {
     if(!preg_match('/^[a-f0-9]{32}$/D',$request))hyg_fail('expired_form');
-    hyg_tx(function()use($public,$row,$edit,$version,$request){
-        $r=hyg_room($public,true);$m=hyg_member($r);hyg_open($r);
+    $appended=false;
+    hyg_tx(function()use($public,$row,$edit,$version,$request,&$appended){
+        $r=hyg_room($public,true);$m=hyg_member($r);
+        $append=!$edit&&hyg_host_may_append($r);
+        if(!$append)hyg_open($r);
         if(!$edit&&hyg_one('SELECT id FROM group_items WHERE room_id=? AND member_id=? AND request_key=?',[$r['id'],$m['id'],$request]))return;
+        $quote=$append?hyg_locked_quote($r):null;
         $selection=hyg_selection($row);$resolved=hyg_resolve($selection);
         if($edit){
             $i=hyg_one('SELECT * FROM group_items WHERE id=? AND room_id=?',[$edit,$r['id']]);
@@ -304,9 +363,17 @@ function hyg_save_item(string $public,array $row,int $edit,int $version,string $
         }else{
             $n=hyg_one('SELECT COUNT(*) n FROM group_items WHERE room_id=?',[$r['id']]);if((int)$n['n']>=200)hyg_fail('room_full');
             hyg_insert_item((int)$r['id'],(int)$m['id'],$selection,$resolved,$request);
+            if($quote){
+                hyg_reprice_after_append($r,$m,$quote);
+                $appended=true;
+            }
         }
         hyg_touch((int)$r['id']);
     });
+    if(!$appended)return;
+    hyg_reconfirm_host_share($public);
+    $promotion=hyg_settlement(hyg_room($public))['promotion']??null;
+    if($promotion&&$promotion['mode']==='draw')hcgs_grow_group_session($public,(int)$promotion['eligible_qty'],(int)$promotion['expected_chances']);
 }
 /** Validate the immutable quote without requiring payment yet; callers serialize on the room row. */
 function hyg_locked_quote(array $r,bool $allowExpiredResolution=false): array {
@@ -348,9 +415,11 @@ function hyg_remove_member(array $r,array $host,array $data): void {
     }
     $settlement=['version'=>2,'payment'=>$payment,'coupon'=>$coupon,'coupon_record'=>$record,'coupon_rule'=>'group_min_base_per_5_v1'];
     $promotion=$quote['settlement']['promotion']??null;
-    if($promotion!==null){$promotion['eligible_qty']=promotion_drink_qty($cart);$promotion['expected_chances']=$promotion['mode']==='draw'?min(max(0,(int)$promotion['expected_chances']),game_chances_for_drink_qty($promotion['eligible_qty'])):0;$settlement['promotion']=$promotion;}
+    if($promotion!==null){$promotion['eligible_qty']=promotion_game_qty($cart);$promotion['expected_chances']=$promotion['mode']==='draw'?min(max(0,(int)$promotion['expected_chances']),game_chances_for_drink_qty($promotion['eligible_qty'])):0;$settlement['promotion']=$promotion;}
     hyg_exec('UPDATE group_rooms SET lock_signature=?,settlement_json=? WHERE id=?',[hyg_fingerprint($cart,$coupon,$payment,$promotion),json_encode($settlement,JSON_UNESCAPED_UNICODE|JSON_PRESERVE_ZERO_FRACTION|JSON_THROW_ON_ERROR),$r['id']]);
 }
+/** A group order needs at least this many drinks in total before the host can press "Chốt món". */
+function hyg_min_lock_cups(): int {return 2;}
 function hyg_mutate(string $public,string $action,array $data): void {
     hyg_tx(function()use($public,$action,$data){
         $r=hyg_room($public,true);$m=hyg_member($r);$rid=(int)$r['id'];
@@ -358,7 +427,16 @@ function hyg_mutate(string $public,string $action,array $data): void {
         if($action==='cancel'){
             if(!in_array($r['status'],['open','locked'],true))hyg_fail('not_open');
             $members=hyg_all('SELECT * FROM group_members WHERE room_id=? ORDER BY id',[$rid]);
-            if(hyg_room_has_payment_work($members))hyg_fail('payment_cancel_unresolved');
+            // Phần của chính chủ nhóm được tự xác nhận "đã trả" lúc chốt món: không phải tiền thu của ai,
+            // nên không chặn hủy nhóm. Chỉ chặn khi thành viên khác đã báo trả / đã được ghi nhận tiền.
+            $hostMemberId = hyg_host_member_id($r, $members);
+            $otherMembers = array_filter(
+                $members,
+                fn($member) => (int)$member['id'] !== $hostMemberId
+            );
+            if (hyg_room_has_payment_work($otherMembers)) {
+                hyg_fail('payment_cancel_unresolved');
+            }
             if(hyg_positive_int($data['revision']??null)!==(int)$r['revision'])hyg_fail('changed_reload');
             $reason=hyg_payment_reason($data);if($r['status']==='locked')hyg_payment_control_quote($r,$data);
             hyg_payment_event($r,null,(int)$m['id'],'cancelled',0,$reason);
@@ -369,7 +447,14 @@ function hyg_mutate(string $public,string $action,array $data): void {
             hyg_exec("UPDATE group_rooms SET status='open',lock_signature=NULL,settlement_json=NULL WHERE id=?",[$rid]);
         }elseif($action==='lock'){
             hyg_open($r);if((int)($data['revision']??-1)!==(int)$r['revision'])hyg_fail('changed_reload');
-            $cart=hyg_cart($r);if(!$cart)hyg_fail('empty_room');$record=promotion_group_record($r);
+            $cart=hyg_cart($r);if(!$cart)hyg_fail('empty_room');
+            // Giỏ có combo: mọi combo phải chọn đủ nước theo luật combo (thay luật tối thiểu 2 ly nước lẻ).
+            if(hgc_has_combo($cart))hgc_validate_lock($cart);
+            elseif(promotion_drink_qty($cart)<hyg_min_lock_cups())hyg_fail('min_cups');
+            // Đơn nhóm có combo chỉ được ưu đãi "Mua 10 nhận lượt rút thưởng" (tự áp dụng khi đủ 10 ly); bỏ ưu đãi khác đã chọn trước đó.
+            if(hgc_has_combo($cart)){$forced=minigame_enabled()&&promotion_game_qty($cart)>=10?'draw':'none';$current=promotion_room_mode($r);
+                if($current!==$forced&&!($current==='draw'&&$forced==='none')){hyg_exec("UPDATE group_rooms SET promotion_mode=?,coupon_code='',coupon_type='',coupon_source='',coupon_amount=0 WHERE id=?",[$forced,$rid]);$r['promotion_mode']=$forced;$r['coupon_code']='';$r['coupon_type']='';$r['coupon_source']='';$r['coupon_amount']=0;}}
+            $record=promotion_group_record($r);
             $members=hyg_all('SELECT * FROM group_members WHERE room_id=? ORDER BY id',[$rid]);$coupon=hyg_calculate_group_coupon($cart,$record,$r,$members);$payment=hyg_build_payment_summary($r,$members,$cart,$coupon);$payment['frozen']=true;
             $promotion=promotion_room_choice($r,$cart);
             $settlement=['version'=>2,'payment'=>$payment,'coupon'=>$coupon,'coupon_record'=>$record,'coupon_rule'=>'group_min_base_per_5_v1','promotion'=>$promotion];
@@ -425,8 +510,11 @@ function hyg_mutate(string $public,string $action,array $data): void {
             hyg_open($r);$i=hyg_one('SELECT * FROM group_items WHERE id=? AND room_id=?',[(int)($data['item_id']??0),$rid]);
             if(!$i||((int)$i['member_id']!==(int)$m['id']&&!hyg_host($r)))hyg_fail('own_items_only');
             if((int)$i['version']!==(int)($data['item_version']??-1))hyg_fail('changed_reload');
+            // Nhóm combo: số lượng đi theo luật combo, không sửa trực tiếp; xoá combo thì xoá luôn nước đã chọn cho nó.
+            if($action==='quantity'&&in_array(json_decode((string)$i['selection_json'],true)['kind']??'',['combo','combo_drink'],true))hyg_fail('combo_room_only');
+            if($action==='remove'&&(json_decode((string)$i['selection_json'],true)['kind']??'')==='combo')hgc_delete_children($rid,(int)$i['id']);
             if($action==='remove')hyg_exec('DELETE FROM group_items WHERE id=?',[$i['id']]);
-            else{$qty=filter_var($data['qty']??'',FILTER_VALIDATE_INT);if($qty===false||$qty<1||$qty>20)hyg_fail('invalid_quantity');$s=json_decode($i['selection_json'],true);$s['qty']=$qty;$row=hyg_resolve($s);hyg_exec('UPDATE group_items SET selection_json=?,snapshot_json=?,version=version+1 WHERE id=?',[json_encode($s,JSON_UNESCAPED_UNICODE),json_encode($row,JSON_UNESCAPED_UNICODE),$i['id']]);}
+            else{$qty=filter_var($data['qty']??'',FILTER_VALIDATE_INT);if($qty===false||$qty<1||$qty>order_qty_max())hyg_fail('invalid_quantity');$s=json_decode($i['selection_json'],true);$s['qty']=$qty;$row=hyg_resolve($s);hyg_exec('UPDATE group_items SET selection_json=?,snapshot_json=?,version=version+1 WHERE id=?',[json_encode($s,JSON_UNESCAPED_UNICODE),json_encode($row,JSON_UNESCAPED_UNICODE),$i['id']]);}
         }else hyg_fail('invalid_input');
         hyg_touch($rid);
     });
@@ -446,24 +534,42 @@ function hyg_checkout(string $public,bool $lock=false): array {
     if(!hyg_payments_confirmed($quote['payment']))hyg_fail('payments_unconfirmed');
     return ['room'=>$r,'already'=>false,'cart'=>$quote['cart'],'coupon'=>$quote['coupon'],'payment'=>$quote['payment']];
 }
-function hyg_store_order_payment_summary(array $r,int $orderId): void {
+function hyg_store_order_payment_summary(array $r,int $orderId,?string $payChoice=null): void {
     if(!db()->inTransaction())throw new RuntimeException('group_payment_snapshot_requires_transaction');
     $payment=hyg_payment_summary($r);
+    // The host picked transfer or cash on the checkout page: the saved snapshot shows that choice, not the one stored when the room was quoted.
+    $hostId=(int)($payment['host_member_id']??0);
+    if(in_array($payChoice,['transfer','cash'],true)&&isset($payment['members'][$hostId]))$payment['members'][$hostId]['method']=$payChoice==='cash'?'cash':'bank_transfer';
     hyg_exec('UPDATE orders SET group_checkout_mode=?,group_payment_summary=? WHERE id=? AND group_room_id=?',[$payment['mode'],json_encode($payment,JSON_UNESCAPED_UNICODE|JSON_PRESERVE_ZERO_FRACTION|JSON_THROW_ON_ERROR),$orderId,$r['id']]);
 }
-function hyg_finish(array $ctx,int $orderId): void {
+function hyg_finish(array $ctx,int $orderId,?string $payChoice=null): void {
     if(!db()->inTransaction())throw new RuntimeException('group_finish_requires_transaction');
     $r=hyg_room((string)$ctx['room']['public_id'],true);hyg_require_host($r);
     if(!hyg_payment_quote_signature_valid($r,$ctx['room']['lock_signature']??null))hyg_fail('changed_reload');
     $quote=hyg_locked_quote($r);if(!$quote['cart'])hyg_fail('empty_room');
     if(!hyg_payments_confirmed($quote['payment']))hyg_fail('payments_unconfirmed');
-    hyg_store_order_payment_summary($r,$orderId);
+    hyg_store_order_payment_summary($r,$orderId,$payChoice);
     hyg_exec("UPDATE group_rooms SET status='submitted',order_id=?,submitted_at=NOW(),invite_token=NULL,revision=revision+1 WHERE id=? AND status='locked'",[$orderId,$r['id']]);
+}
+/** A group the host cancelled is removed completely: members, drinks and payment events go with it. */
+function hyg_delete_cancelled_room(string $public): void {
+    hyg_tx(function()use($public){
+        $r=hyg_room($public,true);
+        hyg_require_host($r);
+        if($r['status']!=='cancelled'||!empty($r['order_id']))hyg_fail('not_open');
+        $rid=(int)$r['id'];
+        hyg_exec('DELETE FROM group_payment_events WHERE room_id=?',[$rid]);
+        try{hyg_exec('DELETE FROM transfer_group_accounts WHERE room_id=?',[$rid]);}catch(Throwable $e){}
+        // Members, removed-member marks and items follow through ON DELETE CASCADE.
+        hyg_exec('DELETE FROM group_rooms WHERE id=?',[$rid]);
+    });
 }
 function hyg_room_url(string $public): string {return base_url('group/?id='.hyg_code($public));}
 function hyg_context(): ?array {
     if(empty($_GET['group']))return null;
-    hyg_schema();$r=hyg_room(hyg_code($_GET['group']));$m=hyg_member($r);hyg_open($r);hyg_headers();
+    hyg_schema();$r=hyg_room(hyg_code($_GET['group']));$m=hyg_member($r);
+    if(!hyg_host_may_append($r))hyg_open($r);
+    hyg_headers();
     return $GLOBALS['hyg_context']=['room'=>$r,'member'=>$m];
 }
 /** True while this device is in a group still taking orders, or the host has an unsent group checkout (header shows "Giỏ nhóm"). */
@@ -472,6 +578,13 @@ function hyg_in_active_group(): bool {
     try{
         $device=hyg_device();if($device==='')return false;
         return (bool)hyg_one("SELECT 1 FROM group_rooms r JOIN group_members m ON m.room_id=r.id WHERE m.device_hash=? AND r.status='open' AND r.expires_at>UTC_TIMESTAMP() LIMIT 1",[$device]);
+    }catch(Throwable $e){return false;}
+}
+/** True while this device is the host of a group order not yet sent or cancelled (still choosing drinks, or closed and awaiting checkout): starting another one is locked. Members of someone else's group are not locked. */
+function hyg_has_live_group(): bool {
+    try{
+        $device=hyg_device();if($device==='')return false;
+        return (bool)hyg_one("SELECT 1 FROM group_rooms r WHERE r.owner_hash=? AND r.status IN ('open','locked') AND r.order_id IS NULL AND r.expires_at>UTC_TIMESTAMP() LIMIT 1",[$device]);
     }catch(Throwable $e){return false;}
 }
 function hyg_url(string $path): string {

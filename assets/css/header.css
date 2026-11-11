@@ -70,3 +70,246 @@
     background: var(--sh-red);
     color: #fff;
 }
+
+/* Nút giỏ hàng: tông đỏ #B32424 (cùng màu khối các bước đặt nhóm) */
+.front-body .topbar .cart-link {
+    border-color: #E8A3A3;
+    color: #B32424;
+}
+
+.front-body .topbar .cart-link:hover {
+    border-color: #B32424;
+    color: #B32424;
+}
+
+.front-body .topbar .cart-link .cart-count,
+body.theme-deep-red .front-body .topbar .cart-link .cart-count,
+body.theme-deep-red.front-body .topbar .cart-link .cart-count {
+    background: #B32424 !important;
+    border-color: #B32424 !important;
+    color: #fff !important;
+}
+
+.front-body .topbar .cart-link .cart-label {
+    background: #FDF2F2;
+    color: #B32424;
+}
+
+/* Menu thành viên: nhấn để sổ xuống tên + đăng xuất */
+.front-body .topbar .member-menu {
+    position: relative;
+    display: inline-flex;
+    min-width: 0;
+}
+
+.front-body .topbar .member-menu-toggle {
+    font: inherit;
+    font-size: 17px;
+    font-weight: 750;
+    cursor: pointer;
+    appearance: none;
+}
+
+.front-body .topbar .member-menu-caret {
+    width: 16px;
+    height: 16px;
+    flex: 0 0 16px;
+    transition: transform .2s;
+}
+
+.front-body .topbar .member-menu.is-open .member-menu-toggle {
+    border-color: var(--sh-red);
+    color: var(--sh-red);
+}
+
+.front-body .topbar .member-menu.is-open .member-menu-caret {
+    transform: rotate(180deg);
+}
+
+.front-body .topbar .member-menu-panel {
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    z-index: 80;
+    width: max-content;
+    min-width: 220px;
+    max-width: min(300px, calc(100vw - 32px));
+    padding: 6px;
+    border: 1px solid var(--sh-line, #e5e7eb);
+    border-radius: 14px;
+    background: #fff;
+    box-shadow: 0 14px 34px rgba(17, 24, 39, .14);
+    color: var(--sh-text, #111827);
+    animation: member-menu-in .16s ease-out;
+}
+
+.front-body .topbar .member-menu-panel[hidden] {
+    display: none;
+}
+
+@keyframes member-menu-in {
+    from { opacity: 0; transform: translateY(-4px); }
+    to { opacity: 1; transform: none; }
+}
+
+.front-body .topbar .member-menu-name {
+    display: block;
+    padding: 10px 12px;
+    margin-bottom: 4px;
+    border-bottom: 1px solid var(--sh-line, #e5e7eb);
+    font-size: 15px;
+    font-weight: 750;
+    line-height: 1.4;
+    color: inherit;
+    text-decoration: none;
+    overflow-wrap: anywhere;
+    white-space: normal;
+}
+
+.front-body .topbar .member-menu-panel form {
+    margin: 0;
+}
+
+.front-body .topbar .member-menu-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    min-height: 0;
+    padding: 10px 12px;
+    border: 0;
+    border-radius: 10px;
+    background: none;
+    color: inherit;
+    font: inherit;
+    font-size: 15px;
+    font-weight: 600;
+    text-align: left;
+    cursor: pointer;
+    box-shadow: none;
+}
+
+.front-body .topbar .member-menu-item:hover,
+.front-body .topbar .member-menu-name:hover {
+    background: var(--sh-red-soft, #f4f6f8);
+    color: var(--sh-red, inherit);
+}
+
+.front-body .topbar .member-menu-item svg {
+    width: 18px;
+    height: 18px;
+    flex: 0 0 18px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.8;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+@media (max-width: 760px) {
+    .front-body .topbar .member-menu {
+        grid-column: 2;
+        grid-row: 1;
+    }
+
+    .front-body .topbar .member-menu .member-link {
+        max-width: 140px;
+    }
+
+    .front-body .topbar .member-menu-caret {
+        display: none;
+    }
+}
+
+/* Giỏ nổi + nút Thêm vào giỏ (nhóm): tông đỏ #B32424 như nút giỏ hàng trên header. */
+.floating-cart,
+body.theme-deep-red .floating-cart {
+    background: #B32424;
+    box-shadow: 0 12px 30px rgba(179, 36, 36, .32);
+}
+
+.floating-cart-count,
+body.theme-deep-red .floating-cart-count {
+    color: #B32424;
+}
+
+.option-form .qty-row .btn.primary {
+    background: #B32424;
+    border-color: #B32424;
+    color: #fff;
+}
+
+.option-form .qty-row .btn.primary:hover {
+    background: #8F1D1D;
+    border-color: #8F1D1D;
+}
+
+/* Hiệu ứng số lượng bay vào icon giỏ (assets/js/app.js). */
+.cart-fly {
+    position: fixed;
+    left: 0;
+    top: 0;
+    z-index: 70;
+    min-width: 34px;
+    height: 34px;
+    padding: 0 9px;
+    display: grid;
+    place-items: center;
+    border-radius: 999px;
+    background: #B32424;
+    color: #fff;
+    font-size: 15px;
+    font-weight: 900;
+    box-shadow: 0 8px 20px rgba(179, 36, 36, .4);
+    pointer-events: none;
+}
+
+.cart-bump {
+    animation: cartBump .45s ease-out;
+}
+
+@keyframes cartBump {
+    0% { transform: scale(1); }
+    35% { transform: scale(1.18); }
+    65% { transform: scale(.94); }
+    100% { transform: scale(1); }
+}
+
+/* Nút Mini Game trên header: tông đỏ #B32424 như nút giỏ hàng, icon tay cầm SVG thay emoji 🎮. */
+.front-body .topbar .game-link {
+    border-color: #E8A3A3;
+    color: #B32424;
+}
+
+.front-body .topbar .game-link:hover {
+    border-color: #B32424;
+    color: #B32424;
+}
+
+.front-body .topbar .game-link b,
+body.theme-deep-red .front-body .topbar .game-link b,
+body.theme-deep-red.front-body .topbar .game-link b {
+    background: #B32424;
+    color: #fff;
+}
+
+.game-link-icon {
+    flex: 0 0 22px;
+    width: 22px;
+    height: 22px;
+}
+
+.game-link-icon .pad {
+    fill: #B32424;
+}
+
+.game-link-icon .dpad {
+    fill: none;
+    stroke: #fff;
+    stroke-width: 1.7;
+    stroke-linecap: round;
+}
+
+.game-link-icon circle {
+    fill: #fff;
+}

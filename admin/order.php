@@ -16,7 +16,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!is_string($action)) throw new InvalidArgumentException('invalid_action');
     if (in_array($action, ['dispatch_refresh', 'dispatch_assign', 'dispatch_adopt', 'dispatch_clear'], true)) {
       $_SESSION['dispatch_order_flash'] = ['id' => $id, 'key' => hds_view_order_action($id, $action, $_POST, (int)$_SESSION['admin_id'])];
-      redirect(base_url('admin/order.php?id=' . $id . '#hds-dispatch-heading'));
+      redirect(base_url('admin/order.php?id=' . $id . (admin_is_embed() ? '&embed=1' : '') . '#hds-dispatch-heading'));
     } elseif ($action === 'confirm_merchant_payment') {
       htp_confirm($id, $_POST['payment_version'] ?? null, (int)$_SESSION['admin_id']);
       $msg = htp('staff_saved');
@@ -42,9 +42,8 @@ $st = db()->prepare('SELECT * FROM orders WHERE id=?');
 $st->execute([$id]);
 $o = $st->fetch();
 if (!$o) exit(e(t('order_not_found')));
-$st = db()->prepare('SELECT * FROM order_items WHERE order_id=?');
-$st->execute([$id]);
-$items = $st->fetchAll();
+// Dòng đơn theo thứ tự hiển thị: dòng combo, rồi các ly nước của combo, rồi dòng thường (lib/order_combo.php).
+$items = order_lines_flat($id);
 $eligibleQty = order_eligible_drink_qty($id);
 admin_header(t('order_no') . ' ' . $o['order_no']);
 ?>
@@ -151,7 +150,7 @@ if ($groupPayment): ?><section class="panel"><?= hyg_render_payment_overview($gr
       </thead>
       <tbody>
         <?php foreach ($items as $i): ?><tr>
-            <td><?= e($i['product_name']) ?><?php if (!empty($i['group_member_name'])): ?><small class="hyg-order-tag"><?= e(gt('ordered_by')) ?>：<?= e($i['group_member_name']) ?></small><?php endif; ?></td>
+            <td><?= e($i['product_name']) ?><?php if (($i['_kind'] ?? 'item') !== 'item'): ?><small class="hyg-order-tag"><?= e(occ_label($i)) ?></small><?php endif; ?><?php if (!empty($i['group_member_name'])): ?><small class="hyg-order-tag"><?= e(gt('ordered_by')) ?>：<?= e($i['group_member_name']) ?></small><?php endif; ?></td>
             <td><?= e($i['cup_size'] ?? '—') ?></td>
             <td><?= e($i['ice_choice'] ?: '—') ?></td>
             <td><?= e($i['sugar_choice'] ?: '—') ?></td>

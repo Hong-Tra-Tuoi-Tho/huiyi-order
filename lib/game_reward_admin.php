@@ -53,6 +53,12 @@ function hgra_text(string $key): string
         'game_media_upload' => ['圖片上傳未完成，請重新選取。', 'Hình chưa tải lên xong. Hãy chọn lại.', 'The picture upload did not complete. Select it again.'],
         'file_error' => ['請選擇 JPEG、PNG 或 WebP，最大 2 MiB。', 'Chọn hình JPEG, PNG hoặc WebP, tối đa 2 MiB.', 'Choose a JPEG, PNG or WebP picture up to 2 MiB.'],
         'limit' => ['最多可設定 12 個獎項。', 'Tối đa 12 quà.', 'A maximum of 12 prizes is allowed.'],
+        'luck' => ['祝你下次好運', 'Chúc bạn may mắn lần sau', 'Better luck next time'],
+        'share_title' => ['分享 Facebook 的獎項', 'Quà khi khách chia sẻ Facebook', 'Facebook share prizes'],
+        'share_hint' => ['客人抽到「祝你下次好運」後，把網站分享到 Facebook，系統會依機率從下列金額抽出一個折抵。至少需設定一個金額，且機率合計須為 100%。', 'Khi khách trúng "Chúc bạn may mắn lần sau" rồi chia sẻ web lên Facebook, hệ thống quay ngẫu nhiên một mức giảm trong danh sách này theo tỷ lệ. Cần ít nhất 1 mức, tổng tỷ lệ bằng 100%.', 'After a "better luck next time" result, a customer who shares the site on Facebook gets one discount drawn from this list by odds. At least one amount is required and the odds must total 100%.'],
+        'share_add' => ['新增金額', 'Thêm mức giá', 'Add amount'],
+        'share_amount' => ['折抵金額', 'Số tiền giảm', 'Discount amount'],
+        'share_invalid' => ['分享獎項：至少一個金額，金額須為正整數，且機率合計須為 100.00%。', 'Quà chia sẻ: cần ít nhất 1 mức, số tiền phải là số nguyên dương và tổng tỷ lệ phải bằng 100,00%.', 'Share prizes: amounts must be positive whole numbers and the odds must total 100.00%.'],
     ];
     $lang = function_exists('current_lang') ? current_lang() : 'vi';
     $index = ['zh' => 0, 'vi' => 1, 'en' => 2][$lang] ?? 1;
@@ -109,15 +115,51 @@ function hgra_candidate(array $post, array $base): array
         $names = is_array($row['name'] ?? null) ? $row['name'] : [];
         $prizes[] = ['id' => hgra_scalar($row, 'id'), 'kind' => hgra_scalar($row, 'kind'), 'enabled' => $enabled === '1', 'weight' => hgra_weight(hgra_scalar($row, 'weight_percent')), 'item_ids' => $itemIds = hgra_item_ids($row), 'item_sizes' => hgra_item_sizes($row, $itemIds), 'gift_qty' => hgra_integer($row, 'gift_qty', 1), 'cup_size' => hgra_scalar($row, 'cup_size'), 'amount' => hgra_integer($row, 'amount'), 'min_spend' => hgra_integer($row, 'min_spend'), 'min_paid_cups' => hgra_integer($row, 'min_paid_cups', 1), 'valid_days' => hgra_integer($row, 'valid_days', 7), 'name' => array_combine(['vi', 'zh', 'en'], array_map(fn($lang) => hgra_scalar($names, $lang), ['vi', 'zh', 'en']))];
     }
+    // "Chúc bạn may mắn lần sau" lưu như quà giảm tiền 0đ: toàn bộ luồng game (không phát phiếu, mở lượt chia sẻ Facebook) đã dựa trên quà 0đ.
+    foreach ($prizes as &$luckPrize) {
+        if ($luckPrize['kind'] !== 'luck') continue;
+        $luckPrize['kind'] = 'discount';
+        $luckPrize['item_ids'] = [];
+        $luckPrize['item_sizes'] = [];
+        $luckPrize['gift_qty'] = 1;
+        $luckPrize['cup_size'] = '';
+        $luckPrize['amount'] = 0;
+        $luckPrize['min_spend'] = 0;
+        $luckPrize['min_paid_cups'] = 1;
+        $luckPrize['valid_days'] = 7;
+    }
+    unset($luckPrize);
     $faces = array_values($base['faces']);
     $back = $base['back_image'];
     if (hgra_scalar($post, 'back_remove') === '1') $back = '';
     for ($i = 0; $i < 6; $i++) if (hgra_scalar($post, 'face_remove_' . $i) === '1') $faces[$i] = '';
     return ['theme' => hgra_scalar($post, 'theme'), 'back_image' => $back, 'faces' => $faces, 'prizes' => $prizes];
 }
+/** Danh sách quà chia sẻ Facebook từ form: [['amount' => int, 'weight' => basis 10000], ...]; rỗng = dùng mặc định. */
+function hgra_share_candidate(array $post): array
+{
+    $rows = $post['share'] ?? [];
+    if (!is_array($rows) || count($rows) < 1 || count($rows) > 10) throw new InvalidArgumentException('share_invalid');
+    $list = [];
+    $total = 0;
+    foreach ($rows as $row) {
+        if (!is_array($row)) throw new InvalidArgumentException('share_invalid');
+        try {
+            $amount = hgra_integer($row, 'amount');
+            $weight = hgra_weight(hgra_scalar($row, 'weight_percent'));
+        } catch (InvalidArgumentException $e) {
+            throw new InvalidArgumentException('share_invalid');
+        }
+        if ($amount < 1 || $amount > 100000000) throw new InvalidArgumentException('share_invalid');
+        $list[] = ['amount' => $amount, 'weight' => $weight];
+        $total += $weight;
+    }
+    if ($total !== 10000) throw new InvalidArgumentException('share_invalid');
+    return $list;
+}
 function hgra_clear_cache(): void
 {
-    foreach (['hgr_game_config', 'hgr_topping_id', 'hgr_drink_id', 'hgr_drink_size'] as $key) unset($GLOBALS['__drink_order_setting_cache'][$key]);
+    foreach (['hgr_game_config', 'hgr_topping_id', 'hgr_drink_id', 'hgr_drink_size', 'hgr_share_prizes'] as $key) unset($GLOBALS['__drink_order_setting_cache'][$key]);
 }
 function hgr_admin_save(): string
 {
@@ -136,6 +178,7 @@ function hgr_admin_save(): string
         $revision = hgra_scalar($_POST, 'revision');
         if (!preg_match('/\A[a-f0-9]{64}\z/D', $revision) || !hash_equals(hgr_config_revision(), $revision)) throw new InvalidArgumentException('stale');
         $candidate = hgr_validate_config(hgra_candidate($_POST, hgr_config()));
+        $shareList = hgra_share_candidate($_POST);
         $uploads = [];
         foreach (array_merge(['back_upload'], array_map(fn($i) => 'face_upload_' . $i, range(0, 5))) as $field) {
             if (isset($_FILES[$field]) && !is_array($_FILES[$field])) throw new InvalidArgumentException('game_media_invalid');
@@ -151,6 +194,7 @@ function hgr_admin_save(): string
         $pdo->beginTransaction();
         // Serialize first saves as well as later edits with the same singleton setting lock.
         $pdo->prepare('INSERT IGNORE INTO settings(setting_key,setting_value) VALUES(?,?)')->execute(['hgr_game_config', '']);
+        $pdo->prepare('INSERT IGNORE INTO settings(setting_key,setting_value) VALUES(?,?)')->execute(['hgr_share_prizes', '']);
         $keys = ['hgr_game_config', 'hgr_topping_id', 'hgr_drink_id', 'hgr_drink_size'];
         $lock = $pdo->prepare('SELECT setting_key,setting_value FROM settings WHERE setting_key IN (?,?,?,?) ORDER BY setting_key FOR UPDATE');
         $lock->execute($keys);
@@ -163,6 +207,7 @@ function hgr_admin_save(): string
         $json = json_encode($candidate, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
         if (strlen($json) > 60000) throw new InvalidArgumentException('invalid');
         set_setting('hgr_game_config', $json);
+        set_setting('hgr_share_prizes', $shareList ? json_encode($shareList, JSON_THROW_ON_ERROR) : '');
         $pdo->commit();
         unset($GLOBALS['__hgra_failed_post']);
         return hgra_text('saved');
@@ -172,7 +217,7 @@ function hgr_admin_save(): string
         hgr_media_cleanup($created);
         if ($error instanceof InvalidArgumentException) {
             $key = $error->getMessage();
-            $known = ['stale', 'weight_invalid', 'game_media_size', 'game_media_type', 'game_media_dimensions', 'game_media_invalid', 'game_media_upload'];
+            $known = ['stale', 'share_invalid', 'weight_invalid', 'game_media_size', 'game_media_type', 'game_media_dimensions', 'game_media_invalid', 'game_media_upload'];
             $message = hgra_text(in_array($key, $known, true) ? $key : 'invalid');
         } else {
             error_log('minigame admin: unable to save settings');
@@ -194,10 +239,21 @@ function hgra_media_field(string $slot, string $path, string $label): void
         <div class="hgra-media-preview <?= $isBack ? 'hgra-back-preview' : '' ?>"><img data-media-preview <?= $valid ? 'src="' . e(base_url($path)) . '"' : '' ?> alt="<?= e($label) ?>" <?= $valid && !$checked ? '' : 'hidden' ?>><span data-media-default <?= $valid && !$checked ? 'hidden' : '' ?>><?= $isBack ? '✦' : $symbols[$position] ?></span></div><strong><?= e($label) ?></strong><label class="hgra-upload-label"><?= e(hgra_text('upload')) ?><input type="file" name="<?= e($upload) ?>" accept="image/jpeg,image/png,image/webp" data-media-upload></label><label class="hgra-check"><input type="checkbox" name="<?= e($remove) ?>" value="1" data-media-remove <?= $checked ? 'checked' : '' ?>><?= e(hgra_text('remove')) ?></label><small data-media-error role="status"></small>
     </div><?php
         }
+        function hgra_share_row(string $index, string $amount, string $weight): void
+        {
+            $prefix = 'share[' . $index . ']';
+            ?><div class="hgra-share-row" data-share-row>
+        <label><?= e(hgra_text('share_amount')) ?><input type="number" name="<?= e($prefix) ?>[amount]" min="1" max="100000000" step="1" value="<?= e($amount) ?>" required inputmode="numeric"></label>
+        <label><?= e(hgra_text('weight')) ?><input type="number" name="<?= e($prefix) ?>[weight_percent]" min="0" max="100" step="0.01" value="<?= e($weight) ?>" required data-share-weight inputmode="decimal"></label>
+        <button type="button" class="btn small" data-share-delete><?= e(hgra_text('delete')) ?></button>
+    </div><?php
+        }
         function hgra_prize_form(string $index, array $prize, array $tops, array $teas): void
         {
             $prefix = 'prizes[' . $index . ']';
             $kind = hgra_scalar($prize, 'kind', 'discount');
+            // Quà giảm tiền 0đ chính là "Chúc bạn may mắn lần sau".
+            if ($kind === 'discount' && (int)hgra_scalar($prize, 'amount', '0') === 0) $kind = 'luck';
             $id = hgra_scalar($prize, 'id', 'prize_' . bin2hex(random_bytes(8)));
             $enabled = in_array($prize['enabled'] ?? true, [true, 1, '1'], true);
             $items = is_array($prize['item_ids'] ?? null) ? $prize['item_ids'] : [hgra_scalar($prize, 'item_id', '0')];
@@ -213,7 +269,7 @@ function hgra_media_field(string $slot, string $path, string $label): void
             <div><input type="hidden" name="<?= e($prefix) ?>[id]" value="<?= e($id) ?>"><input type="hidden" name="<?= e($prefix) ?>[enabled]" value="0"><label class="hgra-check"><input type="checkbox" name="<?= e($prefix) ?>[enabled]" value="1" data-prize-enabled <?= $enabled ? 'checked' : '' ?>><?= e(hgra_text('enabled')) ?></label><button type="button" class="btn small" data-prize-delete><?= e(hgra_text('delete')) ?></button></div>
         </div>
         <div class="hgra-prize-fields">
-            <label><?= e(hgra_text('kind')) ?><select name="<?= e($prefix) ?>[kind]" data-prize-kind><?php foreach (['topping', 'tea', 'discount'] as $value): ?><option value="<?= $value ?>" <?= $kind === $value ? 'selected' : '' ?>><?= e(hgra_text($value)) ?></option><?php endforeach; ?></select></label>
+            <label><?= e(hgra_text('kind')) ?><select name="<?= e($prefix) ?>[kind]" data-prize-kind><?php foreach (['topping', 'tea', 'discount', 'luck'] as $value): ?><option value="<?= $value ?>" <?= $kind === $value ? 'selected' : '' ?>><?= e(hgra_text($value)) ?></option><?php endforeach; ?></select></label>
             <label><?= e(hgra_text('weight')) ?><input type="number" name="<?= e($prefix) ?>[weight_percent]" min="0" max="100" step="0.01" value="<?= e($weight) ?>" required data-prize-weight inputmode="decimal"></label>
             <div class="hgra-field" data-prize-item-field><span><?= e(hgra_text('item')) ?></span>
                 <select name="<?= e($prefix) ?>[item_ids][]" multiple size="6" data-prize-item data-selected="<?= e(json_encode($items)) ?>" data-item-sizes="<?= e(json_encode((object)$itemSizes)) ?>">
@@ -238,9 +294,9 @@ function hgra_media_field(string $slot, string $path, string $label): void
             </div>
             <label data-prize-qty-field><?= e(hgra_text('gift_qty')) ?><input type="number" name="<?= e($prefix) ?>[gift_qty]" min="1" max="20" step="1" value="<?= e(hgra_scalar($prize, 'gift_qty', '1') ?: '1') ?>" inputmode="numeric"></label>
             <label data-prize-amount-field><?= e(hgra_text('amount')) ?><input type="number" name="<?= e($prefix) ?>[amount]" min="0" max="100000000" step="1" value="<?= e(hgra_scalar($prize, 'amount', '0')) ?>" inputmode="numeric"></label>
-            <label><?= e(hgra_text('min_spend')) ?><input type="number" name="<?= e($prefix) ?>[min_spend]" min="0" max="100000000" step="1" value="<?= e(hgra_scalar($prize, 'min_spend', '0')) ?>" required inputmode="numeric"></label>
-            <label><?= e(hgra_text('min_cups')) ?><input type="number" name="<?= e($prefix) ?>[min_paid_cups]" min="1" max="100" step="1" value="<?= e(hgra_scalar($prize, 'min_paid_cups', '1')) ?>" required inputmode="numeric"></label>
-            <label><?= e(hgra_text('days')) ?><input type="number" name="<?= e($prefix) ?>[valid_days]" min="1" max="365" step="1" value="<?= e(hgra_scalar($prize, 'valid_days', '7')) ?>" required inputmode="numeric"></label>
+            <label data-prize-cond><?= e(hgra_text('min_spend')) ?><input type="number" name="<?= e($prefix) ?>[min_spend]" min="0" max="100000000" step="1" value="<?= e(hgra_scalar($prize, 'min_spend', '0')) ?>" required inputmode="numeric"></label>
+            <label data-prize-cond><?= e(hgra_text('min_cups')) ?><input type="number" name="<?= e($prefix) ?>[min_paid_cups]" min="1" max="100" step="1" value="<?= e(hgra_scalar($prize, 'min_paid_cups', '1')) ?>" required inputmode="numeric"></label>
+            <label data-prize-cond><?= e(hgra_text('days')) ?><input type="number" name="<?= e($prefix) ?>[valid_days]" min="1" max="365" step="1" value="<?= e(hgra_scalar($prize, 'valid_days', '7')) ?>" required inputmode="numeric"></label>
         </div>
         <details class="hgra-names">
             <summary><?= e(hgra_text('names')) ?></summary>
@@ -257,6 +313,10 @@ function hgra_media_field(string $slot, string $path, string $label): void
                 $prizes = is_array($post) && is_array($post['prizes'] ?? null) ? array_values($post['prizes']) : $config['prizes'];
                 $prizes = array_filter(array_slice($prizes, 0, 12), 'is_array');
                 $revision = is_array($post) ? hgra_scalar($post, 'revision', hgr_config_revision()) : hgr_config_revision();
+                // Quà chia sẻ Facebook: lấy từ form vừa gửi lỗi, nếu không thì từ cài đặt đã lưu.
+                $shareRows = [];
+                $shareSource = is_array($post) && is_array($post['share'] ?? null) ? array_values($post['share']) : array_map(fn($c) => ['amount' => $c['amount'], 'weight_percent' => number_format($c['weight'] / 100, 2, '.', '')], hymg_share_saved());
+                foreach ($shareSource as $row) if (is_array($row)) $shareRows[] = ['amount' => hgra_scalar($row, 'amount'), 'weight_percent' => hgra_scalar($row, 'weight_percent')];
                 $tops = db()->query('SELECT * FROM toppings WHERE active=1 AND price>0 ORDER BY sort_order,id')->fetchAll();
                 $teas = db()->query('SELECT p.* FROM products p JOIN categories c ON c.id=p.category_id WHERE p.active=1 AND c.active=1 ORDER BY p.sort_order,p.id')->fetchAll();
                 ?><section class="panel hgra-admin">
@@ -276,6 +336,14 @@ function hgra_media_field(string $slot, string $path, string $label): void
                 <div data-prize-list><?php foreach ($prizes as $i => $prize) hgra_prize_form((string)$i, $prize, $tops, $teas); ?></div>
                 <div class="hgra-prize-toolbar"><button class="btn" type="button" data-prize-add>＋ <?= e(hgra_text('add')) ?></button><output data-prize-total><?= e(hgra_text('total')) ?>: <strong data-prize-total-number>0.00%</strong></output></div>
                 <p data-prize-error class="hgra-form-error" role="status" hidden></p>
+            </fieldset>
+            <fieldset class="hgra-section" data-share-section>
+                <legend><?= e(hgra_text('share_title')) ?></legend>
+                <p class="field-hint"><?= e(hgra_text('share_hint')) ?></p>
+                <div data-share-list><?php foreach ($shareRows as $i => $shareRow) hgra_share_row((string)$i, $shareRow['amount'], $shareRow['weight_percent']); ?></div>
+                <div class="hgra-prize-toolbar"><button class="btn" type="button" data-share-add>＋ <?= e(hgra_text('share_add')) ?></button><output data-share-total><?= e(hgra_text('total')) ?>: <strong data-share-total-number>0.00%</strong></output></div>
+                <p data-share-error class="hgra-form-error" role="status" hidden><?= e(hgra_text('share_invalid')) ?></p>
+                <template data-share-template><?php hgra_share_row('__SINDEX__', '', ''); ?></template>
             </fieldset><button class="btn primary" type="submit"><?= e(hgra_text('save')) ?></button>
             <template data-prize-template><?php hgra_prize_form('__INDEX__', ['id' => '__ID__', 'kind' => 'discount', 'enabled' => true, 'weight' => 0, 'amount' => 5000, 'min_spend' => 50000, 'min_paid_cups' => 1, 'valid_days' => 7], $tops, $teas); ?></template>
         </form>
