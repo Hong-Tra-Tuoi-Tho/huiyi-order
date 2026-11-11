@@ -34,15 +34,147 @@
     if (cp) await copy(cp.dataset.copyUrl);
     if (event.target.closest('[data-group-refresh]')) { if (document.activeElement) document.activeElement.blur(); await refresh(true); }
   });
+  // Popup xác nhận thay cho window.confirm của trình duyệt.
+  // Promise trả về: 'ok' (nút xác nhận) | 'cancel' (nút còn lại) | 'dismiss' (Esc hoặc bấm nền).
+  // Nội dung: **chữ** được in nổi bật. Tuỳ chọn qua data-attribute trên nút/form:
+  //   data-confirm-title, data-confirm-ok, data-confirm-cancel, data-confirm-have + data-confirm-goal (thanh tiến độ).
+  const confirmLabels = {
+    vi: ['Đồng ý', 'Hủy'],
+    en: ['OK', 'Cancel'],
+    zh: ['確定', '取消'],
+  };
+  const confirmStyleId = 'hyg-confirm-style';
+  const confirmCss = `
+.hyg-confirm-backdrop{position:fixed;inset:0;z-index:100000;display:flex;align-items:center;justify-content:center;padding:16px;background:rgba(24,12,14,.58);backdrop-filter:blur(3px);animation:hygConfirmFade .18s ease-out}
+.hyg-confirm-box{position:relative;width:100%;max-width:400px;padding:30px 24px 22px;border-radius:22px;background:#fffdf9;color:#2a1a1d;text-align:center;box-shadow:0 24px 60px rgba(0,0,0,.35);overflow:hidden;animation:hygConfirmPop .22s cubic-bezier(.2,.9,.3,1.2)}
+.hyg-confirm-box::before{content:"";position:absolute;inset:0 0 auto 0;height:6px;background:linear-gradient(90deg,var(--primary,#721c2b),#f5b301)}
+.hyg-confirm-icon{width:62px;height:62px;margin:0 auto 12px;display:grid;place-items:center;border-radius:50%;background:#fff3cf;font-size:32px;line-height:1}
+.hyg-confirm-title{margin:0 0 8px;font-size:20px;font-weight:800;line-height:1.3;color:var(--primary,#721c2b)}
+.hyg-confirm-text{margin:0;font-size:16px;line-height:1.7;white-space:pre-line}
+.hyg-confirm-text strong{display:inline-block;margin:0 2px;padding:1px 10px;border-radius:999px;background:linear-gradient(135deg,#ff5a4d,#c4161c 55%,#8f0f16);color:#fff;font-size:1.25em;font-weight:900;line-height:1.35;box-shadow:0 3px 8px rgba(196,22,28,.35);animation:hygConfirmPulse 1.6s ease-in-out infinite}
+.hyg-confirm-actions{display:flex;gap:10px;margin-top:22px}
+.hyg-confirm-actions button{flex:1;min-width:0;padding:13px 14px;border:2px solid transparent;border-radius:14px;font:inherit;font-size:16px;font-weight:800;cursor:pointer;transition:transform .12s,box-shadow .12s}
+.hyg-confirm-actions button:active{transform:scale(.97)}
+.hyg-confirm-actions button:focus-visible{outline:3px solid #f5b301;outline-offset:2px}
+.hyg-confirm-cancel{background:#eef0f3;color:#374151}
+.hyg-confirm-ok{background:var(--primary,#721c2b);color:#fff}
+.hyg-confirm-box.is-upsell .hyg-confirm-cancel{background:linear-gradient(180deg,#ffc933,#f5a800);color:#4a1018;box-shadow:0 4px 0 #c78500}
+.hyg-confirm-box.is-upsell .hyg-confirm-ok{background:linear-gradient(135deg,#ff5a4d,#c4161c 55%,#8f0f16);color:#fff;box-shadow:0 4px 0 #6f0b10}
+@media (max-width:420px){.hyg-confirm-actions{flex-direction:column}}
+@keyframes hygConfirmFade{from{opacity:0}to{opacity:1}}
+@keyframes hygConfirmPop{from{opacity:0;transform:translateY(14px) scale(.94)}to{opacity:1;transform:none}}
+@keyframes hygConfirmPulse{0%,100%{transform:scale(1)}50%{transform:scale(1.08)}}
+@media (prefers-reduced-motion:reduce){.hyg-confirm-backdrop,.hyg-confirm-box,.hyg-confirm-text strong{animation:none}}
+`;
+  // Tách **chữ nổi bật** thành <strong>; dựng bằng DOM nên không chèn HTML thô.
+  const fillRichText = (target, message) => {
+    const parts = String(message).split(/\*\*(.+?)\*\*/g);
+    parts.forEach((part, index) => {
+      if (index % 2 === 1) {
+        const strong = document.createElement('strong');
+        strong.textContent = part;
+        target.append(strong);
+      } else if (part) {
+        target.append(document.createTextNode(part));
+      }
+    });
+  };
+  const showConfirm = (message, options = {}) => new Promise((resolve) => {
+    if (!document.getElementById(confirmStyleId)) {
+      const style = document.createElement('style');
+      style.id = confirmStyleId;
+      style.textContent = confirmCss;
+      document.head.append(style);
+    }
+    const lang = (document.documentElement.lang || 'vi').slice(0, 2).toLowerCase();
+    const labels = confirmLabels[lang] || confirmLabels.vi;
+    const upsell = Boolean(options.okLabel && options.cancelLabel);
+    const backdrop = document.createElement('div');
+    backdrop.className = 'hyg-confirm-backdrop';
+    const box = document.createElement('div');
+    box.className = 'hyg-confirm-box' + (upsell ? ' is-upsell' : '');
+    box.setAttribute('role', 'alertdialog');
+    box.setAttribute('aria-modal', 'true');
+    if (options.title) {
+      const icon = document.createElement('div');
+      icon.className = 'hyg-confirm-icon';
+      icon.setAttribute('aria-hidden', 'true');
+      icon.textContent = '🎮';
+      const title = document.createElement('h3');
+      title.className = 'hyg-confirm-title';
+      title.textContent = options.title;
+      box.append(icon, title);
+    }
+    const text = document.createElement('p');
+    text.className = 'hyg-confirm-text';
+    fillRichText(text, message);
+    box.append(text);
+    const actions = document.createElement('div');
+    actions.className = 'hyg-confirm-actions';
+    const cancelButton = document.createElement('button');
+    cancelButton.type = 'button';
+    cancelButton.className = 'hyg-confirm-cancel';
+    cancelButton.textContent = options.cancelLabel || labels[1];
+    const okButton = document.createElement('button');
+    okButton.type = 'button';
+    okButton.className = 'hyg-confirm-ok';
+    okButton.textContent = options.okLabel || labels[0];
+    actions.append(cancelButton, okButton);
+    box.append(actions);
+    backdrop.append(box);
+    const previousFocus = document.activeElement;
+    const close = (result) => {
+      document.removeEventListener('keydown', onKey, true);
+      backdrop.remove();
+      if (previousFocus && previousFocus.focus) previousFocus.focus();
+      resolve(result);
+    };
+    const onKey = (keyEvent) => {
+      if (keyEvent.key === 'Escape') {
+        keyEvent.preventDefault();
+        close('dismiss');
+      }
+    };
+    cancelButton.addEventListener('click', () => close('cancel'));
+    okButton.addEventListener('click', () => close('ok'));
+    backdrop.addEventListener('click', (clickEvent) => {
+      if (clickEvent.target === backdrop) close('dismiss');
+    });
+    document.addEventListener('keydown', onKey, true);
+    document.body.append(backdrop);
+    // Popup gợi ý mua thêm: nút "Mua thêm" được chọn sẵn; popup thường: nút xác nhận.
+    (upsell ? cancelButton : okButton).focus();
+  });
+
   document.addEventListener('submit', (event) => {
     const form = event.target;
-    const confirmText = event.submitter?.dataset.confirm || form.dataset.confirm;
-    if (confirmText && !window.confirm(confirmText)) {
-      event.preventDefault();
-      // Bấm Hủy: nếu nút có data-cancel-url thì chuyển khách về trang chọn món (index) để mua thêm.
-      const cancelUrl = event.submitter?.dataset.cancelUrl;
-      if (cancelUrl) window.location.href = cancelUrl;
-      return;
+    // Lần gửi lại sau khi khách đã bấm xác nhận: bỏ qua bước hỏi.
+    if (form.dataset.confirmed) {
+      delete form.dataset.confirmed;
+    } else {
+      const submitter = event.submitter;
+      const source = submitter?.dataset.confirm ? submitter.dataset : form.dataset;
+      const confirmText = source.confirm;
+      if (confirmText) {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        showConfirm(confirmText, {
+          title: source.confirmTitle,
+          okLabel: source.confirmOk,
+          cancelLabel: source.confirmCancel,
+        }).then((result) => {
+          if (result === 'ok') {
+            form.dataset.confirmed = '1';
+            if (form.requestSubmit) form.requestSubmit(submitter || undefined);
+            else form.submit();
+            return;
+          }
+          // Bấm nút còn lại ("Mua thêm"/"Hủy"): nếu nút có data-cancel-url thì chuyển khách về trang chọn món để mua thêm.
+          const cancelUrl = submitter?.dataset.cancelUrl;
+          if (result === 'cancel' && cancelUrl) window.location.href = cancelUrl;
+        });
+        return;
+      }
     }
     if (form.closest('.hyg-page') && form.dataset.submitting) { event.preventDefault(); return; }
     if (form.closest('.hyg-page')) form.dataset.submitting = '1';

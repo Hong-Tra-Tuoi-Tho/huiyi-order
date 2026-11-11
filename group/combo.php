@@ -307,7 +307,7 @@ front_header(hgc_t('page_title'));
                     <input type="hidden" name="lock_after" value="1">
                     <input type="hidden" name="back" value="combo">
                     <?php if (minigame_enabled() && promotion_game_qty($cart) >= 10): ?><input type="hidden" name="promotion_mode" value="draw"><?php endif; ?>
-                    <button class="hgc-bar-cta" type="submit" <?= (minigame_enabled() && $roomCups >= 5 && $roomCups <= 9) ? 'data-confirm="' . e(gt('lock_game_confirm', ['n' => $roomCups, 'more' => 10 - $roomCups])) . '" data-cancel-url="' . e(base_url('index.php?group=' . $r['public_id'])) . '"' : '' ?>><?= e(hgc_t('bar_cta_host')) ?> →</button>
+                    <button class="hgc-bar-cta" type="submit" <?= (minigame_enabled() && $roomCups >= 5 && $roomCups <= 9) ? hyg_lock_game_attrs((int)$roomCups, (string)$r['public_id']) : '' ?>><?= e(hgc_t('bar_cta_host')) ?> →</button>
                 </form>
             <?php else: ?>
                 <a class="hgc-bar-cta is-alt" href="<?= e(hyg_room_url($r['public_id'])) ?>"><?= e(hgc_t('bar_cta_member')) ?> →</a>

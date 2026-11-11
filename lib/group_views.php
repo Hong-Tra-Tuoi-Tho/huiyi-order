@@ -394,7 +394,7 @@ function hyg_render_room(array $r): string
               foreach ($comboState as $comboRow) $gameCups += max(0, (int)$comboRow['total_cups'] - (int)$comboRow['picked']);
               ?>
               <!-- Button chốt món: gửi form ưu đãi ở cột tổng tiền qua thuộc tính form -->
-              <button class="btn primary block" id="hyg-lock-btn" type="submit" form="group-promotion-selector" name="lock_after" value="1" <?= (minigame_enabled() && $gameCups >= 5 && $gameCups <= 9) ? 'data-confirm="' . e(gt('lock_game_confirm', ['n' => $gameCups, 'more' => 10 - $gameCups])) . '" data-cancel-url="' . e(base_url('index.php?group=' . $r['public_id'])) . '"' : '' ?> <?= !$cart || $hasInvalid || ($hasCombo ? !$comboReady : $drinks < hyg_min_lock_cups()) ? 'disabled' : '' ?>>
+              <button class="btn primary block" id="hyg-lock-btn" type="submit" form="group-promotion-selector" name="lock_after" value="1" <?= (minigame_enabled() && $gameCups >= 5 && $gameCups <= 9) ? hyg_lock_game_attrs((int)$gameCups, (string)$r['public_id']) : '' ?> <?= !$cart || $hasInvalid || ($hasCombo ? !$comboReady : $drinks < hyg_min_lock_cups()) ? 'disabled' : '' ?>>
                 <?= e($drinks > 0 ? gt('lock_cups', ['n' => $drinks]) : gt('lock')) ?>
               </button>
               <?php // Gợi ý mua thêm cho đủ 10 ly chơi mini-game khi đang có 5-9 ly. ?>

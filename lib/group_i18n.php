@@ -157,7 +157,9 @@ function gt(string $key,array $vars=[]): string {
             'waiting_split'=>'已截止收單。付款團員請回報，團主確認所有應付金額後才能送出訂單。',
             'lock'=>'截止收單',
             'lock_cups'=>'截止收單（{n} 杯）',
-            'lock_game_confirm'=>'您目前有 {n} 杯，再加 {more} 杯即可多獲得一次小遊戲機會。確定現在就截止收單嗎？',
+            'lock_game_title'=>'再一點點就能玩小遊戲！',
+            'lock_game_more'=>'再加購',
+            'lock_game_confirm'=>'您目前有 {n} 杯，再加購 **{more} 杯** 即可獲得 1 次小遊戲機會。',
             'lock_upsell'=>'再加 {more} 杯，湊滿 10 杯即可玩小遊戲！',
             'reopen'=>'重新開放選購',
             'checkout'=>'統一結帳',
@@ -391,7 +393,9 @@ function gt(string $key,array $vars=[]): string {
             'waiting_split'=>'Đã chốt món. Thành viên trả tiền hãy báo thanh toán; chỉ gửi đơn sau khi trưởng nhóm xác nhận tất cả khoản phải trả.',
             'lock'=>'Chốt món',
             'lock_cups'=>'Chốt món ({n} ly)',
-            'lock_game_confirm'=>'Bạn đã có {n} ly, còn thiếu {more} ly nữa sẽ được thêm lượt chơi mini-game. Bạn có chắc chắn chốt luôn không?',
+            'lock_game_title'=>'Sắp được chơi Mini Game rồi!',
+            'lock_game_more'=>'Mua thêm',
+            'lock_game_confirm'=>'Bạn đang có {n} ly. Hãy mua thêm **{more} ly** để nhận được 1 lượt chơi Mini Game.',
             'lock_upsell'=>'Mua thêm {more} ly nước để đủ 10 ly và được chơi mini-game nhé!',
             'reopen'=>'Mở lại để chọn món',
             'checkout'=>'Thanh toán chung',
@@ -625,7 +629,9 @@ function gt(string $key,array $vars=[]): string {
             'waiting_split'=>'Ordering is closed. Paying members should report their payments; the host must confirm all required payments before submitting.',
             'lock'=>'Close ordering',
             'lock_cups'=>'Close ordering ({n} drinks)',
-            'lock_game_confirm'=>'You have {n} drinks. Add {more} more to earn an extra mini-game chance. Close ordering now?',
+            'lock_game_title'=>'Almost time for the Mini Game!',
+            'lock_game_more'=>'Add more',
+            'lock_game_confirm'=>'You have {n} drinks. Add **{more} more** to earn 1 Mini Game play.',
             'lock_upsell'=>'Add {more} more drinks to reach 10 and play the mini-game!',
             'reopen'=>'Reopen for changes',
             'checkout'=>'Pay together',
@@ -737,4 +743,24 @@ function gt(string $key,array $vars=[]): string {
     static $auditLoaded=false;if(!$auditLoaded){foreach($audit as $auditLang=>$strings)$d[$auditLang]=array_replace($d[$auditLang],$strings);$auditLoaded=true;}
     $lang=function_exists('current_lang')?current_lang():'vi';$text=$d[$lang][$key]??$d['en'][$key]??(function_exists('hgc_t')?hgc_t($key):$key);
     foreach($vars as $k=>$v)$text=str_replace('{'.$k.'}',(string)$v,$text);return $text;
+}
+
+/**
+ * Thuộc tính HTML cho nút "Chốt món" khi nhóm có 5-9 ly: bật popup gợi ý mua thêm để đủ 10 ly chơi Mini Game.
+ * Popup có 2 nút: "Mua thêm" (về trang chọn món) và "Chốt món" (gửi form như bình thường).
+ */
+function hyg_lock_game_attrs(int $cups, string $roomPublicId): string {
+    $goal = 10;
+    $attrs = [
+        'data-confirm' => gt('lock_game_confirm', ['n' => $cups, 'more' => $goal - $cups]),
+        'data-confirm-title' => gt('lock_game_title'),
+        'data-confirm-ok' => gt('lock'),
+        'data-confirm-cancel' => gt('lock_game_more'),
+        'data-cancel-url' => base_url('index.php?group=' . $roomPublicId),
+    ];
+    $html = '';
+    foreach ($attrs as $name => $value) {
+        $html .= ' ' . $name . '="' . e($value) . '"';
+    }
+    return $html;
 }
