@@ -111,6 +111,24 @@ function hym_zalo_miniapp_url(): string {
     if ($testVersion !== '') $url .= '?env=TESTING&version=' . rawurlencode($testVersion);
     return $url;
 }
+/**
+ * Chế độ test đăng nhập Zalo Mini App trên web live, không ảnh hưởng khách thường.
+ * Vào member/index.php?zalotest=<ZALO_TEST_KEY> để bật cho session này, ?zalotest=off để tắt.
+ * Chưa khai báo ZALO_TEST_KEY thì chế độ này không bao giờ bật.
+ */
+function hym_zalo_test_mode(): bool {
+    $key = defined('ZALO_TEST_KEY') ? (string)ZALO_TEST_KEY : '';
+    if ($key === '' || hym_zalo_miniapp_id() === '') return false;
+    $param = $_GET['zalotest'] ?? null;
+    if (is_string($param) && $param !== '') {
+        if (hash_equals($key, $param)) {
+            $_SESSION['zalo_test'] = true;
+        } elseif ($param === 'off') {
+            unset($_SESSION['zalo_test']);
+        }
+    }
+    return ($_SESSION['zalo_test'] ?? false) === true;
+}
 /** Customers sign in only through the Mini App: password sign-in and registration are closed. */
 function hym_zalo_only(): bool {
     return defined('MEMBER_ZALO_ONLY') && MEMBER_ZALO_ONLY === true && hym_zalo_miniapp_id() !== '';

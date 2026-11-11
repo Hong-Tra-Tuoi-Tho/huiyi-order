@@ -19,7 +19,7 @@ try {
         exit;
     }
 
-    if (!hym_zalo_only()) {
+    if (!hym_zalo_only() && !hym_zalo_test_mode()) {
         http_response_code(404);
         echo json_encode(['status' => 'disabled']);
         exit;
