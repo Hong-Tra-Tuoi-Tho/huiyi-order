@@ -14,6 +14,9 @@ $returnOrder = $_GET['return_order'] ?? '';
 $returnOrder = is_string($returnOrder) && preg_match('/^[A-Za-z0-9_-]{1,80}$/D', $returnOrder) ? $returnOrder : '';
 // Zalo-only sign-in: phones open the Mini App directly, computers also get its QR code.
 $zaloOnly = hym_zalo_only();
+// Người test (link ?zalotest=KEY): vẫn giữ đăng nhập SĐT, thêm nút Zalo Mini App + QR.
+$zaloTest = !$zaloOnly && hym_zalo_test_mode();
+$zaloMiniApp = $zaloOnly || $zaloTest;
 $isPhone = (bool)preg_match('/Android|iPhone|iPad|iPod|Mobile/i', (string)($_SERVER['HTTP_USER_AGENT'] ?? ''));
 $member = null;
 $platformOrders = [];
@@ -30,7 +33,7 @@ try {
 }
 // Máy tính chưa đăng nhập: QR mang mã riêng của session này để điện thoại xác nhận đăng nhập hộ.
 $qrLoginUrl = '';
-if ($zaloOnly && !$isPhone && !$member && !$loadFailed) {
+if ($zaloMiniApp && !$isPhone && !$member && !$loadFailed) {
   try {
     $qrLoginUrl = hym_zalo_miniapp_qr_url(hym_qr_login_code());
   } catch (Throwable $error) {
@@ -143,9 +146,9 @@ front_header($pageTitle);
         } ?>
 
         <!-- Đăng nhập xác thực qua zalo -->
-        <?php if ($zaloOnly || hym_zalo_enabled()): ?>
+        <?php if ($zaloMiniApp || hym_zalo_enabled()): ?>
           <?php if (!$zaloOnly): ?><div class="hym-auth-divider"><span><?= e(mt('member_or')) ?></span></div><?php endif; ?>
-          <a class="btn block btn-zalo-login" href="<?= e($zaloOnly ? hym_zalo_miniapp_url() : base_url('member/zalo.php' . ($returnOrder !== '' ? '?return_order=' . rawurlencode($returnOrder) : ''))) ?>">
+          <a class="btn block btn-zalo-login" href="<?= e($zaloMiniApp ? hym_zalo_miniapp_url() : base_url('member/zalo.php' . ($returnOrder !== '' ? '?return_order=' . rawurlencode($returnOrder) : ''))) ?>">
             <svg viewBox="0 0 48 48" aria-hidden="true">
               <rect width="48" height="48" rx="12" fill="#fff" /><text x="24" y="30" text-anchor="middle" font-family="Arial,sans-serif" font-size="15" font-weight="700" fill="#0068FF">Zalo</text>
             </svg>

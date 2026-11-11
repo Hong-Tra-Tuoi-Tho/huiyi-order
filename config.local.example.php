@@ -18,3 +18,5 @@ define('ZALO_MINIAPP_ID', '');
 define('ZALO_MINIAPP_TEST_VERSION', '');
 // true = customers sign in only through the Zalo Mini App (password sign-in and registration hidden).
 define('MEMBER_ZALO_ONLY', false);
+// Mã bí mật để test Zalo Mini App trên web live: vào member/index.php?zalotest=<mã> (trống = tắt).
+define('ZALO_TEST_KEY', '');
