@@ -90,6 +90,38 @@ function hym_zalo_link_pending(int $memberId): bool {
     try{hym_zalo_link($memberId,(string)$pending['id'],(string)$pending['name']);return true;}
     catch(Throwable $e){return false;}
 }
+/**
+ * Đăng ký lần đầu sau khi đăng nhập Zalo OAuth: khách chỉ nhập số điện thoại và họ tên.
+ * Tài khoản không có mật khẩu (password_hash rỗng), đăng nhập về sau luôn qua Zalo.
+ * Số điện thoại đã thuộc tài khoản khác thì từ chối, vì số này chưa được xác thực.
+ */
+function hym_zalo_register(string $phone,string $displayName): int {
+    $pending=hym_zalo_pending();
+    if(!$pending)hym_fail('member_form_expired');
+    hym_rate_limit('zalo-register-ip',hym_client_ip(),10,3600);
+    $phone=hym_normalize_phone($phone);
+    $name=hym_text($displayName,100);
+    hym_zalo_schema();
+    // Zalo này đã có tài khoản thì không tạo thêm.
+    if(hym_zalo_member_id((string)$pending['id'])>0)hym_fail('member_zalo_already_linked');
+    $pdo=db();
+    $pdo->beginTransaction();
+    try{
+        $st=$pdo->prepare('INSERT INTO members(phone,password_hash,display_name,delivery_address,created_at,updated_at) VALUES(?,\'\',?,\'\',UTC_TIMESTAMP(),UTC_TIMESTAMP())');
+        $st->execute([$phone,$name]);
+        $memberId=(int)$pdo->lastInsertId();
+        $st=$pdo->prepare('INSERT INTO member_zalo_links(member_id,zalo_id,zalo_name,created_at) VALUES(?,?,?,UTC_TIMESTAMP())');
+        $st->execute([$memberId,(string)$pending['id'],(string)$pending['name']]);
+        $pdo->commit();
+    }catch(PDOException $e){
+        if($pdo->inTransaction())$pdo->rollBack();
+        if($e->getCode()==='23000')hym_fail('member_phone_registered');
+        throw $e;
+    }
+    unset($_SESSION['zalo_pending']);
+    hym_session_login($memberId);
+    return $memberId;
+}
 function hym_zalo_pending(): ?array {
     $pending=$_SESSION['zalo_pending']??null;
     return is_array($pending)&&(int)($pending['created_at']??0)>=time()-1800?$pending:null;

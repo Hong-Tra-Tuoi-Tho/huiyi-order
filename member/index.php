@@ -12,11 +12,9 @@ header('Cache-Control: private, no-store');
 header('X-Robots-Tag: noindex, nofollow');
 $returnOrder = $_GET['return_order'] ?? '';
 $returnOrder = is_string($returnOrder) && preg_match('/^[A-Za-z0-9_-]{1,80}$/D', $returnOrder) ? $returnOrder : '';
-// Zalo-only sign-in: phones open the Mini App directly, computers also get its QR code.
-$zaloOnly = hym_zalo_only();
-// Người test (link ?zalotest=KEY): vẫn giữ đăng nhập SĐT, thêm nút Zalo Mini App + QR.
-$zaloTest = !$zaloOnly && hym_zalo_test_mode();
-$zaloMiniApp = $zaloOnly || $zaloTest;
+// MEMBER_ZALO_ONLY = true: đăng nhập bằng Zalo Mini App (+ QR trên máy tính).
+// MEMBER_ZALO_ONLY = false: đăng nhập bằng Zalo OA (liên kết Zalo). Link ?zalotest=KEY bật thêm Mini App để test.
+$zaloMiniApp = hym_zalo_only() || hym_zalo_test_mode();
 $isPhone = (bool)preg_match('/Android|iPhone|iPad|iPod|Mobile/i', (string)($_SERVER['HTTP_USER_AGENT'] ?? ''));
 $member = null;
 $platformOrders = [];
@@ -31,7 +29,7 @@ try {
 } catch (Throwable $error) {
   $loadFailed = true;
 }
-// Máy tính chưa đăng nhập: QR mang mã riêng của session này để điện thoại xác nhận đăng nhập hộ.
+// Máy tính chưa đăng nhập: QR mang mã riêng của session này để điện thoại (Mini App) xác nhận đăng nhập hộ.
 $qrLoginUrl = '';
 if ($zaloMiniApp && !$isPhone && !$member && !$loadFailed) {
   try {
@@ -116,44 +114,23 @@ front_header($pageTitle);
     <div class="hym-auth-single">
       <section class="hym-card" id="member-login">
         <!-- <h2><?= e(mt('member_login_title')) ?></h2> -->
-        <?php if ($zaloOnly): ?>
-          <!-- <p class="hym-note"><?= e(mt('member_zalo_only_intro')) ?></p> -->
-        <?php else: ?>
-          <form class="hym-form" method="post" action="<?= e(base_url('member/action.php')) ?>"><?= csrf_field() ?><input type="hidden" name="action" value="login"><?php if ($returnOrder !== ''): ?><input type="hidden" name="return_order" value="<?= e($returnOrder) ?>"><?php endif; ?>
-            <label for="member-login-phone"><?= e(mt('member_phone')) ?><input id="member-login-phone" type="tel" inputmode="tel" name="phone" required maxlength="32" autocomplete="username"></label>
-            <label for="member-login-password"><?= e(mt('member_password')) ?>
-              <span class="hym-pass">
-                <input id="member-login-password" type="password" name="password" required maxlength="72" autocomplete="current-password">
-                <button class="hym-pass-toggle" type="button" data-pass-toggle aria-controls="member-login-password" aria-pressed="false" aria-label="<?= e(mt('member_password_show')) ?>" data-show-label="<?= e(mt('member_password_show')) ?>" data-hide-label="<?= e(mt('member_password_hide')) ?>">
-                  <svg class="hym-pass-eye" viewBox="0 0 24 24" aria-hidden="true">
-                    <path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z" />
-                    <circle cx="12" cy="12" r="3" />
-                  </svg>
-                  <svg class="hym-pass-eye-off" viewBox="0 0 24 24" aria-hidden="true">
-                    <path d="M3 3l18 18M10.6 5.1A10.4 10.4 0 0 1 12 5c6.4 0 10 7 10 7a17.6 17.6 0 0 1-3.2 4.1M6.6 6.6C3.7 8.4 2 12 2 12s3.6 7 10 7a9.7 9.7 0 0 0 5.4-1.6M9.9 9.9a3 3 0 0 0 4.2 4.2" />
-                  </svg>
-                </button>
-              </span>
-            </label>
-            <button class="btn primary block" type="submit"><?= e(mt('member_login')) ?></button>
-          </form>
-        <?php endif; ?>
-
         <?php // Nút đăng nhập test local: file _local_login.php nằm trong .gitignore, server thật không có thì không hiện.
         if (is_file(__DIR__ . '/_local_login.php')) {
             require_once __DIR__ . '/_local_login.php';
             hym_local_login_form($returnOrder);
         } ?>
 
-        <!-- Đăng nhập xác thực qua zalo -->
-        <?php if ($zaloMiniApp || hym_zalo_enabled()): ?>
-          <?php if (!$zaloOnly): ?><div class="hym-auth-divider"><span><?= e(mt('member_or')) ?></span></div><?php endif; ?>
-          <a class="btn block btn-zalo-login" href="<?= e($zaloMiniApp ? hym_zalo_miniapp_url() : base_url('member/zalo.php' . ($returnOrder !== '' ? '?return_order=' . rawurlencode($returnOrder) : ''))) ?>">
-            <svg viewBox="0 0 48 48" aria-hidden="true">
-              <rect width="48" height="48" rx="12" fill="#fff" /><text x="24" y="30" text-anchor="middle" font-family="Arial,sans-serif" font-size="15" font-weight="700" fill="#0068FF">Zalo</text>
-            </svg>
-            <span><?= e(mt('member_login_zalo')) ?></span>
-          </a>
+        <?php $zaloBtn = '<svg viewBox="0 0 48 48" aria-hidden="true"><rect width="48" height="48" rx="12" fill="#fff" /><text x="24" y="30" text-anchor="middle" font-family="Arial,sans-serif" font-size="15" font-weight="700" fill="#0068FF">Zalo</text></svg><span>' . e(mt('member_login_zalo')) . '</span>'; ?>
+
+        <!-- Zalo OA (liên kết Zalo, member/zalo.php): khách mới nhập họ tên + SĐT ở trang đăng ký. Chỉ hiện khi MEMBER_ZALO_ONLY = false. -->
+        <?php if (!hym_zalo_only() && hym_zalo_enabled()): ?>
+          <a class="btn block btn-zalo-login" href="<?= e(base_url('member/zalo.php' . ($returnOrder !== '' ? '?return_order=' . rawurlencode($returnOrder) : ''))) ?>"><?= $zaloBtn ?></a>
+        <?php endif; ?>
+
+        <!-- Zalo Mini App (lấy SĐT từ Zalo): điện thoại mở thẳng Mini App, máy tính quét QR. Chỉ hiện khi MEMBER_ZALO_ONLY = true. -->
+        <?php if ($zaloMiniApp): ?>
+          <?php if (!hym_zalo_only() && hym_zalo_enabled()): ?><div class="hym-auth-divider"><span><?= e(mt('member_or')) ?></span></div><?php endif; ?>
+          <a class="btn block btn-zalo-login" href="<?= e(hym_zalo_miniapp_url()) ?>"><?= $zaloBtn ?></a>
         <?php endif; ?>
 
         <?php if ($qrLoginUrl !== ''): ?>
@@ -161,10 +138,6 @@ front_header($pageTitle);
             <canvas data-zalo-qr="<?= e($qrLoginUrl) ?>" data-qr-status="<?= e(base_url('member/qr-status.php')) ?>" role="img" aria-label="<?= e(mt('member_zalo_qr_hint')) ?>"></canvas>
             <p class="hym-note"><?= e(mt('member_zalo_qr_hint')) ?></p>
           </div>
-        <?php endif; ?>
-
-        <?php if (!$zaloOnly): ?>
-          <a class="btn block hym-register-link" href="<?= e(base_url('member/register.php')) ?>"><?= e(mt('member_register')) ?></a>
         <?php endif; ?>
       </section>
     </div>
