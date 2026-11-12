@@ -37,6 +37,21 @@
     display: none;
 }
 
+/* Ít combo hơn số thẻ vừa màn hình: không trượt, các thẻ căn giữa thay vì dồn sang trái. */
+.hcf-track.is-static {
+    justify-content: center;
+}
+
+/* Từ iPad trở lên: ít combo thì các thẻ chia đều bề ngang dải (thẳng lề với tiêu đề), không để khoảng trống hai bên.
+   Bỏ tỉ lệ 4/5 vì thẻ rộng hơn bình thường; ảnh nền vẫn phủ kín (object-fit: cover). */
+@media (min-width: 640px) {
+    .hcf-track.is-static .hcf-card {
+        flex: 1 1 0;
+        aspect-ratio: auto;
+        min-height: 440px;
+    }
+}
+
 .hcf-card {
     --hcf-bg: #1f3f6e;
     position: relative;
@@ -181,12 +196,12 @@
     outline-offset: 3px;
 }
 
-/* ‹ › chỉ hiện từ iPad trở lên, khi rê chuột / focus. */
+/* Nút ‹ › luôn hiện ở hai bên khi dải có thể trượt; ẩn khi ít combo (không trượt, xem .is-static). */
 .front-body .hcf-section button.hcf-arrow {
     position: absolute;
     top: calc(50% - 7px);
     z-index: 2;
-    display: none;
+    display: grid;
     place-items: center;
     width: 42px;
     min-width: 0;
@@ -201,21 +216,38 @@
     line-height: 1;
     box-shadow: 0 4px 14px rgba(16, 24, 40, .2);
     cursor: pointer;
-    opacity: 0;
+    opacity: 1;
     transform: translateY(-50%);
     transition: opacity .2s;
 }
 
+/* Hết đường trượt về phía đó: mờ đi, vẫn thấy nút để người dùng hiểu còn nút bên kia. */
 .front-body .hcf-section button.hcf-arrow:disabled {
-    visibility: hidden;
+    opacity: .35;
+    cursor: default;
+}
+
+/* Ít combo, không có gì để trượt: không hiện nút. */
+.front-body .hcf-section .hcf-track.is-static ~ button.hcf-arrow {
+    display: none;
 }
 
 .hcf-arrow.is-prev {
-    left: -8px;
+    left: 6px;
 }
 
 .hcf-arrow.is-next {
-    right: -8px;
+    right: 6px;
+}
+
+@media (min-width: 640px) {
+    .hcf-arrow.is-prev {
+        left: -8px;
+    }
+
+    .hcf-arrow.is-next {
+        right: -8px;
+    }
 }
 
 .hcf-viewport:hover .hcf-arrow,
