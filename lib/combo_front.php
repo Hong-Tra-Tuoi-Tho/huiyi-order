@@ -65,7 +65,11 @@ function hcf_render_section(array $combos, ?array $room = null): string
 
     ob_start();
     ?>
+<<<<<<< HEAD
+  <link rel="stylesheet" href="<?= e(base_url('assets/css/home-combos.css?v=8')) ?>">
+=======
   <link rel="stylesheet" href="<?= e(base_url('assets/css/home-combos.css?v=5')) ?>">
+>>>>>>> origin/main
   <section class="hcf-section" id="combos" data-home-combos data-dot-label="<?= e(hcf_t('go_to')) ?>"
     aria-roledescription="carousel" aria-label="<?= e(hcf_t('title')) ?>">
     <div class="section-title-row hcf-heading">
@@ -114,7 +118,11 @@ function hcf_render_section(array $combos, ?array $room = null): string
     </div>
     <div class="hcf-dots" data-combo-dots></div>
   </section>
+<<<<<<< HEAD
+  <script src="<?= e(base_url('assets/js/home-combos.js?v=7')) ?>" defer></script>
+=======
   <script src="<?= e(base_url('assets/js/home-combos.js?v=5')) ?>" defer></script>
+>>>>>>> origin/main
     <?php
 
     return (string)ob_get_clean();
