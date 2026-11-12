@@ -99,7 +99,10 @@
         }
 
         function refresh() {
+<<<<<<< HEAD
             syncClones();
+=======
+>>>>>>> origin/main
             buildDots();
             sync();
         }
@@ -148,6 +151,7 @@
 
         // Vòng lặp 1 chiều: nhân bản vài thẻ đầu đặt cuối dải.
         // Chạy tới bản nhân bản cuối thì nhảy ngầm về 0 (giao diện y hệt nên không thấy giật lại).
+<<<<<<< HEAD
         // Chỉ nhân bản khi số combo nhiều hơn số thẻ vừa màn hình (cần trượt).
         // Combo ít, vừa khít màn hình thì không trượt và không nhân bản, tránh thấy một combo hiện 2 lần.
         function syncClones() {
@@ -181,6 +185,14 @@
                 copy.setAttribute('aria-hidden', 'true');
                 track.appendChild(copy);
             }
+=======
+        var cloneCount = Math.min(cards.length, 3);
+        for (var k = 0; k < cloneCount; k++) {
+            var copy = cards[k].cloneNode(true);
+            copy.removeAttribute('data-combo-card');
+            copy.setAttribute('aria-hidden', 'true');
+            track.appendChild(copy);
+>>>>>>> origin/main
         }
 
         function rawIndex() {
