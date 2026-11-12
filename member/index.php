@@ -140,6 +140,9 @@ front_header($pageTitle);
             <?php if (!$isPhone): ?>
               <canvas data-zalo-qr role="img" aria-label="<?= e(mt('member_zalo_qr_hint')) ?>"></canvas>
               <p class="hym-note"><?= e(mt('member_zalo_qr_hint')) ?></p>
+            <?php else: ?>
+              <!-- Mini App không được tự đưa khách về trình duyệt (Zalo 4.1), nên nhắc ở đây. -->
+              <p class="hym-note"><?= e(mt('member_zalo_phone_hint')) ?></p>
             <?php endif; ?>
           </div>
         <?php endif; ?>
