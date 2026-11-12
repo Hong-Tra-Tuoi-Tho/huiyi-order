@@ -65,7 +65,7 @@ function hcf_render_section(array $combos, ?array $room = null): string
 
     ob_start();
     ?>
-  <link rel="stylesheet" href="<?= e(base_url('assets/css/home-combos.css?v=8')) ?>">
+  <link rel="stylesheet" href="<?= e(base_url('assets/css/home-combos.css?v=9')) ?>">
   <section class="hcf-section" id="combos" data-home-combos data-dot-label="<?= e(hcf_t('go_to')) ?>"
     aria-roledescription="carousel" aria-label="<?= e(hcf_t('title')) ?>">
     <div class="section-title-row hcf-heading">
