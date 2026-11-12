@@ -29,9 +29,11 @@ try {
 } catch (Throwable $error) {
   $loadFailed = true;
 }
-// Máy tính chưa đăng nhập: QR mang mã riêng của session này để điện thoại (Mini App) xác nhận đăng nhập hộ.
+// Chưa đăng nhập: link Mini App mang mã riêng của session này để Mini App xác nhận đăng nhập hộ.
+// Máy tính: vẽ thành QR để quét. Điện thoại: nút "Đăng nhập Zalo" mở thẳng Mini App kèm mã.
+// Mini App không mở link ra ngoài (Zalo 4.1); trang này tự hỏi server và đăng nhập khi khách quay lại.
 $qrLoginUrl = '';
-if ($zaloMiniApp && !$isPhone && !$member && !$loadFailed) {
+if ($zaloMiniApp && !$member && !$loadFailed) {
   try {
     $qrLoginUrl = hym_zalo_miniapp_qr_url(hym_qr_login_code());
   } catch (Throwable $error) {
@@ -130,13 +132,15 @@ front_header($pageTitle);
         <!-- Zalo Mini App (lấy SĐT từ Zalo): điện thoại mở thẳng Mini App, máy tính quét QR. Chỉ hiện khi MEMBER_ZALO_ONLY = true. -->
         <?php if ($zaloMiniApp): ?>
           <?php if (!hym_zalo_only() && hym_zalo_enabled()): ?><div class="hym-auth-divider"><span><?= e(mt('member_or')) ?></span></div><?php endif; ?>
-          <a class="btn block btn-zalo-login" href="<?= e(hym_zalo_miniapp_url()) ?>"><?= $zaloBtn ?></a>
+          <a class="btn block btn-zalo-login" data-zalo-login-link href="<?= e($qrLoginUrl !== '' ? $qrLoginUrl : hym_zalo_miniapp_url()) ?>"><?= $zaloBtn ?></a>
         <?php endif; ?>
 
         <?php if ($qrLoginUrl !== ''): ?>
-          <div class="hym-zalo-qr">
-            <canvas data-zalo-qr="<?= e($qrLoginUrl) ?>" data-qr-status="<?= e(base_url('member/qr-status.php')) ?>" role="img" aria-label="<?= e(mt('member_zalo_qr_hint')) ?>"></canvas>
-            <p class="hym-note"><?= e(mt('member_zalo_qr_hint')) ?></p>
+          <div class="hym-zalo-qr" data-qr-login="<?= e($qrLoginUrl) ?>" data-qr-status="<?= e(base_url('member/qr-status.php')) ?>">
+            <?php if (!$isPhone): ?>
+              <canvas data-zalo-qr role="img" aria-label="<?= e(mt('member_zalo_qr_hint')) ?>"></canvas>
+              <p class="hym-note"><?= e(mt('member_zalo_qr_hint')) ?></p>
+            <?php endif; ?>
           </div>
         <?php endif; ?>
       </section>
@@ -227,13 +231,18 @@ front_header($pageTitle);
 <?php if ($qrLoginUrl !== ''): ?>
   <script src="<?= e(base_url('assets/vendor/huiyi-qrcode.js?v=19.8.0')) ?>"></script>
   <script>
-    // Vẽ mã QR mở Mini App để khách trên máy tính quét bằng Zalo trên điện thoại.
-    // Sau đó hỏi server định kỳ: điện thoại xác nhận xong thì máy tính tự đăng nhập.
+    // Máy tính: vẽ mã QR mở Mini App để quét bằng Zalo trên điện thoại.
+    // Điện thoại: nút "Đăng nhập Zalo" mở Mini App kèm mã.
+    // Sau đó hỏi server định kỳ: Mini App xác nhận xong thì trang này tự đăng nhập.
     (function() {
-      var canvas = document.querySelector('[data-zalo-qr]');
-      if (!canvas || !window.HuiYiQR) return;
+      var box = document.querySelector('[data-qr-login]');
+      if (!box) return;
+      var canvas = box.querySelector('[data-zalo-qr]');
+      var link = document.querySelector('[data-zalo-login-link]');
 
       function draw(url) {
+        if (link) link.setAttribute('href', url);
+        if (!canvas || !window.HuiYiQR) return;
         var qr = window.HuiYiQR.encode(url);
         var border = 4;
         var scale = 6;
@@ -252,9 +261,9 @@ front_header($pageTitle);
         }
       }
 
-      draw(canvas.getAttribute('data-zalo-qr'));
+      draw(box.getAttribute('data-qr-login'));
 
-      var statusUrl = canvas.getAttribute('data-qr-status');
+      var statusUrl = box.getAttribute('data-qr-status');
       if (!statusUrl || !window.fetch) return;
 
       var done = false;
