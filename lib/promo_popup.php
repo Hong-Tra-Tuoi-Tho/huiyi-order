@@ -134,7 +134,9 @@ function promo_popup_render(string $groupPublic = ''): void
               <div class="promo-popup-gift" aria-hidden="true"><span>🎁</span><i></i><i></i></div>
             <?php endif; ?>
             <div class="promo-popup-info">
+              <?php if ($s['kind'] !== 'combo'): ?>
               <span class="promo-popup-badge"><?= e($badges[$s['kind']] ?? '') ?></span>
+              <?php endif; ?>
               <h3 class="promo-popup-name"><?= e($s['name']) ?></h3>
               <?php if ($s['sub'] !== ''): ?><p class="promo-popup-sub"><?= e($s['sub']) ?></p><?php endif; ?>
             </div>
@@ -178,9 +180,9 @@ function promo_popup_render(string $groupPublic = ''): void
 .promo-popup-track::-webkit-scrollbar{display:none}
 .promo-popup-slide{position:relative;flex:0 0 100%;min-width:0;scroll-snap-align:center;display:flex;flex-direction:column;align-items:center;color:#fff;text-align:center}
 .promo-popup-slide.is-combo .promo-popup-media{cursor:pointer}
-.promo-popup-media{position:relative;width:100%;aspect-ratio:1/1;overflow:hidden;border-radius:12px}
+.promo-popup-media{position:relative;width:100%;aspect-ratio:1/1;overflow:hidden;border-radius:12px;background:#b30019}
 .promo-popup-media::after{content:"";position:absolute;inset:0;background:linear-gradient(to top,rgba(0,0,0,.7) 0,rgba(0,0,0,0) 45%);pointer-events:none}
-.promo-popup-img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.promo-popup-img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;object-position:center}
 .promo-popup-info{position:absolute;left:0;right:0;bottom:0;z-index:2;padding:0 clamp(20px,calc(var(--pp-size)*.05),44px) clamp(18px,calc(var(--pp-size)*.045),40px);text-align:left}
 .promo-popup-badge{display:inline-block;margin-bottom:6px;color:#ffd54a;font-size:clamp(12px,calc(var(--pp-size)*.03),18px);font-weight:800;letter-spacing:.14em;text-transform:uppercase;text-shadow:0 1px 8px rgba(0,0,0,.8)}
 .promo-popup-name{margin:0 0 4px;font-size:clamp(26px,calc(var(--pp-size)*.07),56px);line-height:1.2;font-weight:800;text-shadow:0 2px 14px rgba(0,0,0,.9)}

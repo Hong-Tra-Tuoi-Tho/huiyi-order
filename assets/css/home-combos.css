@@ -90,12 +90,49 @@
   z-index: -2;
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;
+  object-position: center;
   transition: transform 0.5s ease;
 }
 
 .hcf-card:hover .hcf-card-image {
-  transform: scale(1.04);
+  transform: none;
+}
+
+/* Thẻ có ảnh: nền đỏ cùng tông ảnh để phần ảnh không phủ tới vẫn liền màu. */
+.hcf-card:not(.no-image) {
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+/* Nền thẻ = chính ảnh combo làm mờ, nên ảnh nào cũng có nền liền màu, không cần đặt màu mặc định. */
+.hcf-card:not(.no-image)::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -3;
+  background: var(--hcf-img) center / cover no-repeat;
+  filter: blur(22px) saturate(1.1);
+  transform: scale(1.25);
+}
+
+/* Tên + giá dồn xuống dưới, ngay trên dòng "Tối đa..." và nút; ảnh phía trên để trống. */
+.hcf-card:not(.no-image) .hcf-card-top {
+  max-width: none;
+}
+
+.hcf-card:not(.no-image) .hcf-card-name {
+  font-size: clamp(16px, 4vw, 20px);
+  -webkit-line-clamp: 2;
+}
+
+.hcf-card:not(.no-image) .hcf-card-price {
+  margin-top: 4px;
+  font-size: 16px;
+}
+
+.hcf-card:not(.no-image)::before {
+  background: linear-gradient(0deg, rgba(0, 0, 0, 0.8) 0%, rgba(0, 0, 0, 0.5) 35%, rgba(0, 0, 0, 0) 60%);
 }
 
 /* Phủ tối trên + dưới để chữ trắng luôn đọc được trên mọi ảnh. */
