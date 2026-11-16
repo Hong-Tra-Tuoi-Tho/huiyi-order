@@ -34,6 +34,215 @@
     });
   }
 
+  // Tab combo / tab nhóm món: nhớ tab đang xem (kể cả khi trang tự cập nhật hoặc tải lại).
+  const TAB_KEY = 'hgc-tab:' + live.dataset.liveUrl;
+  let activeCombo = '';
+  let activeGroup = {};
+  try {
+    const saved = JSON.parse(sessionStorage.getItem(TAB_KEY) || '{}');
+    activeCombo = String(saved.combo || '');
+    activeGroup = saved.groups && typeof saved.groups === 'object' ? saved.groups : {};
+  } catch (_) {
+    // Không đọc được bộ nhớ trình duyệt: dùng tab đầu tiên.
+  }
+
+  function saveTabs() {
+    try {
+      sessionStorage.setItem(TAB_KEY, JSON.stringify({ combo: activeCombo, groups: activeGroup }));
+    } catch (_) {
+      // Bỏ qua: chỉ mất việc nhớ tab.
+    }
+  }
+
+  // Tab chạy vòng như băng chuyền, luôn cuộn về MỘT hướng (sang trái): hàng tab = [bản sao][tab thật][bản sao].
+  // Chọn tab thì cuộn mượt để tab đó đứng sát trái; tab phía trước đi vòng ra sau (dùng bản sao), không đổi chỗ tab.
+  // Cuộn xong thì nhảy ngầm về dải tab thật (nhìn y hệt) để chạy vô tận.
+  const tabPos = (bar, el) => el.getBoundingClientRect().left - bar.getBoundingClientRect().left + bar.scrollLeft;
+  const realTabs = bar => [...bar.querySelectorAll('.hgc-tab:not([data-clone])')];
+
+  // Tạo bản sao hai bên cho đủ dài (kể cả chỉ có 1 tab). Trả về true nếu vừa tạo mới.
+  function buildLoop(bar) {
+    if (bar.querySelector('[data-clone]')) {
+      return false;
+    }
+    const tabs = realTabs(bar);
+    const width = tabs.length ? tabPos(bar, tabs[tabs.length - 1]) + tabs[tabs.length - 1].offsetWidth - tabPos(bar, tabs[0]) : 0;
+    // Các tab vừa khít màn hình thì không cần chạy vòng (nhân bản sẽ thấy tab bị lặp lại).
+    if (!width || width <= bar.clientWidth + 1) {
+      return false;
+    }
+    const copies = Math.ceil(bar.clientWidth / width) + 1;
+    const makeSet = () => {
+      const frag = document.createDocumentFragment();
+      tabs.forEach(tab => {
+        const clone = tab.cloneNode(true);
+        clone.dataset.clone = '1';
+        clone.tabIndex = -1;
+        clone.setAttribute('aria-hidden', 'true');
+        frag.append(clone);
+      });
+      return frag;
+    };
+    for (let i = 0; i < copies; i++) {
+      bar.insertBefore(makeSet(), tabs[0]);
+      bar.append(makeSet());
+    }
+    return true;
+  }
+
+  // Chu vi một vòng (từ tab thật đầu tiên tới bản sao kế tiếp của nó).
+  function loopWidth(bar) {
+    const tabs = realTabs(bar);
+    const next = tabs.length ? tabs[tabs.length - 1].nextElementSibling : null;
+    return next ? tabPos(bar, next) - tabPos(bar, tabs[0]) : 0;
+  }
+
+  // Đang ở dải bản sao thì nhảy ngầm về dải tab thật (cùng hình ảnh, người dùng không thấy).
+  function normalizeLoop(bar) {
+    const tabs = realTabs(bar);
+    const width = loopWidth(bar);
+    if (!tabs.length || !width) {
+      return;
+    }
+    const base = tabPos(bar, tabs[0]);
+    if (bar.scrollLeft >= base + width) {
+      bar.scrollLeft -= width;
+    } else if (bar.scrollLeft < base) {
+      bar.scrollLeft += width;
+    }
+  }
+
+  function rotateTabs(smooth) {
+    live.querySelectorAll('.hgc-tabs').forEach(bar => {
+      if (!bar.clientWidth) {
+        return; // đang ẩn (combo khác): đến khi hiện ra sẽ làm lại
+      }
+      const built = buildLoop(bar);
+      bar.parentElement?.querySelectorAll('[data-tabs-arrows]').forEach(arrow => {
+        arrow.hidden = !bar.querySelector('[data-clone]');
+      });
+      const tabs = realTabs(bar);
+      const index = tabs.findIndex(tab => tab.getAttribute('aria-selected') === 'true');
+      if (index < 0) {
+        return;
+      }
+      if (!bar.querySelector('[data-clone]')) {
+        bar.scrollLeft = 0;
+        bar.dataset.aligned = String(index);
+        return;
+      }
+      if (!built && bar.dataset.aligned === String(index)) {
+        return; // tab không đổi: không giật lại vị trí người dùng đang vuốt
+      }
+      const width = loopWidth(bar);
+      const base = tabPos(bar, tabs[0]);
+      let target = tabPos(bar, tabs[index]);
+      const animate = smooth && !built && bar.dataset.aligned !== undefined && !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      if (animate) {
+        normalizeLoop(bar);
+        // Luôn đi tiếp về một hướng: tab ở phía trước thì lấy bản sao của nó ở vòng sau.
+        if (target <= bar.scrollLeft + 1) {
+          target += width;
+        }
+        bar.scrollTo({ left: target, behavior: 'smooth' });
+      } else {
+        bar.scrollLeft = target;
+      }
+      bar.dataset.aligned = String(index);
+    });
+  }
+
+  // Đổi bề ngang màn hình (xoay máy...): bỏ bản sao rồi tính lại xem còn cần chạy vòng không.
+  let lastWidth = window.innerWidth;
+  window.addEventListener('resize', () => {
+    if (window.innerWidth === lastWidth) {
+      return;
+    }
+    lastWidth = window.innerWidth;
+    live.querySelectorAll('.hgc-tabs').forEach(bar => {
+      bar.querySelectorAll('[data-clone]').forEach(clone => clone.remove());
+      delete bar.dataset.aligned;
+    });
+    rotateTabs(false);
+  });
+
+  // Cuộn xong (hoặc người dùng vuốt xong) thì chuẩn hoá vị trí để chạy vô tận.
+  document.addEventListener('scroll', event => {
+    const bar = event.target;
+    if (!(bar instanceof HTMLElement) || !bar.classList.contains('hgc-tabs')) {
+      return;
+    }
+    clearTimeout(bar._loopTimer);
+    bar._loopTimer = setTimeout(() => normalizeLoop(bar), 140);
+  }, true);
+
+  // Nhóm còn thiếu ly kế tiếp sau nhóm vừa đủ: các nhóm sau trong combo, rồi các nhóm trước, rồi combo khác.
+  function findNextGroup(comboId, groupId) {
+    const sections = [...live.querySelectorAll('[data-combo]')];
+    const index = sections.findIndex(section => section.dataset.combo === comboId);
+    const open = section => [...section.querySelectorAll('[data-group]')].filter(group => !group.classList.contains('is-full'));
+    const own = sections[index];
+    if (own) {
+      const groups = [...own.querySelectorAll('[data-group]')];
+      const at = groups.findIndex(group => group.dataset.group === groupId);
+      const pick = [...groups.slice(at + 1), ...groups.slice(0, at)].find(group => !group.classList.contains('is-full'));
+      if (pick) {
+        return { combo: comboId, group: pick.dataset.group };
+      }
+    }
+    const others = [...sections.slice(index + 1), ...sections.slice(0, Math.max(0, index))];
+    for (const section of others) {
+      const pick = open(section)[0];
+      if (pick) {
+        return { combo: section.dataset.combo, group: pick.dataset.group };
+      }
+    }
+    return null;
+  }
+
+  // Hiện đúng combo / nhóm món đang chọn, ẩn phần còn lại; tab không còn tồn tại thì quay về tab đầu.
+  function applyTabs(smooth = false) {
+    const sections = [...live.querySelectorAll('[data-combo]')];
+    if (!sections.length) {
+      return;
+    }
+    if (!sections.some(section => section.dataset.combo === activeCombo)) {
+      activeCombo = sections[0].dataset.combo;
+    }
+    live.querySelectorAll('[data-tab-combo]').forEach(tab => {
+      tab.setAttribute('aria-selected', String(tab.dataset.tabCombo === activeCombo));
+    });
+    sections.forEach(section => {
+      const comboId = section.dataset.combo;
+      section.hidden = comboId !== activeCombo;
+      const groups = [...section.querySelectorAll('[data-group]')];
+      if (!groups.length) {
+        return;
+      }
+      if (!groups.some(group => group.dataset.group === activeGroup[comboId])) {
+        activeGroup[comboId] = groups[0].dataset.group;
+      }
+      groups.forEach(group => {
+        group.hidden = group.dataset.group !== activeGroup[comboId];
+      });
+      section.querySelectorAll('[data-tab-group]').forEach(tab => {
+        tab.setAttribute('aria-selected', String(tab.dataset.tabGroup === activeGroup[comboId]));
+      });
+    });
+    rotateTabs(smooth);
+  }
+
+  // Thanh tab: so sánh bỏ qua bản sao (clone) và aria-selected do trình duyệt tự đặt, để không thay lại mỗi 3 giây.
+  function swapTabs(oldNode, newNode) {
+    const clean = node => [...node.children]
+      .filter(child => !child.hasAttribute('data-clone'))
+      .map(child => child.outerHTML.replace(/ aria-selected="[^"]*"/g, ''))
+      .join('');
+    if (clean(oldNode) !== clean(newNode)) {
+      oldNode.replaceWith(newNode);
+    }
+  }
+
   // Khung combo / nhóm món / món: khác nhau thì thay cả vùng (chủ nhóm thêm hoặc xoá combo).
   function structureKey(root) {
     return [...root.querySelectorAll('[data-combo]')].map(section => {
@@ -57,6 +266,11 @@
     initMultiCheck(newNode);
   }
 
+  // HTML của món bỏ request_key (mỗi lần tải trang server sinh khoá ngẫu nhiên mới, làm món nào cũng "khác").
+  function drinkHtml(node) {
+    return node.outerHTML.replace(/(name="request_key"\s+value=")[^"]*/g, '$1');
+  }
+
   // Một món: đang mở form mà vẫn chọn được thì giữ form, chỉ chỉnh số ly tối đa.
   function updateDrink(oldDrink, newDrink) {
     const oldForm = oldDrink.querySelector('form');
@@ -70,6 +284,10 @@
           oldQty.value = newQty.max;
         }
       }
+      return;
+    }
+    // Món không đổi gì (ngoài request_key): giữ nguyên, không vẽ lại ảnh / không giật khung.
+    if (!oldDrink.open && drinkHtml(oldDrink) === drinkHtml(newDrink)) {
       return;
     }
     replaceNode(oldDrink, newDrink);
@@ -110,6 +328,12 @@
     const newHead = newSection.querySelector('.hgc-combo-head');
     if (oldHead && newHead) {
       swap(oldHead, newHead);
+    }
+
+    const oldTabs = oldSection.querySelector('.hgc-group-tabs');
+    const newTabs = newSection.querySelector('.hgc-group-tabs');
+    if (oldTabs && newTabs) {
+      swapTabs(oldTabs, newTabs);
     }
 
     // Nút xoá combo mang item_version mới nhất, thay luôn cho khỏi báo "đã thay đổi".
@@ -175,6 +399,11 @@
       live.replaceChildren(...fresh.childNodes);
       initMultiCheck(live);
     } else {
+      const oldComboTabs = live.querySelector('.hgc-combo-tabs');
+      const newComboTabs = fresh.querySelector('.hgc-combo-tabs');
+      if (oldComboTabs && newComboTabs) {
+        swapTabs(oldComboTabs, newComboTabs);
+      }
       fresh.querySelectorAll('[data-combo]').forEach(newSection => {
         const oldSection = live.querySelector(`[data-combo="${newSection.dataset.combo}"]`);
         if (oldSection) {
@@ -183,6 +412,7 @@
       });
       updateBar(fresh);
     }
+    applyTabs();
     live.dataset.signature = fresh.dataset.signature;
   }
 
@@ -308,10 +538,18 @@
       applyFresh(document.importNode(fresh, true));
 
       if (changed && drink) {
-        // Thêm ly xong: đưa nhóm món vừa chọn lên đầu màn hình để thấy ly vừa chọn.
-        // (Không giữ nguyên chỗ cũ được: ô chọn món đóng làm trang ngắn lại, trình duyệt sẽ tự kéo xuống footer.)
+        // Thêm ly xong: nhóm đã đủ ly thì chuyển sang nhóm kế tiếp còn thiếu (cùng combo, rồi tới combo khác).
         const group = live.querySelector(`[data-combo="${anchor?.combo}"] [data-group="${anchor?.group}"]`);
-        if (group) {
+        const next = group?.classList.contains('is-full') ? findNextGroup(anchor.combo, anchor.group) : null;
+        if (next) {
+          activeCombo = next.combo;
+          activeGroup[next.combo] = next.group;
+          applyTabs(true);
+          saveTabs();
+          live.querySelector('.hgc-combo-tabs')?.scrollIntoView({ block: 'start', behavior: 'smooth' });
+        } else if (group) {
+          // Chưa đủ: đưa nhóm vừa chọn lên đầu màn hình để thấy ly vừa chọn.
+          // (Không giữ nguyên chỗ cũ được: ô chọn món đóng làm trang ngắn lại, trình duyệt sẽ tự kéo xuống footer.)
           group.scrollIntoView({ block: 'start', behavior: 'smooth' });
         }
       } else {
@@ -328,17 +566,96 @@
     release();
   });
 
-  // Nút "Chọn tiếp combo …": cuộn mượt tới combo còn thiếu (không đổi địa chỉ trang).
+  // Popup chọn món: đóng bằng nút ✕, bấm nền tối hoặc phím Esc.
+  document.addEventListener('click', event => {
+    const closeBtn = event.target.closest('[data-hgc-close]');
+    if (closeBtn && live.contains(closeBtn)) {
+      closeBtn.closest('details.hgc-drink')?.removeAttribute('open');
+      return;
+    }
+    // Bấm nền tối (phần ::before của details) thì target chính là thẻ details.
+    if (event.target instanceof HTMLElement && event.target.matches('details.hgc-drink[open]') && live.contains(event.target)) {
+      event.target.removeAttribute('open');
+    }
+  });
+
+  document.addEventListener('keydown', event => {
+    if (event.key === 'Escape') {
+      live.querySelectorAll('details.hgc-drink[open]').forEach(drink => drink.removeAttribute('open'));
+    }
+  });
+
+  // Hai mũi tên ‹ ›: cuộn hàng tab qua trái / phải (hàng chạy vòng nên cuộn mãi được).
+  document.addEventListener('click', event => {
+    const arrow = event.target.closest('[data-tabs-prev], [data-tabs-next]');
+    const bar = arrow && live.contains(arrow) ? arrow.closest('.hgc-group-tabs-wrap')?.querySelector('.hgc-tabs') : null;
+    if (bar) {
+      const step = Math.max(120, bar.clientWidth * 0.6);
+      bar.scrollBy({ left: arrow.hasAttribute('data-tabs-next') ? step : -step, behavior: 'smooth' });
+    }
+  });
+
+  // Bấm tab combo / tab nhóm món.
+  document.addEventListener('click', event => {
+    const tab = event.target.closest('[data-tab-combo], [data-tab-group]');
+    // Bấm thùng rác trong tab: để form xoá combo tự xử lý, không đổi tab.
+    if (!tab || !live.contains(tab) || event.target.closest('.hgc-remove-form')) {
+      return;
+    }
+    if (tab.dataset.tabCombo) {
+      activeCombo = tab.dataset.tabCombo;
+    } else {
+      const section = tab.closest('[data-combo]');
+      if (section) {
+        activeGroup[section.dataset.combo] = tab.dataset.tabGroup;
+      }
+    }
+    applyTabs(true);
+    saveTabs();
+  });
+
+  // Tab combo là thẻ div (chứa thùng rác nên không dùng button): Enter / Space để chọn.
+  document.addEventListener('keydown', event => {
+    const tab = event.target instanceof HTMLElement ? event.target.closest('div.hgc-tab') : null;
+    if (tab && live.contains(tab) && (event.key === 'Enter' || event.key === ' ')) {
+      event.preventDefault();
+      tab.click();
+    }
+  });
+
+  // Nhóm món còn chọn được ly trong 1 combo: ưu tiên nhóm đang mở, không thì nhóm đầu tiên chưa đủ.
+  function findOpenGroup(section) {
+    const comboId = section.dataset.combo;
+    const groups = [...section.querySelectorAll('[data-group]')];
+    const openGroups = groups.filter(group => !group.classList.contains('is-full'));
+    const current = openGroups.find(group => group.dataset.group === activeGroup[comboId]);
+    return current || openGroups[0] || null;
+  }
+
+  // Nút "Chọn tiếp": mở đúng combo + đúng nhóm món còn thiếu ly, rồi cuộn mượt tới nhóm đó (không đổi địa chỉ trang).
   document.addEventListener('click', event => {
     const link = event.target.closest('[data-scroll-to]');
     if (!link || !live.contains(link)) {
       return;
     }
     const target = document.getElementById(link.dataset.scrollTo);
-    if (target) {
-      event.preventDefault();
-      target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    if (!target) {
+      return;
     }
+    event.preventDefault();
+
+    let scrollTarget = target;
+    if (target.dataset.combo) {
+      activeCombo = target.dataset.combo;
+      const group = findOpenGroup(target);
+      if (group) {
+        activeGroup[target.dataset.combo] = group.dataset.group;
+        scrollTarget = group;
+      }
+      applyTabs(true);
+      saveTabs();
+    }
+    scrollTarget.scrollIntoView({ behavior: 'smooth', block: 'start' });
   });
 
   function start() {
@@ -346,6 +663,7 @@
     timer = setInterval(refresh, INTERVAL);
   }
 
+  applyTabs();
   start();
   document.addEventListener('visibilitychange', () => {
     if (!document.hidden) {

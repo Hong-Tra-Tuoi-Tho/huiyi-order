@@ -42,47 +42,73 @@ $liveUrl = base_url('group/combo.php?id=' . $r['public_id'] . '&live=1');
 
 front_header(hgc_t('page_title'));
 ?>
-<link rel="stylesheet" href="<?= e(base_url('assets/css/group-combo.css?v=31')) ?>">
+<?php
+// Icon ly trà sữa nhiều màu (ống hút, nắp, đá, trân châu): dùng chung cho tiêu đề "Chọn ly" và footer.
+$hgcCupSvg = static fn(int $size): string => '<svg class="hgc-cup-svg" viewBox="0 0 32 32" width="' . $size . '" height="' . $size . '" aria-hidden="true">'
+    . '<path d="M19.5 9V3.2c0-.7.5-1.2 1.2-1.2H25" fill="none" stroke="#ffb800" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>'
+    . '<path d="M8.6 12.5 10.3 28a2.2 2.2 0 0 0 2.2 2h7a2.2 2.2 0 0 0 2.2-2l1.7-15.5Z" fill="#fff" stroke="#b3201f" stroke-width="1.6" stroke-linejoin="round"/>'
+    . '<path d="M9.4 17.5h13.2L21.5 27.6a1.6 1.6 0 0 1-1.6 1.4h-7.8a1.6 1.6 0 0 1-1.6-1.4Z" fill="#d92b2b"/>'
+    . '<rect x="12" y="19.2" width="4.2" height="4.2" rx="1" transform="rotate(-12 14 21.3)" fill="#fff" opacity=".6"/>'
+    . '<rect x="17.2" y="21.4" width="3.6" height="3.6" rx="1" transform="rotate(14 19 23.2)" fill="#fff" opacity=".45"/>'
+    . '<circle cx="13" cy="27" r="1.3" fill="#5a0f0f"/><circle cx="16" cy="27.4" r="1.3" fill="#5a0f0f"/><circle cx="19" cy="27" r="1.3" fill="#5a0f0f"/>'
+    . '<path d="M10.3 14.2l.9 8" stroke="#fff" stroke-width="1.2" stroke-linecap="round" opacity=".7"/>'
+    . '<rect x="6.6" y="9" width="18.8" height="3.8" rx="1.9" fill="#b3201f"/>'
+    . '<rect x="8.4" y="9.8" width="6" height="1" rx=".5" fill="#fff" opacity=".35"/>'
+    . '</svg>';
+?>
+<link rel="stylesheet" href="<?= e(base_url('assets/css/group-combo.css?v=63')) ?>">
 <div class="hyg-page hgc-page">
     <a class="back" href="<?= e(hyg_room_url($r['public_id'])) ?>">← <?= e(hgc_t('back_room')) ?></a>
     <?php if ($msg !== ''): ?><div class="alert info" role="status"><?= e($msg) ?></div><?php endif; ?>
 
-    <h1 class="hgc-title"><?= e(hgc_t('page_title')) ?></h1>
+    <h1 class="hgc-title hgc-sr"><?= e(hgc_t('page_title')) ?></h1>
 
     <!-- Vùng tự cập nhật mỗi 3 giây (assets/js/group-combo-live.js): tiến độ, ly đã chọn, nhóm đã đủ -->
     <div class="hgc-live" data-live-url="<?= e($liveUrl) ?>" data-signature="<?= e($liveSignature) ?>">
+
+    <?php if ($combos): ?>
+        <!-- Tab combo: mỗi tab là một combo (tên + số ly đã chọn); chỉ combo đang chọn hiện ra (group-combo-live.js). -->
+        <h2 class="hgc-step-title"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 3 9 5-9 5-9-5 9-5Z" /><path d="m3 13 9 5 9-5" /><path d="m3 17.5 9 5 9-5" /></svg><span><?= e(hgc_t('step_combo')) ?></span></h2>
+        <nav class="hgc-tabs hgc-combo-tabs" role="tablist" aria-label="<?= e(hgc_t('page_title')) ?>">
+            <?php foreach ($combos as $ci => $tabCombo): ?>
+                <?php $tabPercent = $tabCombo['total_cups'] > 0 ? min(100, (int)round($tabCombo['picked'] / $tabCombo['total_cups'] * 100)) : 0; ?>
+                <div role="tab" tabindex="0" class="hgc-tab<?= $tabCombo['complete'] ? ' is-complete' : '' ?><?= hyg_host($r) ? ' has-remove' : '' ?>" data-tab-combo="<?= (int)$tabCombo['item_id'] ?>" aria-selected="<?= $ci === 0 ? 'true' : 'false' ?>">
+                    <?php if ($tabCombo['image'] !== ''): ?>
+                        <img class="hgc-tab-img" src="<?= e(base_url('uploads/' . $tabCombo['image'])) ?>" alt="" loading="lazy">
+                    <?php endif; ?>
+                    <span class="hgc-tab-body">
+                        <span class="hgc-tab-name"><?= e($tabCombo['name']) ?></span>
+                        <span class="hgc-tab-prog">
+                            <span class="hgc-pc-bar"><i style="width: <?= $tabPercent ?>%"></i></span>
+                            <span class="hgc-tab-count"><b><?= (int)$tabCombo['picked'] ?></b>/<?= (int)$tabCombo['total_cups'] ?> <?= e(hgc_t('cups_unit')) ?></span>
+                        </span>
+                    </span>
+                    <?php if (hyg_host($r)): ?>
+                        <!-- Chỉ chủ nhóm xoá được combo: thùng rác nằm ngay góc trên bên phải tab của combo đó; xoá luôn các ly nước đã chọn cho combo -->
+                        <form method="post" action="<?= e(base_url('group/action.php')) ?>" class="hgc-remove-form" data-confirm="<?= e(hgc_t('remove_combo_confirm')) ?>">
+                            <?= hyg_action_fields($r, 'remove') ?>
+                            <input type="hidden" name="item_id" value="<?= (int)$tabCombo['item_id'] ?>">
+                            <input type="hidden" name="item_version" value="<?= (int)$tabCombo['item_version'] ?>">
+                            <input type="hidden" name="back" value="combo">
+                            <button class="hgc-remove-btn" type="submit" aria-label="<?= e(hgc_t('remove_combo')) ?>" title="<?= e(hgc_t('remove_combo')) ?>">
+                                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                    <path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6M10 11v6M14 11v6" />
+                                </svg>
+                            </button>
+                        </form>
+                    <?php endif; ?>
+                </div>
+            <?php endforeach; ?>
+        </nav>
+    <?php endif; ?>
 
     <?php if (!$combos): ?>
         <p class="hyg-card hyg-muted<?= hyg_host($r) ? '' : ' hgc-wait-host' ?>"><?= e(hyg_host($r) ? hgc_t('empty_combos') : hgc_t('wait_host')) ?></p>
     <?php endif; ?>
 
-    <?php foreach ($combos as $combo): ?>
+    <?php foreach ($combos as $ci => $combo): ?>
         <?php $comboLeft = max(0, $combo['total_cups'] - $combo['picked']); ?>
-        <section class="hyg-card hgc-combo<?= $combo['complete'] ? ' is-complete' : '' ?>" id="hgc-combo-<?= (int)$combo['item_id'] ?>" data-combo="<?= (int)$combo['item_id'] ?>">
-            <header class="hgc-combo-head">
-                <?php if ($combo['image'] !== ''): ?>
-                    <img class="hgc-combo-thumb" src="<?= e(base_url('uploads/' . $combo['image'])) ?>" alt="" loading="lazy">
-                <?php endif; ?>
-                <div class="hgc-combo-heading">
-                    <span class="hyg-combo-badge"><?= e(hgc_t('badge')) ?></span>
-                    <h2><?= e($combo['name']) ?></h2>
-                    <p class="hgc-combo-progress"><?= e(hgc_t('progress', ['picked' => $combo['picked'], 'total' => $combo['total_cups']])) ?></p>
-                </div>
-            </header>
-            <?php if (hyg_host($r)): ?>
-                <!-- Chỉ chủ nhóm xoá được combo (nút thùng rác góc phải trên); xoá luôn các ly nước đã chọn cho combo đó -->
-                <form method="post" action="<?= e(base_url('group/action.php')) ?>" class="hgc-remove-form" data-confirm="<?= e(hgc_t('remove_combo_confirm')) ?>">
-                    <?= hyg_action_fields($r, 'remove') ?>
-                    <input type="hidden" name="item_id" value="<?= (int)$combo['item_id'] ?>">
-                    <input type="hidden" name="item_version" value="<?= (int)$combo['item_version'] ?>">
-                    <input type="hidden" name="back" value="combo">
-                    <button class="hgc-remove-btn" type="submit" aria-label="<?= e(hgc_t('remove_combo')) ?>" title="<?= e(hgc_t('remove_combo')) ?>">
-                        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                            <path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6M10 11v6M14 11v6" />
-                        </svg>
-                    </button>
-                </form>
-            <?php endif; ?>
+        <section class="hyg-card hgc-combo<?= $combo['complete'] ? ' is-complete' : '' ?>" id="hgc-combo-<?= (int)$combo['item_id'] ?>" data-combo="<?= (int)$combo['item_id'] ?>"<?= $ci > 0 ? ' hidden' : '' ?>>
 
             <?php if ($combo['invalid']): ?>
                 <!-- Admin đã tắt / xoá combo khi nhóm đang chọn -->
@@ -116,16 +142,40 @@ front_header(hgc_t('page_title'));
                 </div>
             <?php endif; ?>
 
-            <?php foreach ($combo['groups'] as $group): ?>
+            <?php if (count($combo['groups']) > 0): ?>
+                <!-- Tab nhóm món của combo này: mỗi tab là một nhóm (tên + số ly đã chọn / tối đa) -->
+                <h2 class="hgc-step-title"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 8h14l-1.5 12h-11L5 8Z" /><path d="M8 8c0-2.5 1.8-4 4-4s4 1.5 4 4" /></svg><span><?= e(hgc_t('step_group')) ?></span></h2>
+                <div class="hgc-group-tabs-wrap">
+                    <!-- Hai nút ‹ › nhỏ ở hai bên: cuộn hàng tab nhóm qua trái / phải (chỉ hiện khi có nhiều nhóm hơn bề ngang màn hình) -->
+                    <button type="button" class="hgc-tabs-arrow" data-tabs-arrows data-tabs-prev aria-label="Previous" hidden>‹</button>
+                    <nav class="hgc-tabs hgc-group-tabs" role="tablist">
+                        <?php foreach ($combo['groups'] as $gi => $tabGroup): ?>
+                            <?php
+                            $gPicked = (int)$tabGroup['picked'];
+                            $gMax = (int)$tabGroup['max'];
+                            $gPercent = $gMax > 0 ? min(100, (int)round($gPicked / $gMax * 100)) : 0;
+                            $gState = $gPicked >= $gMax ? ' is-complete' : ($gPicked > 0 ? ' is-partial' : '');
+                            ?>
+                            <button type="button" role="tab" class="hgc-tab<?= $gState ?>" data-tab-group="<?= (int)$tabGroup['id'] ?>" aria-selected="<?= $gi === 0 ? 'true' : 'false' ?>">
+                                <span class="hgc-tab-name"><?= e($tabGroup['name']) ?></span>
+                                <span class="hgc-tab-count"><?= $gPicked ?>/<?= $gMax ?></span>
+                                <span class="hgc-pc-bar"><i style="width: <?= $gPercent ?>%"></i></span>
+                            </button>
+                        <?php endforeach; ?>
+                    </nav>
+                    <button type="button" class="hgc-tabs-arrow" data-tabs-arrows data-tabs-next aria-label="Next" hidden>›</button>
+                </div>
+            <?php endif; ?>
+
+            <?php foreach ($combo['groups'] as $gi => $group): ?>
                 <?php
                 $groupLeft = max(0, $group['max'] - $group['picked']);
                 $canAdd = min($groupLeft, $comboLeft);
                 ?>
-                <div class="hgc-group<?= $canAdd < 1 ? ' is-full' : '' ?>" data-group="<?= (int)$group['id'] ?>">
+                <div class="hgc-group<?= $canAdd < 1 ? ' is-full' : '' ?>" data-group="<?= (int)$group['id'] ?>"<?= $gi > 0 ? ' hidden' : '' ?>>
                     <div class="hgc-group-head">
-                        <strong><?= e($group['name']) ?></strong>
-                        <span class="hgc-rule">- <?= e(hgc_t('picked_label')) ?> <b class="hgc-count<?= $group['picked'] >= $group['max'] ? ' is-full' : '' ?>"><?= (int)$group['picked'] ?>/<?= (int)$group['max'] ?></b></span>
-                        <?php if ($groupLeft < 1): ?><span class="hgc-full"><?= e(hgc_t('group_full_label')) ?></span><?php endif; ?>
+                        <strong class="hgc-step-title"><?= $hgcCupSvg(28) ?><span><?= e(hgc_t('step_cups')) ?></span><b class="hgc-count<?= $group['picked'] >= $group['max'] ? ' is-full' : '' ?>"><?= (int)$group['picked'] ?>/<?= (int)$group['max'] ?></b></strong>
+                        <span class="hgc-rule hgc-rule-chip<?= $group['picked'] >= $group['max'] ? ' is-full' : '' ?>"><?= e(hgc_t('cups_picked_chip', ['picked' => (int)$group['picked'], 'max' => (int)$group['max']])) ?></span>
                     </div>
 
                     <?php
@@ -133,24 +183,22 @@ front_header(hgc_t('page_title'));
                     $groupDrinks = array_filter($combo['drinks'], fn($drink) => (int)($drink['_selection']['combo_group'] ?? 0) === (int)$group['id']);
                     ?>
                     <?php if ($groupDrinks): ?>
+                        <!-- Mỗi ly là một thẻ cao cố định (ly × N cao N ô) -->
                         <ul class="hgc-picked">
                             <?php foreach ($groupDrinks as $drink): ?>
-                                <?php $canRemoveDrink = hyg_host($r) || (int)($drink['group_member_id'] ?? 0) === (int)$m['id']; ?>
-                                <li>
+                                <?php
+                                $canRemoveDrink = hyg_host($r) || (int)($drink['group_member_id'] ?? 0) === (int)$m['id'];
+                                $qty = max(1, (int)($drink['qty'] ?? 1));
+                                $topNames = array_map(fn($top) => (string)($top['display_name'] ?? $top['name'] ?? ''), $drink['toppings'] ?? []);
+                                $detail = implode(' · ', array_filter(array_merge(
+                                    [$drink['group_member_name'] ?? '', $drink['cup_size'] ?? '', $drink['ice'] ?? '', $drink['sugar'] ?? ''],
+                                    $topNames
+                                )));
+                                ?>
+                                <li style="--slots: <?= $qty ?>" title="<?= e(($drink['name'] ?? '') . ' × ' . $qty . ' — ' . $detail) ?>">
                                     <span class="hgc-picked-text">
-                                        <strong><?= e($drink['name'] ?? '') ?> × <?= (int)($drink['qty'] ?? 0) ?></strong>
-                                        <small><?= e(implode(' · ', array_filter([$drink['group_member_name'] ?? '', $drink['cup_size'] ?? '', $drink['ice'] ?? '', $drink['sugar'] ?? '']))) ?></small>
-                                        <?php if (!empty($drink['toppings'])): ?>
-                                            <!-- Topping của ly: gấp lại, bấm để sổ xuống danh sách -->
-                                            <details class="hgc-picked-toppings">
-                                                <summary><?= e(t('toppings')) ?> (<?= count($drink['toppings']) ?>) · +<?= e(currency()) ?><?= money($drink['unit_price']) ?></summary>
-                                                <ul>
-                                                    <?php foreach ($drink['toppings'] as $topping): ?>
-                                                        <li><?= e($topping['display_name'] ?? $topping['name']) ?> <b>+<?= e(currency()) ?><?= money($topping['price']) ?></b></li>
-                                                    <?php endforeach; ?>
-                                                </ul>
-                                            </details>
-                                        <?php endif; ?>
+                                        <strong><?= e($drink['name'] ?? '') ?> × <?= $qty ?></strong>
+                                        <small><?= e($detail) ?></small>
                                     </span>
                                     <?php if ($canRemoveDrink): ?>
                                         <!-- Mỗi người xoá được ly của mình (chủ nhóm xoá được mọi ly) để chọn lại, kể cả khi nhóm đã đủ ly -->
@@ -189,8 +237,7 @@ front_header(hgc_t('page_title'));
                                         <span class="hgc-drink-placeholder" aria-hidden="true">DRINK</span>
                                     <?php endif; ?>
                                     <span class="hgc-drink-name"><?= e($name) ?></span>
-                                    <?php if ($item['sizes'] !== ['']): ?><small><?= e(implode(' / ', $item['sizes'])) ?></small><?php endif; ?>
-                                    <?php if ($canAdd > 0): ?><span class="hgc-drink-cta" aria-hidden="true"><?= e(hgc_t('pick')) ?><i></i></span><?php endif; ?>
+                                    <?php if ($canAdd > 0): ?><span class="hgc-drink-cta" aria-hidden="true"><?= e(hgc_t('pick')) ?></span><?php endif; ?>
                                 </summary>
 
                                 <?php if ($canAdd > 0): ?>
@@ -202,6 +249,17 @@ front_header(hgc_t('page_title'));
                                         <input type="hidden" name="combo_group" value="<?= (int)$group['id'] ?>">
                                         <input type="hidden" name="product_id" value="<?= (int)$productId ?>">
                                         <input type="hidden" name="request_key" value="<?= bin2hex(random_bytes(16)) ?>">
+
+                                        <!-- Đầu popup chọn món: tên món + nút đóng (group-combo-live.js) -->
+                                        <div class="hgc-modal-head">
+                                            <?php if (!empty($product['image'])): ?>
+                                                <img class="hgc-modal-cup" src="<?= e(base_url('uploads/' . $product['image'])) ?>" alt="">
+                                            <?php else: ?>
+                                                <span class="hgc-modal-cup hgc-modal-cup-emoji" aria-hidden="true">🥤</span>
+                                            <?php endif; ?>
+                                            <strong><?= e($name) ?></strong>
+                                            <button type="button" class="hgc-modal-close" data-hgc-close aria-label="Close">✕</button>
+                                        </div>
 
                                         <?php if ($item['sizes'] !== ['']): ?>
                                             <fieldset class="hgc-options">
@@ -277,8 +335,7 @@ front_header(hgc_t('page_title'));
         $totalPicked = array_sum(array_map(fn($c) => (int)$c['picked'], $combos));
         $isHost = hyg_host($r);
         // Tổng ly nước của cả phòng (ly combo + ly mua lẻ) để xét ưu đãi mini-game 10 ly.
-        $roomCups = promotion_game_qty($cart) + array_sum(array_map(fn($c) => max(0, (int)$c['total_cups'] - (int)$c['picked']), $combos));
-    ?>
+        $roomCups = promotion_game_qty($cart) + array_sum(array_map(fn($c) => max(0, (int)$c['total_cups'] - (int)$c['picked']), $combos));    ?>
     <div class="hgc-bar" data-bar="<?= $todo ? 'todo' : 'done' ?>">
         <?php if ($todo): ?>
             <?php
@@ -288,16 +345,33 @@ front_header(hgc_t('page_title'));
                 return max(0, $need - (int)$c['picked']);
             };
             $next = $todo[0];
-            $missingAll = array_sum(array_map($missing, $todo));
+            // Số ly còn thiếu của đúng combo mà nút "Chọn tiếp" dẫn tới.
+            $missingNext = max(1, $missing($next));
             ?>
-            <div class="hgc-bar-msg"><span class="hgc-bar-tick is-todo"><?= count($todo) ?></span><?= str_replace('@@', '<strong class="hgc-missing">' . e(hgc_t('bar_missing', ['n' => $missingAll])) . '</strong>', e(hgc_t('bar_todo', ['name' => implode(', ', array_map(fn($c) => $c['name'], $todo)), 'cups' => '@@']))) ?></div>
-            <a class="hgc-bar-cta" href="#hgc-combo-<?= (int)$next['item_id'] ?>" data-scroll-to="hgc-combo-<?= (int)$next['item_id'] ?>"><?= e(hgc_t('bar_cta_todo', ['name' => $next['name']])) ?> ↓</a>
+            <div class="hgc-bar-row">
+                <div class="hgc-bar-info">
+                    <span class="hgc-bar-icon"><?= $hgcCupSvg(34) ?></span>
+                    <span class="hgc-bar-text">
+                        <strong class="hgc-bar-name hgc-bar-need"><?= e(hgc_t('bar_need_title', ['n' => $missingNext])) ?></strong>
+                        <span class="hgc-bar-sub"><?= e(hgc_t('bar_need_sub', ['n' => $missingNext])) ?></span>
+                    </span>
+                </div>
+                <a class="hgc-bar-cta" href="#hgc-combo-<?= (int)$next['item_id'] ?>" data-scroll-to="hgc-combo-<?= (int)$next['item_id'] ?>" title="<?= e(hgc_t('bar_cta_todo', ['name' => $next['name']])) ?>">
+                    <span><?= e(hgc_t('bar_cta_next')) ?></span>
+                    <i aria-hidden="true">→</i>
+                </a>
+            </div>
         <?php else: ?>
-            <div class="hgc-bar-msg"><span class="hgc-bar-tick">✓</span><?= e(hgc_t('bar_done')) ?></div>
-            <?php if (!$isHost): ?><div class="hgc-bar-sub"><?= e(hgc_t('bar_done_sub_member', ['n' => $totalPicked])) ?></div><?php endif; ?>
             <?php if ($isHost && minigame_enabled() && $roomCups >= 5 && $roomCups <= 9): ?>
                 <div class="hgc-bar-upsell"><?= e(gt('lock_upsell', ['more' => 10 - $roomCups])) ?></div>
             <?php endif; ?>
+            <div class="hgc-bar-row">
+                <div class="hgc-bar-info">
+                    <span class="hgc-bar-text">
+                        <strong class="hgc-bar-name"><?= e(hgc_t('bar_done')) ?></strong>
+                        <small class="hgc-bar-sub"><?= e($isHost ? hgc_t('bar_done_sub_host', ['n' => $totalPicked]) : hgc_t('bar_done_sub_member', ['n' => $totalPicked])) ?></small>
+                    </span>
+                </div>
             <?php if ($isHost): ?>
                 <?php /* Chốt món ngay tại đây: gửi như nút "Chốt món" ở đơn nhóm (action coupon + lock_after), xong vào thẳng trang thanh toán. Gửi thường (data-native), không qua fetch. */ ?>
                 <form method="post" action="<?= e(base_url('group/action.php')) ?>" class="hgc-bar-lock" data-native>
@@ -307,15 +381,22 @@ front_header(hgc_t('page_title'));
                     <input type="hidden" name="lock_after" value="1">
                     <input type="hidden" name="back" value="combo">
                     <?php if (minigame_enabled() && promotion_game_qty($cart) >= 10): ?><input type="hidden" name="promotion_mode" value="draw"><?php endif; ?>
-                    <button class="hgc-bar-cta" type="submit" <?= (minigame_enabled() && $roomCups >= 5 && $roomCups <= 9) ? hyg_lock_game_attrs((int)$roomCups, (string)$r['public_id']) : '' ?>><?= e(hgc_t('bar_cta_host')) ?> →</button>
+                    <button class="hgc-bar-cta" type="submit" <?= (minigame_enabled() && $roomCups >= 5 && $roomCups <= 9) ? hyg_lock_game_attrs((int)$roomCups, (string)$r['public_id']) : '' ?>>
+                        <span><?= e(hgc_t('bar_cta_host')) ?></span>
+                        <i aria-hidden="true">›</i>
+                    </button>
                 </form>
             <?php else: ?>
-                <a class="hgc-bar-cta is-alt" href="<?= e(hyg_room_url($r['public_id'])) ?>"><?= e(hgc_t('bar_cta_member')) ?> →</a>
+                <a class="hgc-bar-cta is-alt" href="<?= e(hyg_room_url($r['public_id'])) ?>">
+                    <span><?= e(hgc_t('bar_cta_member')) ?></span>
+                    <i aria-hidden="true">›</i>
+                </a>
             <?php endif; ?>
+            </div>
         <?php endif; ?>
     </div>
     <?php } ?>
     </div>
 </div>
-<script src="<?= e(base_url('assets/js/group-combo-live.js?v=16')) ?>" defer></script>
+<script src="<?= e(base_url('assets/js/group-combo-live.js?v=31')) ?>" defer></script>
 <?php front_footer(); ?>
