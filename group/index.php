@@ -58,7 +58,7 @@ unset($_SESSION['hyg_message']);
 $orderSuccess = !empty($_SESSION['hyg_order_success']);
 unset($_SESSION['hyg_order_success']);
 ?>
-<?php if ($r): ?><link rel="stylesheet" href="<?= e(base_url('assets/css/group-combo.css?v=31')) ?>"><?php endif; ?>
+<?php if ($r): ?><link rel="stylesheet" href="<?= e(base_url('assets/css/group-combo.css?v=51')) ?>"><?php endif; ?>
 <div class="hyg-page">
   <?php /* Nhóm combo: "menu" của nhóm là trang chọn combo (chủ nhóm) / chọn nước (thành viên), không phải danh sách món. */ ?>
   <a class="back" href="<?= e(base_url($r ? 'index.php?group=' . $r['public_id'] : 'index.php')) ?>">← <?= e(t('back_menu')) ?></a>
