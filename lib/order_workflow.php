@@ -101,6 +101,11 @@ function htp_list_sql(array $filters): array {
     if(is_string($method)&&in_array($method,['transfer','cash','split'],true)){$where[]='o.payment_method=?';$args[]=$method;}
     $type=$filters['type']??'';
     if($type==='group')$where[]='o.group_room_id IS NOT NULL';elseif($type==='personal')$where[]='o.group_room_id IS NULL';
+    // Đơn combo: đơn có ít nhất 1 dòng trong order_combos (có thể là đơn cá nhân hoặc đơn nhóm).
+    elseif($type==='combo')$where[]='EXISTS (SELECT 1 FROM order_combos oc WHERE oc.order_id=o.id)';
+    // Lọc theo loại combo cụ thể (combos.id) — chỉ lấy đơn có dòng order_combos thuộc combo đó.
+    $combo=$filters['combo']??'';
+    if(is_string($combo)&&preg_match('/^[1-9]\d{0,9}$/D',$combo)){$where[]='EXISTS (SELECT 1 FROM order_combos oc2 WHERE oc2.order_id=o.id AND oc2.combo_id=?)';$args[]=(int)$combo;}
     $store=$filters['store']??'';
     if($store==='hq')$where[]='o.dispatch_store_id IS NULL';elseif(is_string($store)&&preg_match('/^[1-9]\d{0,9}$/D',$store)){$where[]='o.dispatch_store_id=?';$args[]=(int)$store;}
     foreach(['date_from'=>['>=',''],'date_to'=>['<','+1 day']] as $key=>[$op,$shift]){
