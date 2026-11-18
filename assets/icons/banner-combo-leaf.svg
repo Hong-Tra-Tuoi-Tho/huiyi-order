@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none" stroke="#e39a9a" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+  <!-- Lá trà nét viền (trang trí góc phải trên banner combo nhóm) -->
+  <path d="M10 54C10 30 26 12 56 8c-2 28-18 46-46 46Z"/>
+  <path d="M10 54 46 18"/>
+  <path d="M22 42l-6-12M30 34l-4-14M38 26l-2-12M22 42l14 2M30 34l14 0M38 26l12-2"/>
+</svg>

@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- Cành lá trà xanh nhạt (cạnh 2 ly nước trên banner combo nhóm) -->
+  <path d="M30 60C31 44 36 30 46 18" fill="none" stroke="#8fb36a" stroke-width="2" stroke-linecap="round"/>
+  <path d="M46 18C40 6 48 0 60 2c0 12-6 18-14 16Z" fill="#b9d58e"/>
+  <path d="M38 32C28 26 18 30 10 22c10-8 24-6 28 10Z" fill="#a8cb7c"/>
+  <path d="M34 44c8-6 18-4 24 4-8 6-20 6-24-4Z" fill="#c6dfa0"/>
+  <path d="M46 18c4-6 8-10 13-14M38 32c-8-4-16-6-24-8M34 44c8-1 14 0 20 3" fill="none" stroke="#ffffff" stroke-opacity=".7" stroke-width="1"/>
+</svg>
