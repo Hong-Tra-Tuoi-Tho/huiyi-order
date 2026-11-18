@@ -22,13 +22,15 @@ header('Cache-Control: private, no-store');
 // 1. BỘ LỌC — đọc từ GET, chỉ nhận chuỗi; htp_list_sql() tự kiểm tra từng giá trị hợp lệ
 // -------------------------------------------------------------
 $filters=[];
-foreach(['q','status','payment_state','method','type','store','date_from','date_to'] as $key)$filters[$key]=is_string($_GET[$key]??null)?trim($_GET[$key]):'';
+foreach(['q','status','payment_state','method','type','combo','store','date_from','date_to'] as $key)$filters[$key]=is_string($_GET[$key]??null)?trim($_GET[$key]):'';
 $sorts=['newest'=>'o.id DESC','oldest'=>'o.id ASC','amount_desc'=>'o.total_amount DESC, o.id DESC','amount_asc'=>'o.total_amount ASC, o.id DESC'];
 $sort=is_string($_GET['sort']??null)&&isset($sorts[$_GET['sort']])?$_GET['sort']:'newest';
 $perPage=in_array((int)($_GET['per_page']??0),[20,50,100],true)?(int)$_GET['per_page']:20;
 $page=max(1,(int)($_GET['page']??1));
 // Đơn có thể đã gán cho cửa hàng nay đã tắt, nên danh sách lọc lấy cả cửa hàng đang tắt.
 try{$stores=hyg_all('SELECT id,name,enabled FROM dispatch_stores ORDER BY enabled DESC,name');}catch(Throwable $error){$stores=[];}
+// Danh sách combo cho bộ lọc "Loại combo" (gồm cả combo đã tắt vì đơn cũ vẫn có thể thuộc combo đó).
+try{$comboList=hyg_all('SELECT id,name_vi FROM combos ORDER BY name_vi,id');}catch(Throwable $error){$comboList=[];}
 // Giữ nguyên bộ lọc hiện tại, chỉ đổi vài tham số (trang, trạng thái…).
 $listUrl=function(array $overrides=[]):string{
     $params=array_merge(array_diff_key($_GET,['page'=>1,'export'=>1]),$overrides);
@@ -44,25 +46,33 @@ if(($_GET['export']??'')==='xlsx'){
     require_once __DIR__.'/../lib/xlsx_export.php';
     $rows=(function()use($listSql,$listArgs,$sorts,$sort){
         $st=db()->prepare($listSql.' ORDER BY '.$sorts[$sort]);$st->execute($listArgs);
-        while($o=$st->fetch())yield [$o['order_no'],$o['created_at'],$o['group_room_id']?pwf('type_group'):pwf('type_personal'),$o['group_title']??'',$o['customer_name'],$o['phone'],$o['address'],payment_label((string)$o['payment_method']),status_label((string)$o['status']),pwf((string)$o['financial_state']),
+        // Tên combo của từng đơn (gom từ order_combos, snapshot lúc đặt), ví dụ "Thư giãn chủ nhật, Văn phòng".
+        $comboSt=db()->prepare('SELECT combo_name FROM order_combos WHERE order_id=? ORDER BY id');
+        while($o=$st->fetch()){
+            $comboSt->execute([(int)$o['id']]);
+            $comboNames=implode(', ',$comboSt->fetchAll(PDO::FETCH_COLUMN));
+            yield [$o['order_no'],$o['created_at'],$o['group_room_id']?pwf('type_group'):pwf('type_personal'),$o['group_title']??'',$comboNames,$o['customer_name'],$o['phone'],$o['address'],payment_label((string)$o['payment_method']),status_label((string)$o['status']),pwf((string)$o['financial_state']),
             $o['subtotal_amount'],$o['discount_amount'],$o['coupon_code']??'',$o['total_amount'],$o['received_amount'],$o['refunded_amount'],(float)$o['received_amount']-(float)$o['refunded_amount'],
             $o['dispatch_store_name']?:pwf('list_store_hq'),order_notification_status_label((string)($o['notification_email_status']??'pending')),$o['order_note']??''];
+        }
     })();
     // Khối tiêu đề đầu file: tên danh sách, giờ xuất + số đơn, và các bộ lọc đang áp dụng.
     $storeName=$filters['store']==='hq'?pwf('list_store_hq'):'';foreach($stores as $s)if((string)$s['id']===$filters['store'])$storeName=$s['name'];
+    $comboName='';foreach($comboList as $cb)if((string)$cb['id']===$filters['combo'])$comboName=$cb['name_vi'].' (#'.$cb['id'].')';
     $applied=array_filter([
         $filters['q']!==''?pwf('list_search').': "'.$filters['q'].'"':'',
         $filters['status']!==''?t('status').': '.status_label($filters['status']):'',
         $filters['payment_state']!==''?pwf('payment_state').': '.pwf($filters['payment_state']):'',
         $filters['method']!==''?pwf('list_method').': '.payment_label($filters['method']):'',
         $filters['type']!==''?pwf('list_type').': '.pwf('type_'.$filters['type']):'',
+        $comboName!==''?pwf('list_combo').': '.$comboName:'',
         $storeName!==''?pwf('list_store').': '.$storeName:'',
         $filters['date_from']!==''?pwf('list_date_from').': '.$filters['date_from']:'',
         $filters['date_to']!==''?pwf('list_date_to').': '.$filters['date_to']:'',
     ]);
     $title=[pwf('xls_title_orders').' — '.store_name(),strtr(pwf('xls_exported'),['{time}'=>date('Y-m-d H:i')]),pwf('xls_filters').': '.($applied?implode(' · ',$applied):pwf('xls_no_filter'))];
     // Cột 10,11,13–16 là tiền: ghi dạng số (có dấu phân cách hàng nghìn) để Excel cộng/lọc được.
-    hxl_send('don-hang-'.date('Ymd-His').'.xlsx',[t('order_no'),t('time'),pwf('list_type'),pwf('detail_group'),t('customer'),t('phone'),t('address'),t('payment'),t('status'),pwf('payment_state'),t('subtotal'),pwf('detail_discount'),t('coupon'),t('amount'),pwf('received_amount'),pwf('refunded_amount'),pwf('net_received'),pwf('list_store'),t('email_status'),t('order_note')],$rows,[10,11,13,14,15,16],$title);
+    hxl_send('don-hang-'.date('Ymd-His').'.xlsx',[t('order_no'),t('time'),pwf('list_type'),pwf('detail_group'),pwf('list_combo'),t('customer'),t('phone'),t('address'),t('payment'),t('status'),pwf('payment_state'),t('subtotal'),pwf('detail_discount'),t('coupon'),t('amount'),pwf('received_amount'),pwf('refunded_amount'),pwf('net_received'),pwf('list_store'),t('email_status'),t('order_note')],$rows,[11,12,14,15,16,17],$title);
 }
 
 // -------------------------------------------------------------
@@ -96,7 +106,8 @@ admin_header(t('order_center'));?>
     <label><?=e(t('status'))?><select name="status"><option value=""><?=e(pwf('list_status_all'))?></option><?php foreach(['new','accepted','done','cancelled'] as $key):?><option value="<?=$key?>" <?=$filters['status']===$key?'selected':''?>><?=e(status_label($key))?></option><?php endforeach;?></select></label>
     <label><?=e(pwf('payment_state'))?><select name="payment_state"><option value=""><?=e(pwf('filter_all'))?></option><?php foreach(['unpaid','requested','partial','confirmed','overpaid','refund_pending','refunded','legacy','not_required','rejected'] as $key):?><option value="<?=$key?>" <?=$filters['payment_state']===$key?'selected':''?>><?=e(pwf($key))?></option><?php endforeach;?></select></label>
     <label><?=e(pwf('list_method'))?><select name="method"><option value=""><?=e(pwf('list_method_all'))?></option><?php foreach(['transfer','cash','split'] as $key):?><option value="<?=$key?>" <?=$filters['method']===$key?'selected':''?>><?=e(payment_label($key))?></option><?php endforeach;?></select></label>
-    <label><?=e(pwf('list_type'))?><select name="type"><option value=""><?=e(pwf('list_type_all'))?></option><option value="personal" <?=$filters['type']==='personal'?'selected':''?>><?=e(pwf('type_personal'))?></option><option value="group" <?=$filters['type']==='group'?'selected':''?>><?=e(pwf('type_group'))?></option></select></label>
+    <label><?=e(pwf('list_type'))?><select name="type"><option value=""><?=e(pwf('list_type_all'))?></option><option value="personal" <?=$filters['type']==='personal'?'selected':''?>><?=e(pwf('type_personal'))?></option><option value="group" <?=$filters['type']==='group'?'selected':''?>><?=e(pwf('type_group'))?></option><option value="combo" <?=$filters['type']==='combo'?'selected':''?>><?=e(pwf('type_combo'))?></option></select></label>
+    <label><?=e(pwf('list_combo'))?><select name="combo"><option value=""><?=e(pwf('list_combo_all'))?></option><?php foreach($comboList as $cb):?><option value="<?=(int)$cb['id']?>" <?=$filters['combo']===(string)$cb['id']?'selected':''?>><?=e($cb['name_vi'])?> (#<?=(int)$cb['id']?>)</option><?php endforeach;?></select></label>
     <label><?=e(pwf('list_store'))?><select name="store"><option value=""><?=e(pwf('list_store_all'))?></option><option value="hq" <?=$filters['store']==='hq'?'selected':''?>><?=e(pwf('list_store_hq'))?></option><?php foreach($stores as $s):?><option value="<?=(int)$s['id']?>" <?=$filters['store']===(string)$s['id']?'selected':''?>><?=e($s['name'])?><?=$s['enabled']?'':' ('.e(pwf('list_store_off')).')'?></option><?php endforeach;?></select></label>
     <label><?=e(pwf('list_date_from'))?><input type="date" name="date_from" value="<?=e($filters['date_from'])?>"></label>
     <label><?=e(pwf('list_date_to'))?><input type="date" name="date_to" value="<?=e($filters['date_to'])?>"></label>

@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 200" preserveAspectRatio="none">
+  <!-- Sóng nền banner combo nhóm: 2 lớp sóng mờ + 3 đường kẻ trắng mảnh -->
+  <path d="M0 128 C70 98 140 150 220 132 S340 92 400 108 L400 200 L0 200 Z" fill="#ffffff" fill-opacity=".28"/>
+  <path d="M0 158 C90 128 170 186 260 160 S360 130 400 142 L400 200 L0 200 Z" fill="#f6b2ae" fill-opacity=".30"/>
+  <path d="M0 176 C110 156 190 198 290 182 S370 168 400 172 L400 200 L0 200 Z" fill="#ffffff" fill-opacity=".35"/>
+  <path d="M0 122 C70 92 140 144 220 126 S340 86 400 102" fill="none" stroke="#ffffff" stroke-opacity=".85" stroke-width="1.4" vector-effect="non-scaling-stroke"/>
+  <path d="M0 150 C90 120 170 178 260 152 S360 122 400 134" fill="none" stroke="#ffffff" stroke-opacity=".6" stroke-width="1.2" vector-effect="non-scaling-stroke"/>
+  <path d="M0 70 C80 40 170 90 250 60 S360 20 400 34" fill="none" stroke="#ffffff" stroke-opacity=".45" stroke-width="1" vector-effect="non-scaling-stroke"/>
+</svg>
