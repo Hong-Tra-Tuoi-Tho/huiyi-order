@@ -161,6 +161,8 @@ function gt(string $key,array $vars=[]): string {
             'lock_game_more'=>'再加購',
             'lock_game_confirm'=>'您目前有 {n} 杯，再加購 **{more} 杯** 即可獲得 1 次小遊戲機會。',
             'lock_upsell'=>'再加 {more} 杯，湊滿 10 杯即可玩小遊戲！',
+            'lock_game_confirm_next'=>'您目前有 {n} 杯，已有 {chances} 次小遊戲機會。再加購 **{more} 杯**，即可再多 1 次機會（共 {total} 次）。',
+            'lock_upsell_next'=>'再加 {more} 杯，即可多 1 次小遊戲機會（共 {total} 次）！',
             'reopen'=>'重新開放選購',
             'checkout'=>'統一結帳',
             'cancel'=>'取消團購',
@@ -397,6 +399,8 @@ function gt(string $key,array $vars=[]): string {
             'lock_game_more'=>'Mua thêm',
             'lock_game_confirm'=>'Bạn đang có {n} ly. Hãy mua thêm **{more} ly** để nhận được 1 lượt chơi Mini Game.',
             'lock_upsell'=>'Mua thêm {more} ly nước để đủ 10 ly và được chơi mini-game nhé!',
+            'lock_game_confirm_next'=>'Bạn đang có {n} ly và đã được {chances} lượt chơi Mini Game. Mua thêm **{more} ly** để nhận thêm 1 lượt nữa (tổng {total} lượt).',
+            'lock_upsell_next'=>'Mua thêm {more} ly nước để được thêm 1 lượt mini-game nữa (tổng {total} lượt) nhé!',
             'reopen'=>'Mở lại để chọn món',
             'checkout'=>'Thanh toán chung',
             'cancel'=>'Hủy nhóm',
@@ -633,6 +637,8 @@ function gt(string $key,array $vars=[]): string {
             'lock_game_more'=>'Add more',
             'lock_game_confirm'=>'You have {n} drinks. Add **{more} more** to earn 1 Mini Game play.',
             'lock_upsell'=>'Add {more} more drinks to reach 10 and play the mini-game!',
+            'lock_game_confirm_next'=>'You have {n} drinks and already {chances} Mini Game play(s). Add **{more} more** to earn 1 extra play ({total} in total).',
+            'lock_upsell_next'=>'Add {more} more drinks to earn 1 extra mini-game play ({total} in total)!',
             'reopen'=>'Reopen for changes',
             'checkout'=>'Pay together',
             'cancel'=>'Cancel group',
@@ -750,9 +756,15 @@ function gt(string $key,array $vars=[]): string {
  * Popup có 2 nút: "Mua thêm" (về trang chọn món) và "Chốt món" (gửi form như bình thường).
  */
 function hyg_lock_game_attrs(int $cups, string $roomPublicId): string {
-    $goal = 10;
+    // Còn thiếu bao nhiêu ly để tới chục kế tiếp (16 ly -> 4, 9 ly -> 1).
+    $more = 10 - ($cups % 10);
+    $chances = intdiv($cups, 10);
+    // Đã có sẵn >= 1 lượt thì câu nói rõ là "thêm 1 lượt nữa" thay vì "nhận 1 lượt".
+    $confirm = $chances >= 1
+        ? gt('lock_game_confirm_next', ['n' => $cups, 'more' => $more, 'chances' => $chances, 'total' => $chances + 1])
+        : gt('lock_game_confirm', ['n' => $cups, 'more' => $more]);
     $attrs = [
-        'data-confirm' => gt('lock_game_confirm', ['n' => $cups, 'more' => $goal - $cups]),
+        'data-confirm' => $confirm,
         'data-confirm-title' => gt('lock_game_title'),
         'data-confirm-ok' => gt('lock'),
         'data-confirm-cancel' => gt('lock_game_more'),
