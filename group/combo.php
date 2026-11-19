@@ -360,7 +360,11 @@ $hgcCupSvg = static fn(int $size): string => '<svg class="hgc-cup-svg" viewBox="
             $totalPicked = array_sum(array_map(fn($c) => (int)$c['picked'], $combos));
             $isHost = hyg_host($r);
             // Tổng ly nước của cả phòng (ly combo + ly mua lẻ) để xét ưu đãi mini-game 10 ly.
-            $roomCups = promotion_game_qty($cart) + array_sum(array_map(fn($c) => max(0, (int)$c['total_cups'] - (int)$c['picked']), $combos));    ?>
+            $roomCups = promotion_game_qty($cart) + array_sum(array_map(fn($c) => max(0, (int)$c['total_cups'] - (int)$c['picked']), $combos));
+            // Nhắc mua thêm khi số ly lẻ (sau khi trừ các chục đầy) là 6-9: 6-9, 16-19, 26-29...
+            $cupsToNextChance = 10 - ($roomCups % 10);
+            $nearGameChance = minigame_enabled() && ($roomCups % 10) >= 6;
+            ?>
             <div class="hgc-bar" data-bar="<?= $todo ? 'todo' : 'done' ?>">
                 <?php if ($todo): ?>
                     <?php
@@ -387,8 +391,10 @@ $hgcCupSvg = static fn(int $size): string => '<svg class="hgc-cup-svg" viewBox="
                         </a>
                     </div>
                 <?php else: ?>
-                    <?php if ($isHost && minigame_enabled() && $roomCups >= 5 && $roomCups <= 9): ?>
-                        <div class="hgc-bar-upsell"><?= e(gt('lock_upsell', ['more' => 10 - $roomCups])) ?></div>
+                    <?php if ($isHost && $nearGameChance): ?>
+                        <div class="hgc-bar-upsell"><?= e($roomCups >= 10
+                            ? gt('lock_upsell_next', ['more' => $cupsToNextChance, 'total' => intdiv($roomCups, 10) + 1])
+                            : gt('lock_upsell', ['more' => $cupsToNextChance])) ?></div>
                     <?php endif; ?>
                     <div class="hgc-bar-row">
                         <div class="hgc-bar-info">
@@ -406,7 +412,7 @@ $hgcCupSvg = static fn(int $size): string => '<svg class="hgc-cup-svg" viewBox="
                                 <input type="hidden" name="lock_after" value="1">
                                 <input type="hidden" name="back" value="combo">
                                 <?php if (minigame_enabled() && promotion_game_qty($cart) >= 10): ?><input type="hidden" name="promotion_mode" value="draw"><?php endif; ?>
-                                <button class="hgc-bar-cta" type="submit" <?= (minigame_enabled() && $roomCups >= 5 && $roomCups <= 9) ? hyg_lock_game_attrs((int)$roomCups, (string)$r['public_id']) : '' ?>>
+                                <button class="hgc-bar-cta" type="submit" <?= $nearGameChance ? hyg_lock_game_attrs((int)$roomCups, (string)$r['public_id']) : '' ?>>
                                     <span><?= e(hgc_t('bar_cta_host')) ?></span>
                                     <i aria-hidden="true">›</i>
                                 </button>
