@@ -54,6 +54,11 @@ function base_url(string $path = ''): string
     $base = defined('APP_BASE_URL') ? rtrim(APP_BASE_URL, '/') : '';
     return $base . '/' . ltrim($path, '/');
 }
+/** URL ảnh thu nhỏ vuông (thumb.php, cache trong uploads/thumbs); $size: 120 hoặc 300. */
+function thumb_url(string $file, int $size = 300): string
+{
+    return base_url('thumb.php?f=' . rawurlencode(basename($file)) . '&s=' . $size);
+}
 /** Cloudflare edge ranges (https://www.cloudflare.com/ips/); update when Cloudflare publishes new ones. */
 function cloudflare_ip_ranges(): array
 {

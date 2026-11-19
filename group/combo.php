@@ -87,7 +87,7 @@ $hgcCupSvg = static fn(int $size): string => '<svg class="hgc-cup-svg" viewBox="
                         <?php $tabPercent = $tabCombo['total_cups'] > 0 ? min(100, (int)round($tabCombo['picked'] / $tabCombo['total_cups'] * 100)) : 0; ?>
                         <div role="tab" tabindex="0" class="hgc-tab<?= $tabCombo['complete'] ? ' is-complete' : '' ?><?= hyg_host($r) ? ' has-remove' : '' ?>" data-tab-combo="<?= (int)$tabCombo['item_id'] ?>" aria-selected="<?= $ci === 0 ? 'true' : 'false' ?>">
                             <?php if ($tabCombo['image'] !== ''): ?>
-                                <img class="hgc-tab-img" src="<?= e(base_url('uploads/' . $tabCombo['image'])) ?>" alt="" loading="lazy">
+                                <img class="hgc-tab-img" src="<?= e(thumb_url((string)$tabCombo['image'], 120)) ?>" alt="" loading="lazy">
                             <?php endif; ?>
                             <span class="hgc-tab-body">
                                 <span class="hgc-tab-name"><?= e($tabCombo['name']) ?></span>
@@ -257,7 +257,7 @@ $hgcCupSvg = static fn(int $size): string => '<svg class="hgc-cup-svg" viewBox="
                                 <details class="hgc-drink" data-drink="<?= (int)$productId ?>" <?= $canAdd < 1 ? 'data-disabled' : '' ?>>
                                     <summary>
                                         <?php if (!empty($product['image'])): ?>
-                                            <img src="<?= e(base_url('uploads/' . $product['image'])) ?>" alt="" loading="lazy">
+                                            <img src="<?= e(thumb_url((string)$product['image'], 300)) ?>" alt="" width="52" height="52" loading="lazy" decoding="async">
                                         <?php else: ?>
                                             <span class="hgc-drink-placeholder" aria-hidden="true">DRINK</span>
                                         <?php endif; ?>
@@ -278,7 +278,7 @@ $hgcCupSvg = static fn(int $size): string => '<svg class="hgc-cup-svg" viewBox="
                                             <!-- Đầu popup chọn món: tên món + nút đóng (group-combo-live.js) -->
                                             <div class="hgc-modal-head">
                                                 <?php if (!empty($product['image'])): ?>
-                                                    <img class="hgc-modal-cup" src="<?= e(base_url('uploads/' . $product['image'])) ?>" alt="">
+                                                    <img class="hgc-modal-cup" src="<?= e(thumb_url((string)$product['image'], 120)) ?>" alt="" width="36" height="36" loading="lazy" decoding="async">
                                                 <?php else: ?>
                                                     <span class="hgc-modal-cup hgc-modal-cup-emoji" aria-hidden="true">🥤</span>
                                                 <?php endif; ?>
