@@ -1,5 +1,6 @@
 <?php
 
+
 /**
  * Nhóm combo: mọi thành viên chọn nước cho các combo chủ nhóm đã thêm vào giỏ nhóm.
  * Mỗi combo chia theo nhóm món (admin/combos.php); số ly mỗi nhóm và cả combo bị giới hạn theo cấu hình.
@@ -58,12 +59,31 @@ $hgcCupSvg = static fn(int $size): string => '<svg class="hgc-cup-svg" viewBox="
     . '</svg>';
 ?>
 <link rel="stylesheet" href="<?= e(base_url('assets/css/group-combo.css?v=108')) ?>">
+<?php
+// Icon ly trà sữa nhiều màu (ống hút, nắp, đá, trân châu): dùng chung cho tiêu đề "Chọn ly" và footer.
+$hgcCupSvg = static fn(int $size): string => '<svg class="hgc-cup-svg" viewBox="0 0 32 32" width="' . $size . '" height="' . $size . '" aria-hidden="true">'
+    . '<path d="M19.5 9V3.2c0-.7.5-1.2 1.2-1.2H25" fill="none" stroke="#ffb800" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>'
+    . '<path d="M8.6 12.5 10.3 28a2.2 2.2 0 0 0 2.2 2h7a2.2 2.2 0 0 0 2.2-2l1.7-15.5Z" fill="#fff" stroke="#b3201f" stroke-width="1.6" stroke-linejoin="round"/>'
+    . '<path d="M9.4 17.5h13.2L21.5 27.6a1.6 1.6 0 0 1-1.6 1.4h-7.8a1.6 1.6 0 0 1-1.6-1.4Z" fill="#d92b2b"/>'
+    . '<rect x="12" y="19.2" width="4.2" height="4.2" rx="1" transform="rotate(-12 14 21.3)" fill="#fff" opacity=".6"/>'
+    . '<rect x="17.2" y="21.4" width="3.6" height="3.6" rx="1" transform="rotate(14 19 23.2)" fill="#fff" opacity=".45"/>'
+    . '<circle cx="13" cy="27" r="1.3" fill="#5a0f0f"/><circle cx="16" cy="27.4" r="1.3" fill="#5a0f0f"/><circle cx="19" cy="27" r="1.3" fill="#5a0f0f"/>'
+    . '<path d="M10.3 14.2l.9 8" stroke="#fff" stroke-width="1.2" stroke-linecap="round" opacity=".7"/>'
+    . '<rect x="6.6" y="9" width="18.8" height="3.8" rx="1.9" fill="#b3201f"/>'
+    . '<rect x="8.4" y="9.8" width="6" height="1" rx=".5" fill="#fff" opacity=".35"/>'
+    . '</svg>';
+?>
+<link rel="stylesheet" href="<?= e(base_url('assets/css/group-combo.css?v=108')) ?>">
 <div class="hyg-page hgc-page">
+    <?php if (!$combos): ?>
+        <a class="back" href="<?= e(hyg_room_url($r['public_id'])) ?>">← <?= e(hgc_t('back_room')) ?></a>
+    <?php endif; ?>
     <?php if (!$combos): ?>
         <a class="back" href="<?= e(hyg_room_url($r['public_id'])) ?>">← <?= e(hgc_t('back_room')) ?></a>
     <?php endif; ?>
     <?php if ($msg !== ''): ?><div class="alert info" role="status"><?= e($msg) ?></div><?php endif; ?>
 
+    <h1 class="hgc-title hgc-sr"><?= e(hgc_t('page_title')) ?></h1>
     <h1 class="hgc-title hgc-sr"><?= e(hgc_t('page_title')) ?></h1>
 
     <!-- Vùng tự cập nhật mỗi 3 giây (assets/js/group-combo-live.js): tiến độ, ly đã chọn, nhóm đã đủ -->
@@ -130,6 +150,10 @@ $hgcCupSvg = static fn(int $size): string => '<svg class="hgc-cup-svg" viewBox="
                     <!-- Admin đã tắt / xoá combo khi nhóm đang chọn -->
                     <p class="alert danger" role="alert"><?= e(hgc_t('combo_unavailable')) ?></p>
                 <?php endif; ?>
+                <?php if ($combo['invalid']): ?>
+                    <!-- Admin đã tắt / xoá combo khi nhóm đang chọn -->
+                    <p class="alert danger" role="alert"><?= e(hgc_t('combo_unavailable')) ?></p>
+                <?php endif; ?>
 
                 <?php if ($combo['stale']): ?>
                     <!-- Admin vừa xoá nhóm / món khỏi combo: các ly này không còn hợp lệ, khách bỏ đi và chọn lại -->
@@ -157,7 +181,77 @@ $hgcCupSvg = static fn(int $size): string => '<svg class="hgc-cup-svg" viewBox="
                         </ul>
                     </div>
                 <?php endif; ?>
+                <?php if ($combo['stale']): ?>
+                    <!-- Admin vừa xoá nhóm / món khỏi combo: các ly này không còn hợp lệ, khách bỏ đi và chọn lại -->
+                    <div class="alert danger hgc-stale" role="alert">
+                        <p><?= e(hgc_t('combo_changed_notice')) ?></p>
+                        <ul class="hgc-picked">
+                            <?php foreach ($combo['stale'] as $drink): ?>
+                                <li>
+                                    <span class="hgc-picked-text">
+                                        <strong><?= e($drink['name'] ?? '') ?> × <?= (int)($drink['qty'] ?? 0) ?></strong>
+                                        <small><?= e($drink['group_member_name'] ?? '') ?></small>
+                                    </span>
+                                    <?php if (hyg_host($r) || (int)($drink['group_member_id'] ?? 0) === (int)$m['id']): ?>
+                                        <form method="post" action="<?= e(base_url('group/action.php')) ?>" class="hgc-drink-remove">
+                                            <?= hyg_action_fields($r, 'remove') ?>
+                                            <input type="hidden" name="item_id" value="<?= (int)$drink['_item_id'] ?>">
+                                            <input type="hidden" name="item_version" value="<?= (int)$drink['_item_version'] ?>">
+                                            <input type="hidden" name="back" value="combo">
+                                            <input type="hidden" name="removed" value="drink">
+                                            <button type="submit" class="hgc-drink-remove-btn" aria-label="<?= e(hgc_t('remove_drink')) ?>" title="<?= e(hgc_t('remove_drink')) ?>">✕</button>
+                                        </form>
+                                    <?php endif; ?>
+                                </li>
+                            <?php endforeach; ?>
+                        </ul>
+                    </div>
+                <?php endif; ?>
 
+                <?php if (count($combo['groups']) > 0): ?>
+                    <!-- Tab nhóm món của combo này: mỗi tab là một nhóm (tên + số ly đã chọn / tối đa) -->
+                    <h2 class="hgc-step-title"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <!-- Icon ly trà sữa: nắp, ống hút, thân ly, vạch trân châu -->
+                            <path d="M6 9h12l-1.3 11.1a1.6 1.6 0 0 1-1.6 1.4H8.9a1.6 1.6 0 0 1-1.6-1.4L6 9Z" />
+                            <path d="M5 9h14" />
+                            <path d="M13.5 9V4.5a1 1 0 0 1 1-1H18" />
+                            <path d="M7.2 14.5h9.6" />
+                            <circle cx="10" cy="18" r=".6" fill="currentColor" />
+                            <circle cx="12" cy="18.4" r=".6" fill="currentColor" />
+                            <circle cx="14" cy="18" r=".6" fill="currentColor" />
+                        </svg><span><?= e(hgc_t('step_group')) ?></span></h2>
+                    <div class="hgc-group-tabs-wrap">
+                        <!-- Hai nút ‹ › nhỏ ở hai bên: cuộn hàng tab nhóm qua trái / phải (chỉ hiện khi có nhiều nhóm hơn bề ngang màn hình) -->
+                        <button type="button" class="hgc-tabs-arrow" data-tabs-arrows data-tabs-prev aria-label="Previous" hidden>‹</button>
+                        <nav class="hgc-tabs hgc-group-tabs" role="tablist">
+                            <?php foreach ($combo['groups'] as $gi => $tabGroup): ?>
+                                <?php
+                                $gPicked = (int)$tabGroup['picked'];
+                                $gMax = (int)$tabGroup['max'];
+                                $gPercent = $gMax > 0 ? min(100, (int)round($gPicked / $gMax * 100)) : 0;
+                                $gState = $gPicked >= $gMax ? ' is-complete' : ($gPicked > 0 ? ' is-partial' : '');
+                                ?>
+                                <button type="button" role="tab" class="hgc-tab<?= $gState ?>" data-tab-group="<?= (int)$tabGroup['id'] ?>" aria-selected="<?= $gi === 0 ? 'true' : 'false' ?>">
+                                    <span class="hgc-tab-name"><?= e($tabGroup['name']) ?></span>
+                                    <span class="hgc-tab-count"><?= $gPicked ?>/<?= $gMax ?></span>
+                                    <span class="hgc-pc-bar"><i style="width: <?= $gPercent ?>%"></i></span>
+                                </button>
+                            <?php endforeach; ?>
+                        </nav>
+                        <button type="button" class="hgc-tabs-arrow" data-tabs-arrows data-tabs-next aria-label="Next" hidden>›</button>
+                    </div>
+                <?php endif; ?>
+
+                <?php foreach ($combo['groups'] as $gi => $group): ?>
+                    <?php
+                    $groupLeft = max(0, $group['max'] - $group['picked']);
+                    $canAdd = min($groupLeft, $comboLeft);
+                    ?>
+                    <div class="hgc-group<?= $canAdd < 1 ? ' is-full' : '' ?>" data-group="<?= (int)$group['id'] ?>" <?= $gi > 0 ? ' hidden' : '' ?>>
+                        <!-- <div class="hgc-group-head">
+                        <strong class="hgc-step-title"><?= $hgcCupSvg(28) ?><span><?= e(hgc_t('step_cups')) ?></span><b class="hgc-count<?= $group['picked'] >= $group['max'] ? ' is-full' : '' ?>"><?= (int)$group['picked'] ?>/<?= (int)$group['max'] ?></b></strong>
+                        <span class="hgc-rule hgc-rule-chip<?= $group['picked'] >= $group['max'] ? ' is-full' : '' ?>"><?= e(hgc_t('cups_picked_chip', ['picked' => (int)$group['picked'], 'max' => (int)$group['max']])) ?></span>
+                    </div> -->
                 <?php if (count($combo['groups']) > 0): ?>
                     <!-- Tab nhóm món của combo này: mỗi tab là một nhóm (tên + số ly đã chọn / tối đa) -->
                     <h2 class="hgc-step-title"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -240,7 +334,47 @@ $hgcCupSvg = static fn(int $size): string => '<svg class="hgc-cup-svg" viewBox="
                                 <?php endforeach; ?>
                             </ul>
                         <?php endif; ?>
+                        <?php
+                        // Ly đã chọn của nhóm món này: hiện ngay dưới tên nhóm (không gom xuống cuối combo).
+                        $groupDrinks = array_filter($combo['drinks'], fn($drink) => (int)($drink['_selection']['combo_group'] ?? 0) === (int)$group['id']);
+                        ?>
+                        <?php if ($groupDrinks): ?>
+                            <!-- Mỗi ly là một thẻ cao cố định (ly × N cao N ô) -->
+                            <ul class="hgc-picked">
+                                <?php foreach ($groupDrinks as $drink): ?>
+                                    <?php
+                                    $canRemoveDrink = hyg_host($r) || (int)($drink['group_member_id'] ?? 0) === (int)$m['id'];
+                                    $qty = max(1, (int)($drink['qty'] ?? 1));
+                                    $topNames = array_map(fn($top) => (string)($top['display_name'] ?? $top['name'] ?? ''), $drink['toppings'] ?? []);
+                                    $detail = implode(' · ', array_filter(array_merge(
+                                        [$drink['group_member_name'] ?? '', $drink['cup_size'] ?? '', $drink['ice'] ?? '', $drink['sugar'] ?? ''],
+                                        $topNames
+                                    )));
+                                    ?>
+                                    <li style="--slots: <?= $qty ?>" title="<?= e(($drink['name'] ?? '') . ' × ' . $qty . ' — ' . $detail) ?>">
+                                        <span class="hgc-picked-text">
+                                            <strong><?= e($drink['name'] ?? '') ?> × <?= $qty ?></strong>
+                                            <small><?= e($detail) ?></small>
+                                        </span>
+                                        <?php if ($canRemoveDrink): ?>
+                                            <!-- Mỗi người xoá được ly của mình (chủ nhóm xoá được mọi ly) để chọn lại, kể cả khi nhóm đã đủ ly -->
+                                            <form method="post" action="<?= e(base_url('group/action.php')) ?>" class="hgc-drink-remove">
+                                                <?= hyg_action_fields($r, 'remove') ?>
+                                                <input type="hidden" name="item_id" value="<?= (int)$drink['_item_id'] ?>">
+                                                <input type="hidden" name="item_version" value="<?= (int)$drink['_item_version'] ?>">
+                                                <input type="hidden" name="back" value="combo">
+                                                <input type="hidden" name="removed" value="drink">
+                                                <button type="submit" class="hgc-drink-remove-btn" aria-label="<?= e(hgc_t('remove_drink')) ?>" title="<?= e(hgc_t('remove_drink')) ?>">✕</button>
+                                            </form>
+                                        <?php endif; ?>
+                                    </li>
+                                <?php endforeach; ?>
+                            </ul>
+                        <?php endif; ?>
 
+                        <?php if (!$group['items']): ?>
+                            <p class="hyg-muted"><?= e(hgc_t('no_drinks')) ?></p>
+                        <?php endif; ?>
                         <?php if (!$group['items']): ?>
                             <p class="hyg-muted"><?= e(hgc_t('no_drinks')) ?></p>
                         <?php endif; ?>
@@ -294,7 +428,21 @@ $hgcCupSvg = static fn(int $size): string => '<svg class="hgc-cup-svg" viewBox="
                                                     <?php endforeach; ?>
                                                 </fieldset>
                                             <?php endif; ?>
+                                            <?php if ($item['sizes'] !== ['']): ?>
+                                                <fieldset class="hgc-options">
+                                                    <legend><?= e(hgc_t('size')) ?></legend>
+                                                    <?php foreach ($item['sizes'] as $index => $size): ?>
+                                                        <label class="choice"><input type="radio" name="cup_size" value="<?= e($size) ?>" <?= $index === 0 ? 'checked' : '' ?>><span><?= e($size) ?></span></label>
+                                                    <?php endforeach; ?>
+                                                </fieldset>
+                                            <?php endif; ?>
 
+                                            <fieldset class="hgc-options">
+                                                <legend><?= e(t('ice')) ?></legend>
+                                                <?php foreach ($ices as $index => $label): ?>
+                                                    <label class="choice"><input type="radio" name="ice_index" value="<?= (int)$index ?>" <?= $index === 0 ? 'checked' : '' ?>><span><?= e($label) ?></span></label>
+                                                <?php endforeach; ?>
+                                            </fieldset>
                                             <fieldset class="hgc-options">
                                                 <legend><?= e(t('ice')) ?></legend>
                                                 <?php foreach ($ices as $index => $label): ?>
@@ -308,7 +456,38 @@ $hgcCupSvg = static fn(int $size): string => '<svg class="hgc-cup-svg" viewBox="
                                                     <label class="choice"><input type="radio" name="sugar_index" value="<?= (int)$index ?>" <?= $index === 0 ? 'checked' : '' ?>><span><?= e($label) ?></span></label>
                                                 <?php endforeach; ?>
                                             </fieldset>
+                                            <fieldset class="hgc-options">
+                                                <legend><?= e(t('sugar')) ?></legend>
+                                                <?php foreach ($sugars as $index => $label): ?>
+                                                    <label class="choice"><input type="radio" name="sugar_index" value="<?= (int)$index ?>" <?= $index === 0 ? 'checked' : '' ?>><span><?= e($label) ?></span></label>
+                                                <?php endforeach; ?>
+                                            </fieldset>
 
+                                            <?php if ($allToppings): ?>
+                                                <?php
+                                                $recommended = $recommendedByProduct[(int)$productId] ?? [];
+                                                $orderedToppings = array_merge(
+                                                    array_filter($allToppings, fn($top) => isset($recommended[(int)$top['id']])),
+                                                    array_filter($allToppings, fn($top) => !isset($recommended[(int)$top['id']]))
+                                                );
+                                                ?>
+                                                <!-- Danh sách chọn nhiều topping: dùng lại dropdown multi-check của trang món (assets/js/app.js) -->
+                                                <div class="hgc-options hgc-toppings">
+                                                    <strong class="hgc-toppings-label"><?= e(t('toppings')) ?> <small><?= e(hgc_t('topping_note')) ?></small></strong>
+                                                    <details class="multi-check" data-multi-check>
+                                                        <summary data-placeholder="<?= e(hgc_t('topping_placeholder')) ?>"><?= e(hgc_t('topping_placeholder')) ?></summary>
+                                                        <div class="multi-check-list">
+                                                            <?php foreach ($orderedToppings as $top): ?>
+                                                                <label class="multi-check-item">
+                                                                    <input type="checkbox" name="toppings[]" value="<?= (int)$top['id'] ?>" data-label="<?= e(localized_name($top)) ?>">
+                                                                    <span><?= e(localized_name($top)) ?></span>
+                                                                    <b>+<?= e(currency()) ?><?= money($top['price']) ?></b>
+                                                                </label>
+                                                            <?php endforeach; ?>
+                                                        </div>
+                                                    </details>
+                                                </div>
+                                            <?php endif; ?>
                                             <?php if ($allToppings): ?>
                                                 <?php
                                                 $recommended = $recommendedByProduct[(int)$productId] ?? [];
@@ -348,7 +527,22 @@ $hgcCupSvg = static fn(int $size): string => '<svg class="hgc-cup-svg" viewBox="
                         </div>
                     </div>
                 <?php endforeach; ?>
+                                            <div class="hgc-submit">
+                                                <label><?= e(t('quantity')) ?>
+                                                    <input type="number" name="qty" min="1" max="<?= (int)$canAdd ?>" value="1" inputmode="numeric" data-msg-max="<?= e(hgc_t('qty_max', ['max' => (int)$canAdd])) ?>" data-msg-min="<?= e(hgc_t('qty_min')) ?>" oninvalid="this.setCustomValidity(this.validity.rangeOverflow ? this.dataset.msgMax : this.dataset.msgMin)" oninput="this.setCustomValidity('')">
+                                                </label>
+                                                <button class="btn primary" type="submit"><?= e(hgc_t('add_to_combo')) ?></button>
+                                            </div>
+                                        </form>
+                                    <?php endif; ?>
+                                </details>
+                            <?php endforeach; ?>
+                        </div>
+                    </div>
+                <?php endforeach; ?>
 
+            </section>
+        <?php endforeach; ?>
             </section>
         <?php endforeach; ?>
 
@@ -429,5 +623,6 @@ $hgcCupSvg = static fn(int $size): string => '<svg class="hgc-cup-svg" viewBox="
         <?php } ?>
     </div>
 </div>
+<script src="<?= e(base_url('assets/js/group-combo-live.js?v=31')) ?>" defer></script>
 <script src="<?= e(base_url('assets/js/group-combo-live.js?v=31')) ?>" defer></script>
 <?php front_footer(); ?>
