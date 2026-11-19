@@ -208,16 +208,63 @@ $sharePost = str_replace('{url}', $shareUrl, $share['post']);
         };
         box.querySelector('[data-fb-share-copy]').addEventListener('click', copy);
         // Coming back to this page after a real stay on Facebook is the only signal a browser gives.
+        // iPhone opens the Facebook app, which can leave Safari frozen without firing focus/visibilitychange on return,
+        // so on phones a touch, a restored page or a timer also counts as coming back.
         const waitForReturn = function(done) {
             const openedAt = Date.now();
+            // Set once the page was seen leaving (hidden or blurred); without it a phone only trusts a longer stay.
+            let left = false;
+            let finished = false;
+            let timer = 0;
+            const returnEvents = [
+                [document, 'visibilitychange'],
+                [window, 'focus'],
+                [window, 'pageshow']
+            ];
+            const touchEvents = [
+                [document, 'touchstart'],
+                [document, 'pointerdown']
+            ];
+            const markLeft = function() {
+                if (document.hidden || document.visibilityState === 'hidden') left = true;
+            };
+            const onBlur = function() {
+                left = true;
+            };
+            const stop = function() {
+                finished = true;
+                window.clearInterval(timer);
+                returnEvents.concat(touchEvents).forEach(function(pair) {
+                    pair[0].removeEventListener(pair[1], onReturn, true);
+                });
+                document.removeEventListener('visibilitychange', markLeft);
+                window.removeEventListener('blur', onBlur);
+                window.removeEventListener('pagehide', onBlur);
+            };
             const onReturn = function() {
-                if (document.hidden || Date.now() - openedAt < shareMinMs) return;
-                document.removeEventListener('visibilitychange', onReturn);
-                window.removeEventListener('focus', onReturn);
+                if (finished || document.hidden || Date.now() - openedAt < shareMinMs) return;
+                stop();
                 done(true);
             };
-            document.addEventListener('visibilitychange', onReturn);
-            window.addEventListener('focus', onReturn);
+            // Timer fallback for phones: only when the page was seen leaving, or after a long enough stay with no signal at all.
+            const onTick = function() {
+                if (finished || document.hidden) return;
+                const elapsed = Date.now() - openedAt;
+                if (elapsed < shareMinMs) return;
+                if (left || elapsed >= 12000) onReturn();
+            };
+            document.addEventListener('visibilitychange', markLeft);
+            window.addEventListener('blur', onBlur);
+            window.addEventListener('pagehide', onBlur);
+            returnEvents.forEach(function(pair) {
+                pair[0].addEventListener(pair[1], onReturn, true);
+            });
+            if (mobile) {
+                touchEvents.forEach(function(pair) {
+                    pair[0].addEventListener(pair[1], onReturn, true);
+                });
+                timer = window.setInterval(onTick, 500);
+            }
         };
         // Facebook's own page shows its login form when needed; a new tab (phone) or pop-up (computer) keeps this checkout page and its cart.
         // Must run inside a click so the browser allows the pop-up. done(true) once the customer comes back after shareMinMs.
