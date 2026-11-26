@@ -353,11 +353,8 @@ function dash_funnel_chart(array $steps, int $warnPercent): string
                             $title = $step['label'] . ': ' . number_format($step['bar'], 0, ',', '.') . ' ' . $unit . ', ' . number_format($step['events'], 0, ',', '.') . ' đơn đi qua bước, ' . number_format($step['devices'], 0, ',', '.') . ' thiết bị';
                             ?>
                             <div class="fc-col" style="left:<?= round($i * 100 / $count, 3) ?>%;width:<?= round(100 / $count, 3) ?>%" title="<?= e($title) ?>">
-                                <?php if ((int)$step['bar'] === 0): ?>
-                                    <span class="fc-zero">0</span>
-                                <?php else: ?>
-                                    <div class="fc-bar" style="height:<?= round($barPct, 2) ?>%"><?php if ($inside): ?><b><?= number_format($step['bar'], 0, ',', '.') ?></b><?php endif; ?></div>
-                                    <?php if (!$inside): ?><span class="fc-over" style="bottom:calc(<?= round($barPct, 2) ?>% + 4px)"><?= number_format($step['bar'], 0, ',', '.') ?></span><?php endif; ?>
+                                <?php if ((int)$step['bar'] > 0): ?>
+                                    <div class="fc-bar" style="height:<?= round($barPct, 2) ?>%"></div>
                                 <?php endif; ?>
                             </div>
                         <?php endforeach; ?>
@@ -381,7 +378,7 @@ function dash_funnel_chart(array $steps, int $warnPercent): string
                         <?php $exit = $step['exit_rate'] ?? null; ?>
                         <div class="fc-step" style="width:<?= round(100 / $count, 3) ?>%">
                             <strong><?= e($step['label']) ?></strong>
-                            <span class="fc-raw"><?= number_format((int)$step['events'], 0, ',', '.') ?> đơn đi qua</span>
+                            <span class="fc-raw"><?= number_format((int)$step['bar'], 0, ',', '.') ?> lần thao tác</span>
                             <small>Tỷ lệ thoát (theo đơn)</small>
                             <?php if ($exit === null): ?>
                                 <em>—</em>
@@ -1628,7 +1625,7 @@ admin_header('Thống kê truy cập');
                     <input type="hidden" name="do" value="add_funnel">
                     <button type="submit" class="btn primary">+ Thêm phễu</button>
                 </form>
-                <small class="field-hint">Mỗi lượt là một hành trình đi đúng thứ tự các bước (bấm lặp lại cùng một bước hoặc nhảy cóc không tính thêm), nên số lượt luôn giảm dần qua các bước; tỷ lệ thoát tính theo số lượt này. Đường là số thiết bị khác nhau đã đi tới bước. Thao tác mới thêm ở phần cấu hình bên dưới cần lưu trước thì mới chọn được ở đây.</small>
+                <small class="field-hint">Mỗi lượt là một hành trình đi đúng thứ tự các bước (bấm lặp lại cùng một bước không tính thêm; nếu khách nhảy cóc tới bước sau thì các bước ở giữa vẫn tính là đã đi qua), nên số lượt luôn giảm dần qua các bước; tỷ lệ thoát tính theo số lượt này. Đường là số thiết bị khác nhau đã đi tới bước. Thao tác mới thêm ở phần cấu hình bên dưới cần lưu trước thì mới chọn được ở đây.</small>
             </div>
         </section>
         <table style="display:none">
