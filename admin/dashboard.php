@@ -40,6 +40,39 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && ($_POST['do'] ?? '') === 's
     }
 }
 
+// Nhập cấu hình từ file JSON: ghi đè toàn bộ cấu hình đang lưu trong DB.
+if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && ($_POST['do'] ?? '') === 'import_config') {
+    verify_csrf();
+    $upload = $_FILES['config_file'] ?? null;
+    $raw = '';
+    $problem = '';
+    if (!is_array($upload) || ($upload['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK || !is_uploaded_file((string)$upload['tmp_name'])) {
+        $problem = 'Chưa chọn file JSON hoặc tải file lên thất bại.';
+    } elseif ((int)$upload['size'] > 1048576) {
+        $problem = 'File JSON quá lớn (tối đa 1MB).';
+    } else {
+        $raw = (string)file_get_contents((string)$upload['tmp_name']);
+        $raw = preg_replace('/^ï»¿/', '', $raw);
+        $imported = json_decode($raw, true);
+        if (!is_array($imported)) {
+            $problem = 'File không phải JSON hợp lệ.';
+        } else {
+            $problem = htk_validate_config($raw);
+        }
+    }
+    if ($problem === '') {
+        $default = htk_default_config();
+        $clean = array_merge($default, array_intersect_key($imported, $default));
+        $clean['enabled'] = !empty($clean['enabled']);
+        $clean['rules'] = htk_clean_rules($clean['rules']);
+        $clean['funnels'] = htk_clean_funnels(is_array($clean['funnels']) ? $clean['funnels'] : [], array_column($clean['rules'], 'code'));
+        set_setting('tracking_config', json_encode($clean, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+        $message = 'Đã nhập cấu hình từ file JSON và ghi đè cấu hình cũ (' . count($clean['rules']) . ' thao tác).';
+    } else {
+        $error = 'Nhập cấu hình thất bại: ' . $problem;
+    }
+}
+
 $funnelActions = ['save_funnel', 'add_funnel', 'delete_funnel'];
 if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && in_array($_POST['do'] ?? '', $funnelActions, true)) {
     verify_csrf();
@@ -145,6 +178,37 @@ if (($_GET['export'] ?? '') === 'detail' && $dataError === '') {
         $exportRows,
         [2],
         ['Chi tiết theo trang / chức năng', 'Từ ngày ' . $from . ' đến ngày ' . $to . ' (giờ Việt Nam)', 'Xuất lúc ' . gmdate('Y-m-d H:i', time() + HTK_VN_OFFSET) . ' · {count} dòng']
+    );
+}
+
+// Xuất Excel danh sách thao tác ghi log đang lưu trong cấu hình.
+if (($_GET['export'] ?? '') === 'config' && ($_GET['format'] ?? '') === 'json') {
+    header('Content-Type: application/json; charset=utf-8');
+    header('Content-Disposition: attachment; filename="cau-hinh-ghi-log-' . gmdate('Ymd-His', time() + HTK_VN_OFFSET) . '.json"');
+    echo json_encode($config, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT);
+    exit;
+}
+if (($_GET['export'] ?? '') === 'config') {
+    require_once __DIR__ . '/../lib/xlsx_export.php';
+    $kindNames = ['view' => 'Truy cập trang', 'click' => 'Nhấn phần tử', 'minigame' => 'Sự kiện nghiệp vụ (chơi mini-game)', 'order' => 'Sự kiện nghiệp vụ (đặt hàng thành công)'];
+    $exportRows = [];
+    foreach ($config['rules'] as $rule) {
+        $own = $rule['dedupe_seconds'];
+        $exportRows[] = [
+            $rule['label'],
+            $rule['url'],
+            $kindNames[$rule['kind']] ?? $rule['kind'],
+            str_replace("\n", ' | ', $rule['selector']),
+            $own === null ? 'Mặc định (' . $config['dedupe_seconds'] . ' giây)' : ($own === 0 ? 'Không chống trùng' : $own . ' giây'),
+            $rule['enabled'] ? 'Đang bật' : 'Đã tắt',
+        ];
+    }
+    hxl_send(
+        'cau-hinh-ghi-log-' . gmdate('Ymd-His', time() + HTK_VN_OFFSET) . '.xlsx',
+        ['Hành vi', 'URL', 'Loại sự kiện', 'Phần tử', 'Chống trùng', 'Trạng thái'],
+        $exportRows,
+        [],
+        ['Cấu hình ghi log', 'Xuất lúc ' . gmdate('Y-m-d H:i', time() + HTK_VN_OFFSET) . ' (giờ Việt Nam) · {count} thao tác', 'Ghi log ' . ($config['enabled'] ? 'đang bật' : 'đang tắt') . ' · giữ log thô ' . $config['retention_days'] . ' ngày · chống trùng chung ' . $config['dedupe_seconds'] . ' giây']
     );
 }
 
@@ -491,6 +555,370 @@ admin_header('Thống kê truy cập');
         background: #fff;
         border-top: 1px solid #e6e6e6;
         box-shadow: 0 -6px 14px rgba(0, 0, 0, .08)
+    }
+
+    .tc-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 12px
+    }
+
+    .tc-head h2 {
+        margin: 0;
+        font-size: 1.35rem
+    }
+
+    .tc-head p {
+        margin: 4px 0 0;
+        color: #666;
+        font-size: .9rem
+    }
+
+    .tc-status {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        white-space: nowrap;
+        font-size: .9rem
+    }
+
+    .tc-status i {
+        width: 9px;
+        height: 9px;
+        border-radius: 50%;
+        background: #2e8b57
+    }
+
+    .tc-status.off i {
+        background: #b3261e
+    }
+
+    .tc-tabs {
+        display: flex;
+        gap: 22px;
+        margin: 14px 0 0;
+        border-bottom: 1px solid #e3e3e3
+    }
+
+    .tc-tab {
+        border: 0;
+        background: none;
+        padding: 8px 0 11px;
+        font: inherit;
+        font-size: 1.05rem;
+        color: #666;
+        cursor: pointer;
+        border-bottom: 2px solid transparent;
+        margin-bottom: -1px
+    }
+
+    .tc-tab.active {
+        color: var(--shell-accent, #bc1e2c);
+        font-weight: 600;
+        border-bottom-color: var(--shell-accent, #bc1e2c)
+    }
+
+    .tc-stats {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 12px;
+        padding: 18px 0;
+        border-bottom: 1px solid #ececec
+    }
+
+    .tc-stats span {
+        display: block;
+        color: #555;
+        font-size: .9rem
+    }
+
+    .tc-stats b {
+        display: block;
+        margin-top: 4px;
+        font-size: 1.8rem;
+        font-weight: 600
+    }
+
+    .tc-toolbar {
+        display: grid;
+        gap: 8px;
+        margin: 16px 0
+    }
+
+    .tc-toolbar input[type="search"],
+    .tc-toolbar select {
+        width: 100%;
+        box-sizing: border-box;
+        padding: 11px 14px;
+        border: 1px solid #d9d9d9;
+        border-radius: 10px;
+        font: inherit;
+        background: #fff
+    }
+
+    .tc-toolbar-actions {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap
+    }
+
+    .tc-black {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        border: 0;
+        border-radius: 999px;
+        padding: 11px 20px;
+        background: #111;
+        color: #fff;
+        font: inherit;
+        font-weight: 600;
+        cursor: pointer;
+        text-decoration: none
+    }
+
+    .tc-outline {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        border: 1px solid #cfcfcf;
+        border-radius: 999px;
+        padding: 10px 18px;
+        background: #fff;
+        color: #222;
+        font: inherit;
+        cursor: pointer;
+        text-decoration: none
+    }
+
+    .tc-export {
+        position: relative
+    }
+
+    .tc-export summary {
+        list-style: none
+    }
+
+    .tc-export summary::-webkit-details-marker {
+        display: none
+    }
+
+    .tc-export-menu {
+        position: absolute;
+        right: 0;
+        top: calc(100% + 6px);
+        z-index: 20;
+        min-width: 160px;
+        padding: 6px;
+        background: #fff;
+        border: 1px solid #d9d9d9;
+        border-radius: 12px;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, .12)
+    }
+
+    .tc-export-menu a {
+        display: block;
+        padding: 9px 12px;
+        border-radius: 8px;
+        color: #222;
+        text-decoration: none
+    }
+
+    .tc-export-menu a:hover {
+        background: #f3f3f3
+    }
+
+    .tc-list-head,
+    .tc-main {
+        display: grid;
+        grid-template-columns: minmax(150px, 2fr) minmax(130px, 1.3fr) minmax(110px, 1.2fr) 56px 44px;
+        gap: 10px;
+        align-items: center
+    }
+
+    .tc-list-head {
+        padding: 10px 0;
+        color: #666;
+        font-size: .82rem
+    }
+
+    .tc-list-head span:nth-child(4) {
+        text-align: center
+    }
+
+    .tc-row {
+        border-top: 1px solid #ececec;
+        padding: 12px 0
+    }
+
+    .tc-row[hidden] {
+        display: none
+    }
+
+    .tc-name strong {
+        display: block;
+        font-size: .95rem
+    }
+
+    .tc-name small {
+        color: #666;
+        font-size: .85rem
+    }
+
+    .tc-kind {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        font-size: .8rem;
+        color: #333
+    }
+
+    .tc-kind svg {
+        width: 15px;
+        height: 15px;
+        flex: none
+    }
+
+    .tc-dedupe {
+        font-size: .78rem;
+        color: #333
+    }
+
+    .tc-toggle {
+        justify-self: center;
+        width: 30px;
+        height: 30px;
+        padding: 0;
+        border-radius: 50%;
+        border: 2px solid #111;
+        background: #111;
+        color: #fff;
+        cursor: pointer;
+        font-size: .95rem;
+        line-height: 1
+    }
+
+    .tc-row[data-off="1"] .tc-toggle {
+        background: #fff;
+        color: transparent;
+        border-color: #bbb
+    }
+
+    .tc-row[data-off="1"] .tc-name,
+    .tc-row[data-off="1"] .tc-kind,
+    .tc-row[data-off="1"] .tc-dedupe {
+        opacity: .5
+    }
+
+    .tc-edit {
+        border: 0;
+        background: none;
+        padding: 6px;
+        cursor: pointer;
+        color: #444;
+        line-height: 0
+    }
+
+    .tc-edit svg {
+        width: 20px;
+        height: 20px
+    }
+
+    .tc-empty {
+        padding: 18px 0;
+        color: #777;
+        text-align: center
+    }
+
+    .tc-panel[hidden] {
+        display: none
+    }
+
+    .tc-edit-dialog {
+        width: min(560px, 94vw);
+        padding: 20px;
+        border: 0;
+        border-radius: 14px;
+        box-shadow: 0 12px 48px rgba(0, 0, 0, .35)
+    }
+
+    .tc-edit-dialog::backdrop {
+        background: rgba(0, 0, 0, .4)
+    }
+
+    .tc-edit-dialog h3 {
+        margin: 0 0 12px
+    }
+
+    .tc-field {
+        display: grid;
+        gap: 4px;
+        margin-bottom: 12px;
+        font-size: .85rem;
+        color: #555
+    }
+
+    .tc-field input,
+    .tc-field select,
+    .tc-field textarea {
+        width: 100%;
+        box-sizing: border-box;
+        padding: 9px 11px;
+        border: 1px solid #d5d5d5;
+        border-radius: 8px;
+        font: inherit;
+        color: #222
+    }
+
+    .tc-row:not([data-kind="click"]) .tc-selcell {
+        display: none
+    }
+
+    .tc-pickline {
+        display: flex;
+        gap: 8px;
+        align-items: flex-start
+    }
+
+    .tc-pickline textarea {
+        flex: 1
+    }
+
+    .tc-pick-note {
+        font-size: .8rem;
+        color: #2e7d4f
+    }
+
+    .tc-dedupe-sec[hidden] {
+        display: none
+    }
+
+    .tc-edit-actions {
+        display: flex;
+        justify-content: space-between;
+        gap: 8px;
+        margin-top: 6px
+    }
+
+    .tc-row.trk-flash .tc-main {
+        background: #eef8f1
+    }
+
+    @media (max-width: 640px) {
+
+        .tc-list-head {
+            display: none
+        }
+
+        .tc-main {
+            grid-template-columns: 1fr 44px 44px
+        }
+
+        .tc-kind,
+        .tc-dedupe {
+            grid-column: 1 / -1
+        }
     }
 
     .trk-dialog-head {
@@ -1459,77 +1887,145 @@ admin_header('Thống kê truy cập');
 
     <?php
     $formConfig = $formConfig ?? $config;
-    $ruleLabels = [];
-    foreach ($formConfig['rules'] as $item) {
-        $ruleLabels[$item['code']] = $item['label'];
-    }
-    $renderRule = function (array $item): string {
+    $icons = [
+        'doc' => '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2" aria-hidden="true"><path d="M3.5 1.5h6l3 3v10h-9z"/><path d="M5.5 8h5M5.5 10.5h5"/></svg>',
+        'pointer' => '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2" aria-hidden="true"><path d="M5 2v8l2-1.7 1.6 3.4 1.5-.7-1.5-3.3H11z"/></svg>',
+        'bolt' => '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2" aria-hidden="true"><path d="M9 1.5 3.5 9H8l-1 5.5L12.5 7H8z"/></svg>',
+    ];
+    $kindMeta = [
+        'view' => ['Truy cập trang', 'doc', 'view'],
+        'click' => ['Nhấn phần tử', 'pointer', 'click'],
+        'minigame' => ['Sự kiện nghiệp vụ', 'bolt', 'biz'],
+        'order' => ['Sự kiện nghiệp vụ', 'bolt', 'biz'],
+    ];
+    $globalDedupe = (int)($formConfig['dedupe_seconds'] ?? 60);
+    $renderRule = function (array $item) use ($icons, $kindMeta, $globalDedupe): string {
+        $item += ['enabled' => true, 'dedupe_seconds' => null];
+        $meta = $kindMeta[$item['kind']] ?? $kindMeta['view'];
+        $mode = $item['dedupe_seconds'] === null ? 'default' : ((int)$item['dedupe_seconds'] === 0 ? 'off' : 'custom');
+        $dedupeText = $mode === 'default' ? ($globalDedupe > 0 ? 'Mặc định (' . $globalDedupe . ' giây)' : 'Mặc định (không chống trùng)') : ($mode === 'off' ? 'Không chống trùng' : (int)$item['dedupe_seconds'] . ' giây');
         ob_start(); ?>
-        <div class="trk-rule" data-kind="<?= e($item['kind']) ?>">
+        <div class="tc-row" data-kind="<?= e($item['kind']) ?>" data-group="<?= e($meta[2]) ?>" data-off="<?= $item['enabled'] ? '0' : '1' ?>">
             <input type="hidden" name="rules_code[]" value="<?= e($item['code']) ?>">
-            <label>Mô tả<input type="text" name="rules_label[]" value="<?= e($item['label']) ?>" placeholder="Thêm nước vào giỏ" maxlength="100"></label>
-            <label>URL<input type="text" name="rules_url[]" value="<?= e($item['url']) ?>" placeholder="/product" maxlength="200" class="trk-mono"></label>
-            <label>Loại
-                <select name="rules_kind[]" data-kind-select>
-                    <option value="view" <?= $item['kind'] === 'view' ? 'selected' : '' ?>>Truy cập trang</option>
-                    <option value="click" <?= $item['kind'] === 'click' ? 'selected' : '' ?>>Nhấn vào phần tử</option>
-                    <option value="minigame" <?= $item['kind'] === 'minigame' ? 'selected' : '' ?>>Chơi mini-game (tự đếm lượt lật thẻ đầu)</option>
-                    <option value="order" <?= $item['kind'] === 'order' ? 'selected' : '' ?>>Đặt hàng thành công (server ghi)</option>
-                </select>
-            </label>
-            <div class="trk-selcell">
-                <div class="trk-pick">
-                    <textarea name="rules_selector[]" rows="2" placeholder="Chưa chọn phần tử" class="trk-mono"><?= e($item['selector']) ?></textarea>
-                    <button type="button" class="btn small" data-pick>Chọn trên web</button>
-                </div>
-                <span class="trk-pick-note" data-pick-note></span>
-                <label class="trk-dedupe">Chống trùng
-                    <select name="rules_dedupe[]">
-                        <option value="1" <?= empty($item['skip_dedupe']) ? 'selected' : '' ?>>Có (theo thời gian chung)</option>
-                        <option value="0" <?= !empty($item['skip_dedupe']) ? 'selected' : '' ?>>Không (ghi mọi lần bấm)</option>
+            <input type="hidden" name="rules_enabled[]" value="<?= $item['enabled'] ? '1' : '0' ?>" data-f="enabled">
+            <div class="tc-main">
+                <div class="tc-name"><strong data-s="label"><?= e($item['label'] !== '' ? $item['label'] : 'Chưa đặt tên') ?></strong><small class="trk-mono" data-s="url"><?= e($item['url']) ?></small></div>
+                <div class="tc-kind"><span data-s="icon"><?= $icons[$meta[1]] ?></span><span data-s="kind"><?= e($meta[0]) ?></span></div>
+                <div class="tc-dedupe" data-s="dedupe"><?= e($dedupeText) ?></div>
+                <button type="button" class="tc-toggle" data-toggle aria-label="Bật / tắt thao tác">✓</button>
+                <button type="button" class="tc-edit" data-edit aria-label="Sửa thao tác"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><path d="M3 17l1-4L14.5 2.5l2.5 2.5L6.5 15.5z"/><path d="M12.5 4.5l3 3"/></svg></button>
+            </div>
+            <dialog class="tc-edit-dialog">
+                <h3>Sửa thao tác</h3>
+                <label class="tc-field">Mô tả (hành vi)
+                    <input type="text" name="rules_label[]" data-f="label" value="<?= e($item['label']) ?>" placeholder="Thêm nước vào giỏ" maxlength="100">
+                </label>
+                <label class="tc-field">URL
+                    <input type="text" name="rules_url[]" data-f="url" value="<?= e($item['url']) ?>" placeholder="/product" maxlength="200" class="trk-mono">
+                </label>
+                <label class="tc-field">Loại sự kiện
+                    <select name="rules_kind[]" data-f="kind">
+                        <option value="view" <?= $item['kind'] === 'view' ? 'selected' : '' ?>>Truy cập trang</option>
+                        <option value="click" <?= $item['kind'] === 'click' ? 'selected' : '' ?>>Nhấn vào phần tử</option>
+                        <option value="minigame" <?= $item['kind'] === 'minigame' ? 'selected' : '' ?>>Chơi mini-game (tự đếm lượt lật thẻ đầu)</option>
+                        <option value="order" <?= $item['kind'] === 'order' ? 'selected' : '' ?>>Đặt hàng thành công (server ghi)</option>
                     </select>
                 </label>
-            </div>
-            <button type="button" class="btn small" data-remove aria-label="Xóa dòng">Xóa</button>
+                <div class="tc-field tc-selcell">
+                    <span>Phần tử cần theo dõi (mỗi dòng một phần tử, bấm vào phần tử nào cũng tính 1 lượt)</span>
+                    <div class="tc-pickline">
+                        <textarea name="rules_selector[]" data-f="selector" rows="3" placeholder="Chưa chọn phần tử" class="trk-mono"><?= e($item['selector']) ?></textarea>
+                        <button type="button" class="btn small" data-pick>Chọn trên web</button>
+                    </div>
+                    <span class="tc-pick-note" data-pick-note></span>
+                </div>
+                <label class="tc-field">Chống trùng
+                    <select name="rules_dedupe_mode[]" data-f="mode">
+                        <option value="default" <?= $mode === 'default' ? 'selected' : '' ?>>Theo cài đặt chung</option>
+                        <option value="off" <?= $mode === 'off' ? 'selected' : '' ?>>Không chống trùng (ghi mọi lần)</option>
+                        <option value="custom" <?= $mode === 'custom' ? 'selected' : '' ?>>Theo số giây riêng</option>
+                    </select>
+                </label>
+                <label class="tc-field tc-dedupe-sec" <?= $mode === 'custom' ? '' : 'hidden' ?>>Số giây chống trùng
+                    <input type="number" name="rules_dedupe_sec[]" data-f="sec" min="1" max="86400" value="<?= $mode === 'custom' ? (int)$item['dedupe_seconds'] : '' ?>">
+                </label>
+                <div class="tc-edit-actions">
+                    <button type="button" class="btn" data-remove>Xóa thao tác</button>
+                    <button type="button" class="btn primary" data-done>Xong</button>
+                </div>
+            </dialog>
         </div>
     <?php return (string)ob_get_clean();
     };
+    $enabledCount = count(array_filter($formConfig['rules'], function ($item) {
+        return !array_key_exists('enabled', $item) || !empty($item['enabled']);
+    }));
     ?>
     <dialog id="trk-config-dialog" class="trk-dialog">
-        <div class="trk-dialog-head">
-            <h2>Cấu hình lưu log khách hàng</h2>
-            <button type="button" class="btn small" id="trk-close-config" aria-label="Đóng">✕</button>
+        <div class="tc-head">
+            <div>
+                <h2>Cấu hình ghi log</h2>
+                <p>Quản lý hành vi và dữ liệu khách hàng</p>
+            </div>
+            <div style="display:flex;align-items:center;gap:10px">
+                <span class="tc-status <?= !empty($formConfig['enabled']) ? '' : 'off' ?>" id="tc-status"><i></i><span><?= !empty($formConfig['enabled']) ? 'Đang hoạt động' : 'Đang tắt' ?></span></span>
+                <button type="button" class="btn small" id="trk-close-config" aria-label="Đóng">✕</button>
+            </div>
         </div>
-        <?php if ($error !== '' && $formConfig !== null): ?><div class="alert danger" role="alert"><?= e($error) ?></div><?php endif; ?>
+        <?php if ($error !== '' && $formConfig !== null): ?><div class="alert danger" role="alert" style="margin-top:10px"><?= e($error) ?></div><?php endif; ?>
         <form method="post" id="trk-config-form" data-picker-url="<?= e(base_url('admin/dashboard.php')) ?>">
             <?= csrf_field() ?>
             <input type="hidden" name="do" value="save_config">
 
-            <div class="trk-group">
-                <h3>Chung</h3>
-                <label class="toggle-row"><input type="checkbox" name="enabled" value="1" <?= !empty($formConfig['enabled']) ? 'checked' : '' ?>> Bật ghi log</label>
-                <div class="trk-two">
-                    <label>Giữ log thô (ngày)<input type="number" name="retention_days" min="1" max="3650" value="<?= (int)$formConfig['retention_days'] ?>"></label>
-                    <label>Tối đa event mỗi thiết bị mỗi phút<input type="number" name="max_events_per_device_per_min" min="1" max="10000" value="<?= (int)$formConfig['max_events_per_device_per_min'] ?>"></label>
-                    <label>Thời gian ghi Log (trùng nhau)<input type="number" name="dedupe_seconds" min="0" max="86400" value="<?= (int)($formConfig['dedupe_seconds'] ?? 60) ?>"></label>
-                    <label>Cảnh báo tỷ lệ thoát từ (%, 0 = tắt)<input type="number" name="exit_warn_percent" min="0" max="100" value="<?= (int)($formConfig['exit_warn_percent'] ?? 30) ?>"></label>
-                    <label>Tự cập nhật dashboard mỗi (giây, 0 = tắt)<input type="number" name="live_refresh_seconds" min="0" max="3600" value="<?= (int)($formConfig['live_refresh_seconds'] ?? 10) ?>"></label>
-                </div>
-                <!-- <small class="field-hint">Chống spam: F5 hay bấm nhiều lần trong khoảng này chỉ tính 1 lượt cho mỗi thao tác. Điền 0 để tắt. Đặt hàng thành công luôn được ghi đủ.</small> -->
-                <!-- <small class="field-hint">Thống kê theo ngày giữ vĩnh viễn; chỉ log thô bị xóa sau số ngày này.</small> -->
+            <div class="tc-tabs" role="tablist">
+                <button type="button" class="tc-tab active" data-tab="rules" role="tab">Thao tác ghi log</button>
+                <button type="button" class="tc-tab" data-tab="general" role="tab">Cấu hình chung</button>
             </div>
 
-            <div class="trk-group">
-                <h3>Thao tác cần ghi log</h3>
-                <!-- <small class="field-hint">
-                    URL là đường dẫn trong website (ví dụ /index, /cart, /product, /group/); nhập sai URL thì thao tác đó không có log.
-                    "Truy cập trang" ghi mỗi lần mở trang. "Chơi mini-game" ghi lượt lật thẻ đầu tiên của mỗi lần mở trang game. "Đặt hàng thành công" do server ghi khi đơn được tạo (URL là trang khách thấy sau khi đặt, ví dụ /success). "Nhấn vào phần tử" ghi mỗi lần khách bấm vào nút đã chọn: bấm "Chọn trên web", rê chuột vào nút, bấm vào nút đó rồi "Dùng phần tử này". Một thao tác có thể gồm nhiều nút (ví dụ 3 nút chia sẻ): chọn "Dùng và chọn thêm" để chọn tiếp, bấm vào nút nào cũng tính 1 lượt; mỗi dòng trong ô là một phần tử, xóa dòng để bỏ.
-                    Trang cần tham số (như sản phẩm) hãy gõ đủ khi chọn, ví dụ /product?id=3, khi lưu chỉ giữ /product.
-                </small> -->
-                <div class="trk-rows" data-rows="rules">
+            <div class="tc-panel" data-panel="rules">
+                <div class="tc-stats">
+                    <div><span>Tổng cấu hình</span><b id="tc-total"><?= count($formConfig['rules']) ?></b></div>
+                    <div><span>Đang kích hoạt</span><b id="tc-on"><?= $enabledCount ?></b></div>
+                    <div><span>Đã tắt</span><b id="tc-off"><?= count($formConfig['rules']) - $enabledCount ?></b></div>
+                </div>
+                <div class="tc-toolbar">
+                    <input type="search" id="tc-search" placeholder="Tìm theo tên hoặc URL...">
+                    <select id="tc-filter" aria-label="Lọc theo loại sự kiện">
+                        <option value="all">Tất cả sự kiện</option>
+                        <option value="view">Truy cập trang</option>
+                        <option value="click">Nhấn phần tử</option>
+                        <option value="biz">Sự kiện nghiệp vụ</option>
+                    </select>
+                    <div class="tc-toolbar-actions">
+                        <button type="button" class="tc-black" data-add>＋ Thêm thao tác</button>
+                        <label class="tc-outline" for="tc-import-file">Nhập JSON</label>
+                        <details class="tc-export">
+                            <summary class="tc-outline">Xuất cấu hình ▾</summary>
+                            <div class="tc-export-menu">
+                                <a href="?export=config&amp;format=xlsx">Excel (.xlsx)</a>
+                                <a href="?export=config&amp;format=json">JSON (.json)</a>
+                            </div>
+                        </details>
+                    </div>
+                </div>
+                <div class="tc-list-head"><span>Hành vi / URL</span><span>Loại sự kiện</span><span>Chống trùng</span><span>Bật</span><span></span></div>
+                <div id="tc-rows">
                     <?php foreach ($formConfig['rules'] as $item): ?><?= $renderRule($item) ?><?php endforeach; ?>
                 </div>
-                <button type="button" class="btn small" data-add="rules">+ Thêm thao tác</button>
+                <div class="tc-empty" id="tc-empty" hidden>Không có thao tác phù hợp.</div>
+            </div>
+
+            <div class="tc-panel" data-panel="general" hidden>
+                <div class="trk-group">
+                    <label class="toggle-row"><input type="checkbox" name="enabled" value="1" id="tc-enabled" <?= !empty($formConfig['enabled']) ? 'checked' : '' ?>> Bật ghi log</label>
+                    <div class="trk-two">
+                        <label>Giữ log thô (ngày)<input type="number" name="retention_days" min="1" max="3650" value="<?= (int)$formConfig['retention_days'] ?>"></label>
+                        <label>Tối đa event mỗi thiết bị mỗi phút<input type="number" name="max_events_per_device_per_min" min="1" max="10000" value="<?= (int)$formConfig['max_events_per_device_per_min'] ?>"></label>
+                        <label>Thời gian chống trùng chung (giây, 0 = tắt)<input type="number" name="dedupe_seconds" id="tc-global-dedupe" min="0" max="86400" value="<?= $globalDedupe ?>"></label>
+                        <label>Cảnh báo tỷ lệ thoát từ (%, 0 = tắt)<input type="number" name="exit_warn_percent" min="0" max="100" value="<?= (int)($formConfig['exit_warn_percent'] ?? 30) ?>"></label>
+                        <label>Tự cập nhật dashboard mỗi (giây, 0 = tắt)<input type="number" name="live_refresh_seconds" min="0" max="3600" value="<?= (int)($formConfig['live_refresh_seconds'] ?? 10) ?>"></label>
+                    </div>
+                </div>
             </div>
 
             <div class="trk-savebar">
@@ -1538,15 +2034,29 @@ admin_header('Thống kê truy cập');
             </div>
         </form>
 
-        <template id="trk-tpl-rules"><?= $renderRule(['code' => '', 'label' => '', 'url' => '', 'kind' => 'view', 'selector' => '']) ?></template>
+        <form method="post" enctype="multipart/form-data" id="tc-import-form" hidden>
+            <?= csrf_field() ?>
+            <input type="hidden" name="do" value="import_config">
+            <input type="file" name="config_file" id="tc-import-file" accept=".json,application/json">
+        </form>
+
+        <template id="tc-tpl"><?= $renderRule(['code' => '', 'label' => '', 'url' => '', 'kind' => 'view', 'selector' => '', 'enabled' => true, 'dedupe_seconds' => null]) ?></template>
     </dialog>
     <script>
         (function() {
             var form = document.getElementById('trk-config-form');
             if (!form) return;
+            var rowsBox = document.getElementById('tc-rows');
             var activeRow = null;
+            var KIND = {
+                view: ['Truy cập trang', 'doc', 'view'],
+                click: ['Nhấn phần tử', 'pointer', 'click'],
+                minigame: ['Sự kiện nghiệp vụ', 'bolt', 'biz'],
+                order: ['Sự kiện nghiệp vụ', 'bolt', 'biz']
+            };
+            var ICON = <?= json_encode($icons, JSON_UNESCAPED_SLASHES) ?>;
 
-            // Popup cấu hình: mở bằng nút ở thanh trên, đóng bằng ✕ hoặc Esc.
+            // ---- Popup cấu hình: mở bằng nút ở thanh trên, đóng bằng ✕ / Đóng / Esc.
             var dialog = document.getElementById('trk-config-dialog');
             var openButton = document.getElementById('trk-open-config');
             var openDialog = function() {
@@ -1555,98 +2065,225 @@ admin_header('Thống kê truy cập');
                     else dialog.setAttribute('open', '');
                 }
             };
-            if (openButton) openButton.addEventListener('click', openDialog);
-            var closeDialog = function() {
-                if (dialog.close) dialog.close();
-                else dialog.removeAttribute('open');
+            var closeDialog = function(box) {
+                if (box.close) box.close();
+                else box.removeAttribute('open');
             };
+            if (openButton) openButton.addEventListener('click', openDialog);
             ['trk-close-config', 'trk-cancel-config'].forEach(function(id) {
                 var button = document.getElementById(id);
-                if (button) button.addEventListener('click', closeDialog);
+                if (button) button.addEventListener('click', function() {
+                    closeDialog(dialog);
+                });
             });
             <?php if ($error !== '' && $formConfig !== null): ?>openDialog(); // lưu lỗi: mở lại để admin sửa tiếp
-        <?php endif; ?>
+            <?php endif; ?>
 
-        // Thao tác thêm/sửa chưa bấm "Lưu cấu hình" sẽ mất nếu rời trang (kể cả bấm Lưu phễu, Thêm phễu, Xem):
-        // hỏi lại trước khi rời trang.
-        var dirty = false;
-        var markDirty = function() {
-            dirty = true;
-        };
-        form.addEventListener('input', markDirty);
-        form.addEventListener('change', markDirty);
-        form.addEventListener('submit', function() {
-            dirty = false;
-        });
-        window.addEventListener('beforeunload', function(event) {
-            if (!dirty) return;
-            event.preventDefault();
-            event.returnValue = '';
-        });
-
-        form.addEventListener('click', function(event) {
-            var target = event.target;
-            if (!target.closest) return;
-            var add = target.closest('[data-add]');
-            if (add) {
-                var name = add.getAttribute('data-add');
-                var template = document.getElementById('trk-tpl-' + name);
-                var rows = form.querySelector('[data-rows="' + name + '"]');
-                if (template && rows) rows.appendChild(template.content.cloneNode(true));
-                markDirty();
-                return;
+            // ---- Nhập cấu hình từ JSON (ghi đè DB).
+            var importFile = document.getElementById('tc-import-file');
+            if (importFile) {
+                importFile.addEventListener('change', function() {
+                    if (!importFile.files.length) return;
+                    if (confirm('Nhập file "' + importFile.files[0].name + '" sẽ GHI ĐÈ toàn bộ cấu hình ghi log hiện tại (thao tác, phễu, cài đặt chung). Tiếp tục?')) {
+                        window.removeEventListener('beforeunload', warnLeave);
+                        importFile.form.submit();
+                    } else {
+                        importFile.value = '';
+                    }
+                });
             }
-            var row = target.closest('.trk-rule, .trk-row');
-            if (!row) return;
-            if (target.closest('[data-pick]')) {
-                var url = row.querySelector('input[name="rules_url[]"]').value.trim();
-                if (url === '') {
-                    alert('Hãy nhập URL của trang trước.');
+
+            // ---- Thay đổi chưa lưu sẽ mất nếu rời trang: hỏi lại.
+            var dirty = false;
+            var markDirty = function() {
+                dirty = true;
+            };
+            form.addEventListener('input', markDirty);
+            form.addEventListener('change', markDirty);
+            form.addEventListener('submit', function() {
+                dirty = false;
+            });
+            var warnLeave = function(event) {
+                if (!dirty) return;
+                event.preventDefault();
+                event.returnValue = '';
+            };
+            window.addEventListener('beforeunload', warnLeave);
+
+            // ---- Hiển thị dòng tóm tắt theo giá trị trong popup sửa.
+            var field = function(row, name) {
+                return row.querySelector('[data-f="' + name + '"]');
+            };
+            var globalDedupe = function() {
+                var input = document.getElementById('tc-global-dedupe');
+                return input ? parseInt(input.value, 10) || 0 : 0;
+            };
+            var refreshRow = function(row) {
+                var label = field(row, 'label').value.trim();
+                var kind = field(row, 'kind').value;
+                var meta = KIND[kind] || KIND.view;
+                var mode = field(row, 'mode').value;
+                var seconds = parseInt(field(row, 'sec').value, 10) || 0;
+                var text;
+                if (mode === 'off') text = 'Không chống trùng';
+                else if (mode === 'custom') text = seconds + ' giây';
+                else text = globalDedupe() > 0 ? 'Mặc định (' + globalDedupe() + ' giây)' : 'Mặc định (không chống trùng)';
+                row.querySelector('[data-s="label"]').textContent = label !== '' ? label : 'Chưa đặt tên';
+                row.querySelector('[data-s="url"]').textContent = field(row, 'url').value.trim();
+                row.querySelector('[data-s="kind"]').textContent = meta[0];
+                row.querySelector('[data-s="icon"]').innerHTML = ICON[meta[1]];
+                row.querySelector('[data-s="dedupe"]').textContent = text;
+                row.setAttribute('data-kind', kind);
+                row.setAttribute('data-group', meta[2]);
+                row.setAttribute('data-off', field(row, 'enabled').value === '1' ? '0' : '1');
+                row.querySelector('.tc-dedupe-sec').hidden = mode !== 'custom';
+            };
+            var refreshAll = function() {
+                rowsBox.querySelectorAll('.tc-row').forEach(refreshRow);
+                applyFilter();
+            };
+
+            // ---- Thống kê + tìm kiếm + lọc.
+            var updateStats = function() {
+                var rows = rowsBox.querySelectorAll('.tc-row');
+                var off = rowsBox.querySelectorAll('.tc-row[data-off="1"]').length;
+                document.getElementById('tc-total').textContent = rows.length;
+                document.getElementById('tc-on').textContent = rows.length - off;
+                document.getElementById('tc-off').textContent = off;
+            };
+            var applyFilter = function() {
+                var query = document.getElementById('tc-search').value.trim().toLowerCase();
+                var group = document.getElementById('tc-filter').value;
+                var shown = 0;
+                rowsBox.querySelectorAll('.tc-row').forEach(function(row) {
+                    var hay = (row.querySelector('[data-s="label"]').textContent + ' ' + row.querySelector('[data-s="url"]').textContent).toLowerCase();
+                    var ok = (query === '' || hay.indexOf(query) !== -1) && (group === 'all' || row.getAttribute('data-group') === group);
+                    row.hidden = !ok;
+                    if (ok) shown++;
+                });
+                document.getElementById('tc-empty').hidden = shown !== 0;
+                updateStats();
+            };
+            document.getElementById('tc-search').addEventListener('input', applyFilter);
+            document.getElementById('tc-filter').addEventListener('change', applyFilter);
+            // Ô Enter trong ô tìm kiếm không được gửi form.
+            document.getElementById('tc-search').addEventListener('keydown', function(event) {
+                if (event.key === 'Enter') event.preventDefault();
+            });
+
+            // ---- Tab.
+            form.querySelectorAll('.tc-tab').forEach(function(tab) {
+                tab.addEventListener('click', function() {
+                    form.querySelectorAll('.tc-tab').forEach(function(other) {
+                        other.classList.toggle('active', other === tab);
+                    });
+                    form.querySelectorAll('.tc-panel').forEach(function(panel) {
+                        panel.hidden = panel.getAttribute('data-panel') !== tab.getAttribute('data-tab');
+                    });
+                });
+            });
+
+            // ---- Trạng thái chung (chấm xanh/đỏ) + chữ "Mặc định (N giây)" theo cài đặt chung.
+            var enabledBox = document.getElementById('tc-enabled');
+            enabledBox.addEventListener('change', function() {
+                var status = document.getElementById('tc-status');
+                status.classList.toggle('off', !enabledBox.checked);
+                status.querySelector('span').textContent = enabledBox.checked ? 'Đang hoạt động' : 'Đang tắt';
+            });
+            document.getElementById('tc-global-dedupe').addEventListener('input', refreshAll);
+
+            // ---- Click trong danh sách.
+            form.addEventListener('click', function(event) {
+                var target = event.target;
+                if (!target.closest) return;
+                if (target.closest('[data-add]')) {
+                    var template = document.getElementById('tc-tpl');
+                    rowsBox.appendChild(template.content.cloneNode(true));
+                    var created = rowsBox.lastElementChild;
+                    refreshRow(created);
+                    applyFilter();
+                    markDirty();
+                    var box = created.querySelector('dialog');
+                    if (box.showModal) box.showModal();
                     return;
                 }
-                activeRow = row;
-                window.open(form.getAttribute('data-picker-url') + '?open_picker=' + encodeURIComponent(url), 'htk-picker');
-            } else if (target.closest('[data-remove]')) {
-                row.remove();
-                markDirty();
-            } else if (target.closest('[data-up]') && row.previousElementSibling) {
-                row.parentNode.insertBefore(row, row.previousElementSibling);
-                markDirty();
-            }
-        });
+                var row = target.closest('.tc-row');
+                if (!row) return;
+                if (target.closest('[data-toggle]')) {
+                    var flag = field(row, 'enabled');
+                    flag.value = flag.value === '1' ? '0' : '1';
+                    refreshRow(row);
+                    updateStats();
+                    markDirty();
+                } else if (target.closest('[data-edit]')) {
+                    var editor = row.querySelector('dialog');
+                    if (editor.showModal) editor.showModal();
+                    else editor.setAttribute('open', '');
+                } else if (target.closest('[data-done]')) {
+                    refreshRow(row);
+                    applyFilter();
+                    closeDialog(row.querySelector('dialog'));
+                } else if (target.closest('[data-remove]')) {
+                    if (!confirm('Xóa thao tác này?')) return;
+                    closeDialog(row.querySelector('dialog'));
+                    row.remove();
+                    applyFilter();
+                    markDirty();
+                } else if (target.closest('[data-pick]')) {
+                    var url = field(row, 'url').value.trim();
+                    if (url === '') {
+                        alert('Hãy nhập URL của trang trước.');
+                        return;
+                    }
+                    activeRow = row;
+                    window.open(form.getAttribute('data-picker-url') + '?open_picker=' + encodeURIComponent(url), 'htk-picker');
+                }
+            });
 
-        form.addEventListener('change', function(event) {
-            var select = event.target;
-            if (select && select.hasAttribute && select.hasAttribute('data-kind-select')) {
-                var row = select.closest('.trk-rule');
-                if (row) row.setAttribute('data-kind', select.value);
-            }
-        });
+            form.addEventListener('change', function(event) {
+                var row = event.target.closest && event.target.closest('.tc-row');
+                if (row) {
+                    refreshRow(row);
+                    applyFilter();
+                }
+            });
 
-        // Tab công cụ chọn phần tử gửi selector về đây (cùng domain).
-        window.addEventListener('message', function(event) {
-            var data = event.data;
-            if (event.origin !== window.location.origin || !data || data.type !== 'htk-pick' || !activeRow) return;
-            var input = activeRow.querySelector('textarea[name="rules_selector[]"]');
-            if (!input) return;
-            // Một thao tác có thể gồm nhiều phần tử: mỗi lần chọn thêm một dòng (không trùng).
-            var picked = String(data.selector || '').trim();
-            var lines = input.value.split(/\r?\n/).map(function(line) {
-                return line.trim();
-            }).filter(Boolean);
-            if (picked !== '' && lines.indexOf(picked) === -1) lines.push(picked);
-            input.value = lines.join('\n');
-            markDirty();
-            var note = activeRow.querySelector('[data-pick-note]');
-            if (note) note.textContent = 'Đã thêm' + (data.text ? ' "' + data.text + '"' : ' phần tử') + ' (tổng ' + lines.length + ' phần tử, bấm vào phần tử nào cũng tính 1 lượt).';
-            var label = activeRow.querySelector('input[name="rules_label[]"]');
-            if (label && label.value.trim() === '' && data.text) label.value = 'Bấm ' + data.text;
-            activeRow.classList.add('trk-flash');
-            setTimeout(function(row) {
-                row.classList.remove('trk-flash');
-            }, 1500, activeRow);
-            window.focus();
-        });
+            // Đóng popup sửa bằng Esc/✕ cũng cập nhật dòng tóm tắt.
+            form.addEventListener('close', function(event) {
+                var row = event.target.closest && event.target.closest('.tc-row');
+                if (row) {
+                    refreshRow(row);
+                    applyFilter();
+                }
+            }, true);
+
+            refreshAll();
+
+            // ---- Tab công cụ chọn phần tử gửi selector về đây (cùng domain).
+            window.addEventListener('message', function(event) {
+                var data = event.data;
+                if (event.origin !== window.location.origin || !data || data.type !== 'htk-pick' || !activeRow) return;
+                var input = field(activeRow, 'selector');
+                if (!input) return;
+                // Một thao tác có thể gồm nhiều phần tử: mỗi lần chọn thêm một dòng (không trùng).
+                var picked = String(data.selector || '').trim();
+                var lines = input.value.split(/\r?\n/).map(function(line) {
+                    return line.trim();
+                }).filter(Boolean);
+                if (picked !== '' && lines.indexOf(picked) === -1) lines.push(picked);
+                input.value = lines.join('\n');
+                markDirty();
+                var note = activeRow.querySelector('[data-pick-note]');
+                if (note) note.textContent = 'Đã thêm' + (data.text ? ' "' + data.text + '"' : ' phần tử') + ' (tổng ' + lines.length + ' phần tử, bấm vào phần tử nào cũng tính 1 lượt).';
+                var label = field(activeRow, 'label');
+                if (label && label.value.trim() === '' && data.text) label.value = 'Bấm ' + data.text;
+                refreshRow(activeRow);
+                activeRow.classList.add('trk-flash');
+                setTimeout(function(row) {
+                    row.classList.remove('trk-flash');
+                }, 1500, activeRow);
+                window.focus();
+            });
         })();
     </script>
 </div>
