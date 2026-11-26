@@ -40,6 +40,39 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && ($_POST['do'] ?? '') === 's
     }
 }
 
+// Nhập cấu hình từ file JSON: ghi đè toàn bộ cấu hình đang lưu trong DB.
+if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && ($_POST['do'] ?? '') === 'import_config') {
+    verify_csrf();
+    $upload = $_FILES['config_file'] ?? null;
+    $raw = '';
+    $problem = '';
+    if (!is_array($upload) || ($upload['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK || !is_uploaded_file((string)$upload['tmp_name'])) {
+        $problem = 'Chưa chọn file JSON hoặc tải file lên thất bại.';
+    } elseif ((int)$upload['size'] > 1048576) {
+        $problem = 'File JSON quá lớn (tối đa 1MB).';
+    } else {
+        $raw = (string)file_get_contents((string)$upload['tmp_name']);
+        $raw = preg_replace('/^ï»¿/', '', $raw);
+        $imported = json_decode($raw, true);
+        if (!is_array($imported)) {
+            $problem = 'File không phải JSON hợp lệ.';
+        } else {
+            $problem = htk_validate_config($raw);
+        }
+    }
+    if ($problem === '') {
+        $default = htk_default_config();
+        $clean = array_merge($default, array_intersect_key($imported, $default));
+        $clean['enabled'] = !empty($clean['enabled']);
+        $clean['rules'] = htk_clean_rules($clean['rules']);
+        $clean['funnels'] = htk_clean_funnels(is_array($clean['funnels']) ? $clean['funnels'] : [], array_column($clean['rules'], 'code'));
+        set_setting('tracking_config', json_encode($clean, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+        $message = 'Đã nhập cấu hình từ file JSON và ghi đè cấu hình cũ (' . count($clean['rules']) . ' thao tác).';
+    } else {
+        $error = 'Nhập cấu hình thất bại: ' . $problem;
+    }
+}
+
 $funnelActions = ['save_funnel', 'add_funnel', 'delete_funnel'];
 if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && in_array($_POST['do'] ?? '', $funnelActions, true)) {
     verify_csrf();
@@ -149,6 +182,12 @@ if (($_GET['export'] ?? '') === 'detail' && $dataError === '') {
 }
 
 // Xuất Excel danh sách thao tác ghi log đang lưu trong cấu hình.
+if (($_GET['export'] ?? '') === 'config' && ($_GET['format'] ?? '') === 'json') {
+    header('Content-Type: application/json; charset=utf-8');
+    header('Content-Disposition: attachment; filename="cau-hinh-ghi-log-' . gmdate('Ymd-His', time() + HTK_VN_OFFSET) . '.json"');
+    echo json_encode($config, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT);
+    exit;
+}
 if (($_GET['export'] ?? '') === 'config') {
     require_once __DIR__ . '/../lib/xlsx_export.php';
     $kindNames = ['view' => 'Truy cập trang', 'click' => 'Nhấn phần tử', 'minigame' => 'Sự kiện nghiệp vụ (chơi mini-game)', 'order' => 'Sự kiện nghiệp vụ (đặt hàng thành công)'];
@@ -651,6 +690,43 @@ admin_header('Thống kê truy cập');
         font: inherit;
         cursor: pointer;
         text-decoration: none
+    }
+
+    .tc-export {
+        position: relative
+    }
+
+    .tc-export summary {
+        list-style: none
+    }
+
+    .tc-export summary::-webkit-details-marker {
+        display: none
+    }
+
+    .tc-export-menu {
+        position: absolute;
+        right: 0;
+        top: calc(100% + 6px);
+        z-index: 20;
+        min-width: 160px;
+        padding: 6px;
+        background: #fff;
+        border: 1px solid #d9d9d9;
+        border-radius: 12px;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, .12)
+    }
+
+    .tc-export-menu a {
+        display: block;
+        padding: 9px 12px;
+        border-radius: 8px;
+        color: #222;
+        text-decoration: none
+    }
+
+    .tc-export-menu a:hover {
+        background: #f3f3f3
     }
 
     .tc-list-head,
@@ -1922,7 +1998,14 @@ admin_header('Thống kê truy cập');
                     </select>
                     <div class="tc-toolbar-actions">
                         <button type="button" class="tc-black" data-add>＋ Thêm thao tác</button>
-                        <a class="tc-outline" href="?export=config">Xuất cấu hình</a>
+                        <label class="tc-outline" for="tc-import-file">Nhập JSON</label>
+                        <details class="tc-export">
+                            <summary class="tc-outline">Xuất cấu hình ▾</summary>
+                            <div class="tc-export-menu">
+                                <a href="?export=config&amp;format=xlsx">Excel (.xlsx)</a>
+                                <a href="?export=config&amp;format=json">JSON (.json)</a>
+                            </div>
+                        </details>
                     </div>
                 </div>
                 <div class="tc-list-head"><span>Hành vi / URL</span><span>Loại sự kiện</span><span>Chống trùng</span><span>Bật</span><span></span></div>
@@ -1949,6 +2032,12 @@ admin_header('Thống kê truy cập');
                 <button class="btn primary" type="submit">Lưu cấu hình</button>
                 <button class="btn" type="button" id="trk-cancel-config">Đóng</button>
             </div>
+        </form>
+
+        <form method="post" enctype="multipart/form-data" id="tc-import-form" hidden>
+            <?= csrf_field() ?>
+            <input type="hidden" name="do" value="import_config">
+            <input type="file" name="config_file" id="tc-import-file" accept=".json,application/json">
         </form>
 
         <template id="tc-tpl"><?= $renderRule(['code' => '', 'label' => '', 'url' => '', 'kind' => 'view', 'selector' => '', 'enabled' => true, 'dedupe_seconds' => null]) ?></template>
@@ -1990,6 +2079,20 @@ admin_header('Thống kê truy cập');
             <?php if ($error !== '' && $formConfig !== null): ?>openDialog(); // lưu lỗi: mở lại để admin sửa tiếp
             <?php endif; ?>
 
+            // ---- Nhập cấu hình từ JSON (ghi đè DB).
+            var importFile = document.getElementById('tc-import-file');
+            if (importFile) {
+                importFile.addEventListener('change', function() {
+                    if (!importFile.files.length) return;
+                    if (confirm('Nhập file "' + importFile.files[0].name + '" sẽ GHI ĐÈ toàn bộ cấu hình ghi log hiện tại (thao tác, phễu, cài đặt chung). Tiếp tục?')) {
+                        window.removeEventListener('beforeunload', warnLeave);
+                        importFile.form.submit();
+                    } else {
+                        importFile.value = '';
+                    }
+                });
+            }
+
             // ---- Thay đổi chưa lưu sẽ mất nếu rời trang: hỏi lại.
             var dirty = false;
             var markDirty = function() {
@@ -2000,11 +2103,12 @@ admin_header('Thống kê truy cập');
             form.addEventListener('submit', function() {
                 dirty = false;
             });
-            window.addEventListener('beforeunload', function(event) {
+            var warnLeave = function(event) {
                 if (!dirty) return;
                 event.preventDefault();
                 event.returnValue = '';
-            });
+            };
+            window.addEventListener('beforeunload', warnLeave);
 
             // ---- Hiển thị dòng tóm tắt theo giá trị trong popup sửa.
             var field = function(row, name) {
