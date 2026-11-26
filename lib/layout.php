@@ -290,6 +290,8 @@ function front_header(string $title = ''): void
             <script src="<?= e(base_url('assets/js/group-qr.js?v=19.8.5')) ?>"></script><?php endif; ?><script src="<?= e(base_url('assets/js/group-order.js?v=19.8.6.8')) ?>"></script>
         <script src="<?= e(base_url('assets/js/promotion.js?v=19.9.2')) ?>"></script>
         <script src="<?= e(base_url('assets/js/game-entry.js?v=19.9.1')) ?>"></script>
+        <?php if (function_exists('htk_picker_active') && htk_picker_active()): ?><script src="<?= e(base_url('assets/js/tracking-picker.js?v=1.1.0')) ?>" defer></script>
+        <?php elseif (function_exists('htk_enabled') && htk_enabled() && htk_current_page_code() !== ''): ?><script src="<?= e(base_url('assets/js/tracker.js?v=2.0.0')) ?>" data-config="<?= e(json_encode(htk_js_config(), JSON_UNESCAPED_SLASHES)) ?>" defer></script><?php endif; ?>
     </body>
 
     </html><?php }
