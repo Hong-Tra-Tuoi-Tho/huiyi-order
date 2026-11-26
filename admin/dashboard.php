@@ -1187,7 +1187,7 @@ admin_header('Thống kê truy cập');
         white-space: nowrap;
         font-size: .75rem;
         font-weight: 700;
-        color: #f59e0b;
+        color: #000;
         padding: 1px 6px;
         border-radius: 999px;
         background: rgba(255, 255, 255, .92);
