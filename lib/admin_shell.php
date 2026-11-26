@@ -41,6 +41,7 @@ function has_navigation(): array {
   ['members.php','會員管理','Thành viên','Members','users',['members.php']],
   ['member-settings.php','iPOS 匯入','Nhập iPOS','iPOS import','sync',['member-settings.php']]]],
  ['系統與權限','Hệ thống & quyền','System & access',[
+  ['dashboard.php','訪問統計','Thống kê truy cập','Traffic','grid',['dashboard.php']],
   ['settings.php','系統設定','Thiết lập','Settings','settings',['settings.php']],
   ['developer.php','開發文件','Nhà phát triển','Developer','book',['developer.php']],
   ['accounts.php','帳號管理','Tài khoản','Accounts','shield',['accounts.php']]]]];
