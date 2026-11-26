@@ -789,8 +789,8 @@ function htk_daily_series(string $fromDate, string $toDate): array
 
 /**
  * Các phễu theo hành trình thật của từng thiết bị. Duyệt log theo thời gian: một hành trình bắt đầu ở bước 1 và chỉ
- * tiến lên khi gặp đúng bước kế tiếp; lặp lại bước đang đứng (bấm thêm nước nhiều lần, xem lại trang) hoặc nhảy cóc thì
- * bỏ qua; đi hết bước cuối thì hành trình đóng lại và lần sau bắt đầu hành trình mới.
+ * tiến lên khi gặp bước sau bước đang đứng (nhảy cóc vẫn tính là đã qua các bước ở giữa); lặp lại bước đang đứng
+ * (bấm thêm nước nhiều lần, xem lại trang) hoặc đi lùi thì bỏ qua; đi hết bước cuối thì hành trình đóng lại và lần sau bắt đầu hành trình mới.
  * Mỗi bước trả về:
  *   events    số hành trình đã đi tới bước này (đơn vị chung cho cột biểu đồ, tỷ lệ thoát, chuyển đổi),
  *   raw       tổng số lượt thật của thao tác (bấm thêm nước 5 lần là 5), để biết khách bấm bao nhiêu lần,
@@ -884,12 +884,24 @@ function htk_funnel(string $fromDate, string $toDate): array
                     continue;
                 }
                 $raw[$key] = ($raw[$key] ?? 0) + 1; // mọi lượt thật của thao tác, không phụ thuộc thứ tự bước
-                if (!in_array($pos + 1, $map[$key], true)) {
-                    continue;
+                // Bước đích: bước đầu tiên của thao tác này nằm sau bước đang đứng. Đang ở đầu (chưa có hành trình)
+                // thì chỉ bước 1 mới mở hành trình mới; còn lại cho phép nhảy cóc.
+                $target = null;
+                foreach ($map[$key] as $candidateIndex) {
+                    if ($candidateIndex > $pos) {
+                        $target = $candidateIndex;
+                        break;
+                    }
                 }
-                $pos++;
-                $reach[$pos]++;
-                $deviceSets[$pos][$row[0]] = true;
+                if ($target === null || ($pos === -1 && $target !== 0)) {
+                    continue; // lặp lại bước đang đứng, đi lùi, hoặc bước giữa phễu khi chưa bắt đầu
+                }
+                // Các bước bị nhảy qua vẫn tính là đã đi qua, để một bước không ghi log thì không chặn cả phễu.
+                for ($skipped = $pos + 1; $skipped <= $target; $skipped++) {
+                    $reach[$skipped]++;
+                    $deviceSets[$skipped][$row[0]] = true;
+                }
+                $pos = $target;
                 if ($pos === $count - 1) {
                     $pos = -1; // đi hết phễu: hành trình sau là hành trình mới
                 }
