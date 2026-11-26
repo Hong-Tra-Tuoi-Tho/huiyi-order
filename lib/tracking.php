@@ -165,6 +165,18 @@ function htk_selector_list(string $text): array
     return $list;
 }
 
+/**
+ * Thời gian chống trùng riêng của một thao tác: null = dùng cài đặt chung, 0 = không chống trùng, n = n giây.
+ * Cấu hình cũ chỉ có cờ skip_dedupe thì hiểu là 0.
+ */
+function htk_rule_dedupe(array $item): ?int
+{
+    if (isset($item['dedupe_seconds']) && $item['dedupe_seconds'] !== '' && is_numeric($item['dedupe_seconds'])) {
+        return max(0, min(86400, (int)$item['dedupe_seconds']));
+    }
+    return !empty($item['skip_dedupe']) ? 0 : null;
+}
+
 /** Làm sạch danh sách quy tắc đọc từ JSON đã lưu. */
 function htk_clean_rules($list): array
 {
@@ -184,7 +196,8 @@ function htk_clean_rules($list): array
             'url' => (string)($item['url'] ?? '/index'),
             'kind' => $kind,
             'selector' => (string)($item['selector'] ?? ''),
-            'skip_dedupe' => !empty($item['skip_dedupe']),
+            'enabled' => !array_key_exists('enabled', $item) || !empty($item['enabled']),
+            'dedupe_seconds' => htk_rule_dedupe($item),
         ];
     }
     return $rules;
@@ -309,6 +322,9 @@ function htk_validate_config(string $json): string
             return 'Thao tác ' . $name . ' không hợp lệ.';
         }
         $codes[$code] = true;
+        if (isset($rule['dedupe_seconds']) && ((int)$rule['dedupe_seconds'] < 0 || (int)$rule['dedupe_seconds'] > 86400)) {
+            return 'Thao tác ' . $name . ': thời gian chống trùng phải từ 0 đến 86400 giây.';
+        }
         if (preg_match('#^/[!-~]{0,63}$#', $url) !== 1 || $url === '') {
             return 'Thao tác ' . $name . ': URL không hợp lệ.';
         }
@@ -358,7 +374,9 @@ function htk_config_from_form(array $post): array
     $urls = $field('rules_url');
     $kinds = $field('rules_kind');
     $selectors = $field('rules_selector');
-    $dedupes = $field('rules_dedupe');
+    $dedupeModes = $field('rules_dedupe_mode');
+    $dedupeSeconds = $field('rules_dedupe_sec');
+    $enabledFlags = $field('rules_enabled');
     $rules = [];
     $used = [];
     $count = max(count($codes), count($labels), count($urls), count($selectors));
@@ -371,6 +389,8 @@ function htk_config_from_form(array $post): array
         }
         $code = trim((string)($codes[$i] ?? ''));
         $kind = (string)($kinds[$i] ?? '');
+        $mode = (string)($dedupeModes[$i] ?? 'default');
+        $dedupeValue = $mode === 'off' ? 0 : ($mode === 'custom' ? max(1, min(86400, (int)($dedupeSeconds[$i] ?? 0))) : null);
         if (!in_array($kind, ['view', 'click', 'minigame', 'order'], true)) {
             $kind = 'view';
         }
@@ -387,7 +407,8 @@ function htk_config_from_form(array $post): array
             'url' => $url !== '' ? htk_normalize_path($url) : '',
             'kind' => $kind,
             'selector' => $selector,
-            'skip_dedupe' => (string)($dedupes[$i] ?? '1') === '0',
+            'enabled' => (string)($enabledFlags[$i] ?? '1') !== '0',
+            'dedupe_seconds' => $dedupeValue,
         ];
     }
     // Form này không sửa phễu: giữ các phễu đang lưu, chỉ bỏ bước của thao tác đã xóa.
@@ -446,7 +467,7 @@ function htk_time_string($millis, float $now): string
     $seconds = $now;
     if (is_int($millis) || is_float($millis)) {
         $candidate = $millis / 1000;
-        if ($candidate <= $now + 300 && $candidate >= $now - HTK_MAX_AGE_SECONDS) {
+        if ($candidate <= $now && $candidate >= $now - HTK_MAX_AGE_SECONDS) {
             $seconds = $candidate;
         }
     }
@@ -478,7 +499,14 @@ function htk_ingest(string $deviceHex, array $events): array
     $config = htk_config();
     $viewByUrl = [];
     $actionByCode = [];
+    $anyWindow = $config['dedupe_seconds'] > 0;
     foreach (htk_rules() as $rule) {
+        if (!$rule['enabled']) {
+            continue; // thao tác đã tắt: không ghi
+        }
+        if ($rule['dedupe_seconds'] !== null && $rule['dedupe_seconds'] > 0) {
+            $anyWindow = true;
+        }
         if ($rule['kind'] === 'view') {
             $viewByUrl[$rule['url']] = $rule;
         } elseif ($rule['kind'] === 'click' || $rule['kind'] === 'minigame') {
@@ -524,7 +552,7 @@ function htk_ingest(string $deviceHex, array $events): array
         return $handled;
     }
     // Chống ghi lặp: cùng thiết bị + cùng thao tác trong N giây chỉ giữ một lượt.
-    if ($config['dedupe_seconds'] > 0) {
+    if ($anyWindow) {
         [$rows, $repeated] = htk_drop_repeats($deviceHex, $rows, $config['dedupe_seconds']);
         foreach ($repeated as $key) {
             $handled[] = $key;
@@ -563,7 +591,16 @@ function htk_drop_repeats(string $deviceHex, array $rows, int $window): array
     usort($rows, function (array $a, array $b): int {
         return strcmp($a['at'], $b['at']);
     });
-    $since = gmdate('Y-m-d H:i:s', (int)htk_time_float($rows[0]['at']) - $window);
+    // Cửa sổ chống trùng của từng thao tác: riêng (nếu admin đặt) hoặc theo cài đặt chung.
+    $windows = [];
+    $widest = $window;
+    foreach (htk_rules() as $rule) {
+        $own = $rule['dedupe_seconds'];
+        $effective = $own === null ? $window : $own;
+        $windows[$rule['kind'] === 'view' ? '1|' . $rule['url'] . '|' : '2|' . $rule['url'] . '|' . $rule['code']] = $effective;
+        $widest = max($widest, $effective);
+    }
+    $since = gmdate('Y-m-d H:i:s', (int)htk_time_float($rows[0]['at']) - $widest);
     $st = db()->prepare('SELECT event_type,page_code,action_code,MAX(occurred_at) AS last_at FROM app_tracking_events
         WHERE device_id=? AND occurred_at>=? GROUP BY event_type,page_code,action_code');
     $st->execute([hex2bin($deviceHex), $since]);
@@ -576,12 +613,8 @@ function htk_drop_repeats(string $deviceHex, array $rows, int $window): array
     foreach ($rows as $row) {
         $id = $row['type'] . '|' . $row['page'] . '|' . (string)$row['action'];
         $time = htk_time_float($row['at']);
-        $rule = (int)$row['type'] === 2 ? htk_rule((string)$row['action']) : null;
-        if ($rule !== null && !empty($rule['skip_dedupe'])) {
-            $kept[] = $row; // thao tác được admin tắt chống trùng: luôn ghi
-            continue;
-        }
-        if (isset($last[$id]) && abs($time - $last[$id]) < $window) {
+        $own = $windows[$id] ?? $window;
+        if ($own > 0 && isset($last[$id]) && abs($time - $last[$id]) < $own) {
             $dropped[] = $row['key'];
             continue;
         }
@@ -663,7 +696,7 @@ function htk_server_event(string $kind, ?int $memberId = null): void
     try {
         $rule = null;
         foreach (htk_rules() as $candidate) {
-            if ($candidate['kind'] === $kind) {
+            if ($candidate['kind'] === $kind && $candidate['enabled']) {
                 $rule = $candidate;
                 break;
             }
@@ -804,7 +837,7 @@ function htk_funnel(string $fromDate, string $toDate): array
                 $conditions[] = '(event_type=2 AND action_code IN (' . implode(',', array_fill(0, count($actions), '?')) . '))';
                 $args = array_merge($args, array_keys($actions));
             }
-            $st = db()->prepare('SELECT device_id,event_type,page_code,action_code FROM app_tracking_events
+            $st = db()->prepare('SELECT device_id,event_type,page_code,action_code,occurred_at FROM app_tracking_events
                 WHERE occurred_at>=? AND occurred_at<? AND (' . implode(' OR ', $conditions) . ')
                 ORDER BY device_id,occurred_at,id');
             $st->execute($args);
@@ -813,7 +846,34 @@ function htk_funnel(string $fromDate, string $toDate): array
             $deviceSets = array_fill(0, $count, []);
             $current = null;
             $pos = -1;
-            while ($row = $st->fetch(PDO::FETCH_NUM)) {
+            $rows = $st->fetchAll(PDO::FETCH_NUM);
+            // Bước 'order' do server ghi giờ chuẩn, còn bước trước do máy khách ghi giờ có thể lệch vài giây:
+            // nếu bước 'order' đứng ngay trước bước liền trước nó (cùng thiết bị, cách nhau <= 10 giây) thì đảo lại cho đúng thứ tự.
+            $orderPrev = [];
+            foreach ($ruleList as $index => $rule) {
+                if ($index > 0 && $rule['kind'] === 'order') {
+                    $previousRule = $ruleList[$index - 1];
+                    $previousType = htk_rule_type($previousRule);
+                    $orderType = htk_rule_type($rule);
+                    $orderPrev[$orderType . '|' . ($orderType === 1 ? $rule['url'] : $rule['code'])] =
+                        $previousType . '|' . ($previousType === 1 ? $previousRule['url'] : $previousRule['code']);
+                }
+            }
+            if ($orderPrev) {
+                for ($i = 0; $i + 1 < count($rows); $i++) {
+                    $a = $rows[$i];
+                    $b = $rows[$i + 1];
+                    $keyA = (int)$a[1] . '|' . ((int)$a[1] === 1 ? $a[2] : $a[3]);
+                    $keyB = (int)$b[1] . '|' . ((int)$b[1] === 1 ? $b[2] : $b[3]);
+                    if ($a[0] === $b[0] && isset($orderPrev[$keyA]) && $orderPrev[$keyA] === $keyB
+                        && abs(strtotime($b[4]) - strtotime($a[4])) <= 10) {
+                        $rows[$i] = $b;
+                        $rows[$i + 1] = $a;
+                        $i++;
+                    }
+                }
+            }
+            foreach ($rows as $row) {
                 if ($row[0] !== $current) {
                     $current = $row[0];
                     $pos = -1;
@@ -890,7 +950,7 @@ function htk_js_config(): array
     $clicks = [];
     $minigame = '';
     foreach (htk_rules() as $rule) {
-        if ($rule['url'] !== $page) {
+        if ($rule['url'] !== $page || !$rule['enabled']) {
             continue;
         }
         if ($rule['kind'] === 'view') {
