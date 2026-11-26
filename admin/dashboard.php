@@ -1109,12 +1109,16 @@ admin_header('Thống kê truy cập');
 
     .fc-dlabel {
         position: absolute;
-        z-index: 4;
+        z-index: 6;
         transform: translateX(-50%);
         white-space: nowrap;
         font-size: .75rem;
         font-weight: 700;
-        color: #a08a6a
+        color: #f59e0b;
+        padding: 1px 6px;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, .92);
+        box-shadow: 0 1px 3px rgba(0, 0, 0, .18)
     }
 
     .fc-steps {
