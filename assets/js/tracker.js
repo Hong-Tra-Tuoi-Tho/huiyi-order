@@ -79,14 +79,20 @@
     writeQueue(list);
   }
 
+  // Trang thuộc một phòng đơn nhóm: gắn mã phòng để thống kê gom được hành trình của cả nhóm (nhiều thiết bị).
+  function withGroup(event) {
+    if (/^[a-f0-9]{32}$/.test(config.group || '')) event.group = config.group;
+    return event;
+  }
+
   function trackPage() {
     if (!config.page || !config.view) return;
-    enqueue({ key: uuid(), type: 1, page: config.page, action: null, at: Date.now() });
+    enqueue(withGroup({ key: uuid(), type: 1, page: config.page, action: null, at: Date.now() }));
   }
 
   function trackAction(action) {
     if (!config.page) return;
-    enqueue({ key: uuid(), type: 2, page: config.page, action: action, at: Date.now() });
+    enqueue(withGroup({ key: uuid(), type: 2, page: config.page, action: action, at: Date.now() }));
   }
 
   // Gửi một lô; event nào server báo đã xử lý thì xóa khỏi hàng đợi. Thất bại thì giữ nguyên event_key để gửi lại.

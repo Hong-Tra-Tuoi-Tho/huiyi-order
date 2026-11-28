@@ -87,7 +87,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && in_array($_POST['do'] ?? ''
     if ($action === 'add_funnel') {
         if (count($funnels) < 20) {
             $openId = 'f' . bin2hex(random_bytes(5));
-            $funnels[] = ['id' => $openId, 'name' => 'Phễu mới', 'steps' => []];
+            $funnels[] = ['id' => $openId, 'name' => 'Phễu mới', 'steps' => [], 'by' => 'device'];
         }
         $note = 2;
     } elseif ($action === 'delete_funnel') {
@@ -100,6 +100,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && in_array($_POST['do'] ?? ''
             if ($item['id'] === $targetId) {
                 $funnels[$index]['name'] = (string)($_POST['name'] ?? '');
                 $funnels[$index]['steps'] = is_array($_POST['steps'] ?? null) ? array_values($_POST['steps']) : [];
+                $funnels[$index]['by'] = (string)($_POST['by'] ?? '') === 'group' ? 'group' : 'device';
             }
         }
         $note = 1;
@@ -295,8 +296,10 @@ function dash_funnel_chart(array $steps, int $warnPercent): string
     }
     $maxEvents = 0;
     $maxDevices = 0;
+    $unitGroup = (($steps[0]['unit'] ?? '') === 'group');
+    $unitName = $unitGroup ? 'phòng' : 'thiết bị';
     foreach ($steps as $i => $step) {
-        $steps[$i]['bar'] = (int)($step['raw'] ?? $step['events']); // cột = số lần bấm / lượt xem thật
+        $steps[$i]['bar'] = (int)$step['events']; // cột = số hành trình đi tới bước (cùng đơn vị với tỷ lệ thoát); số lần bấm thật nằm ở chú thích
         $maxEvents = max($maxEvents, $steps[$i]['bar']);
         $maxDevices = max($maxDevices, (int)$step['devices']);
     }
@@ -325,8 +328,8 @@ function dash_funnel_chart(array $steps, int $warnPercent): string
     ob_start(); ?>
     <div class="fc">
         <div class="fc-legend">
-            <span><i class="fc-key bar"></i>Số lần bấm / lượt xem</span>
-            <span><i class="fc-key line"></i>Số thiết bị</span>
+            <span><i class="fc-key bar"></i>Số hành trình</span>
+            <span><i class="fc-key line"></i><?= $unitGroup ? 'Số phòng' : 'Số thiết bị' ?></span>
         </div>
         <div class="fc-scroll">
             <div class="fc-wrap" style="min-width:<?= max(320, $count * 92) ?>px">
@@ -350,7 +353,7 @@ function dash_funnel_chart(array $steps, int $warnPercent): string
                             $barPct = $pct($step['bar'], $leftTop);
                             $inside = $barPct >= 14;
                             $unit = ['view' => 'lượt xem', 'click' => 'lần bấm'][$step['kind'] ?? ''] ?? 'lượt';
-                            $title = $step['label'] . ': ' . number_format($step['bar'], 0, ',', '.') . ' ' . $unit . ', ' . number_format($step['events'], 0, ',', '.') . ' đơn đi qua bước, ' . number_format($step['devices'], 0, ',', '.') . ' thiết bị';
+                            $title = $step['label'] . ': ' . number_format($step['events'], 0, ',', '.') . ' hành trình đi tới bước, ' . number_format((int)($step['raw'] ?? 0), 0, ',', '.') . ' ' . $unit . ' thật, ' . number_format($step['devices'], 0, ',', '.') . ' ' . $unitName;
                             ?>
                             <div class="fc-col" style="left:<?= round($i * 100 / $count, 3) ?>%;width:<?= round(100 / $count, 3) ?>%" title="<?= e($title) ?>">
                                 <?php if ((int)$step['bar'] > 0): ?>
@@ -365,7 +368,7 @@ function dash_funnel_chart(array $steps, int $warnPercent): string
                             <?php $devicePct = $pct($step['devices'], $rightTop); ?>
                             <span class="fc-dot" style="left:<?= round($points[$i][0], 3) ?>%;bottom:<?= round($devicePct, 2) ?>%"></span>
                             <?php if ((int)$step['devices'] > 0): // bước không có thiết bị: đã có số 0 của cột, không ghi thêm nhãn để khỏi đè nhau ?>
-                                <span class="fc-dlabel" style="left:<?= round($points[$i][0], 3) ?>%;bottom:calc(<?= round($devicePct, 2) ?>% + 12px)"><?= number_format($step['devices'], 0, ',', '.') ?> thiết bị</span>
+                                <span class="fc-dlabel" style="left:<?= round($points[$i][0], 3) ?>%;bottom:calc(<?= round($devicePct, 2) ?>% + 12px)"><?= number_format($step['devices'], 0, ',', '.') ?> <?= $unitName ?></span>
                             <?php endif; ?>
                         <?php endforeach; ?>
                     </div>
@@ -1595,6 +1598,12 @@ admin_header('Thống kê truy cập');
                                     <table class="trk-table">
                                         <thead>
                                             <tr>
+                                <label class="trk-fedit-name">Đếm theo
+                                    <select name="by">
+                                        <option value="device" <?= ($funnelConfig['by'] ?? 'device') === 'device' ? 'selected' : '' ?>>Thiết bị (mỗi máy một hành trình)</option>
+                                        <option value="group" <?= ($funnelConfig['by'] ?? 'device') === 'group' ? 'selected' : '' ?>>Phòng đơn nhóm (cả nhóm là một hành trình, chỉ tính thao tác có mã phòng)</option>
+                                    </select>
+                                </label>
                                                 <th>Bước (chọn thao tác, theo thứ tự khách đi qua)</th>
                                                 <th></th>
                                             </tr>
@@ -1625,7 +1634,7 @@ admin_header('Thống kê truy cập');
                     <input type="hidden" name="do" value="add_funnel">
                     <button type="submit" class="btn primary">+ Thêm phễu</button>
                 </form>
-                <small class="field-hint">Mỗi lượt là một hành trình đi đúng thứ tự các bước (bấm lặp lại cùng một bước không tính thêm; nếu khách nhảy cóc tới bước sau thì các bước ở giữa vẫn tính là đã đi qua), nên số lượt luôn giảm dần qua các bước; tỷ lệ thoát tính theo số lượt này. Đường là số thiết bị khác nhau đã đi tới bước. Thao tác mới thêm ở phần cấu hình bên dưới cần lưu trước thì mới chọn được ở đây.</small>
+                <small class="field-hint">Mỗi lượt là một hành trình đi đúng thứ tự các bước (bấm lặp lại cùng một bước không tính thêm; nếu khách nhảy cóc tới bước sau thì các bước ở giữa vẫn tính là đã đi qua), nên số lượt luôn giảm dần qua các bước; tỷ lệ thoát tính theo số lượt này. Cột và tỷ lệ thoát cùng tính theo hành trình; số lần bấm thật xem ở chú thích khi rê chuột. Đường là số thiết bị (hoặc số phòng nếu phễu đếm theo phòng) đã đi tới bước. Thao tác mới thêm ở phần cấu hình bên dưới cần lưu trước thì mới chọn được ở đây.</small>
             </div>
         </section>
         <table style="display:none">
