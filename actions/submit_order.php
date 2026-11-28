@@ -149,7 +149,7 @@ hcq_saved($checkoutToken,$no);unset($_SESSION['checkout_drafts'][$checkoutContex
 if($gameSessionId!=='')unset($_SESSION[HCGS_KEY]);
 if($groupId===''){$_SESSION['cart']=[]; clear_coupon();unset($_SESSION['promotion_mode']);}
 // Tracking: đơn đã COMMIT thành công thì server tự ghi, web không gửi event này.
-htk_server_event('order',$orderMemberId);
+htk_server_event('order',$orderMemberId,$groupId);
 $_SESSION['last_order_no']=$no;
 $_SESSION['last_order_expected_game_chances']=$expectedGameChances;
 $_SESSION['last_order_eligible_drinks']=$eligibleDrinkQty;

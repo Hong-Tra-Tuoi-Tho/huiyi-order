@@ -72,7 +72,9 @@ function htk_clean_funnels($funnels, array $knownCodes): array
                 $steps[] = $code;
             }
         }
-        $clean[] = ['id' => $id, 'name' => $name, 'steps' => $steps];
+        // by: 'device' = một hành trình là một thiết bị; 'group' = một hành trình là một phòng đơn nhóm (gồm nhiều thiết bị).
+        $by = (string)($item['by'] ?? 'device') === 'group' ? 'group' : 'device';
+        $clean[] = ['id' => $id, 'name' => $name, 'steps' => $steps, 'by' => $by];
     }
     return $clean;
 }
@@ -85,7 +87,7 @@ function htk_schema(): void
         return;
     }
     $done = true;
-    if (setting('tracking_schema_version') === '2') {
+    if (setting('tracking_schema_version') === '3') {
         return;
     }
     if (db()->inTransaction()) {
@@ -101,6 +103,7 @@ function htk_schema(): void
             action_code VARCHAR(32) CHARACTER SET ascii COLLATE ascii_bin DEFAULT NULL,
             event_key   BINARY(16)       NOT NULL,
             occurred_at DATETIME(3)      NOT NULL,
+            group_id    CHAR(32) CHARACTER SET ascii COLLATE ascii_bin DEFAULT NULL,
             PRIMARY KEY (id),
             UNIQUE KEY uq_event_key (event_key),
             KEY idx_time (occurred_at),
@@ -121,12 +124,21 @@ function htk_schema(): void
             unique_members INT UNSIGNED     NOT NULL,
             PRIMARY KEY (stat_date, event_type, page_code, action_code)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+        // Bảng đã có từ bản cũ: bổ sung cột group_id (mã phòng đơn nhóm) + index nếu chưa có.
+        $hasGroup = db()->query("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='app_tracking_events' AND COLUMN_NAME='group_id'")->fetchColumn();
+        if (!(int)$hasGroup) {
+            db()->exec('ALTER TABLE app_tracking_events ADD COLUMN group_id CHAR(32) CHARACTER SET ascii COLLATE ascii_bin DEFAULT NULL');
+        }
+        $hasIndex = db()->query("SELECT COUNT(*) FROM information_schema.STATISTICS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='app_tracking_events' AND INDEX_NAME='idx_group_time'")->fetchColumn();
+        if (!(int)$hasIndex) {
+            db()->exec('ALTER TABLE app_tracking_events ADD KEY idx_group_time (group_id, occurred_at)');
+        }
         $saved = json_decode(setting('tracking_config'), true);
         if (!is_array($saved) || !isset($saved['rules'])) {
             // Chưa có cấu hình, hoặc cấu hình cũ (pages/actions) → dùng bộ quy tắc mặc định.
             set_setting('tracking_config', json_encode(htk_default_config(), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
         }
-        set_setting('tracking_schema_version', '2');
+        set_setting('tracking_schema_version', '3');
     } catch (Throwable $error) {
         // Không để lỗi tracking làm hỏng trang đặt hàng.
     }
@@ -451,6 +463,24 @@ function htk_current_page_code(): string
     return $script === '' ? '' : htk_normalize_path($script);
 }
 
+/** Mã phòng đơn nhóm hợp lệ (32 ký tự hex thường) hoặc '' nếu không phải. */
+function htk_clean_group($value): string
+{
+    return is_string($value) && preg_match('/^[a-f0-9]{32}$/D', $value) === 1 ? $value : '';
+}
+
+/**
+ * Mã phòng đơn nhóm của trang đang mở: ?group=... (menu, sản phẩm, thanh toán) hoặc ?id=... ở trang /group.
+ */
+function htk_current_group(): string
+{
+    $fromGroup = htk_clean_group($_GET['group'] ?? '');
+    if ($fromGroup !== '') {
+        return $fromGroup;
+    }
+    return htk_current_page_code() === '/group' ? htk_clean_group($_GET['id'] ?? '') : '';
+}
+
 function htk_session_member_id(): ?int
 {
     $id = (int)($_SESSION['member_id'] ?? 0);
@@ -546,6 +576,7 @@ function htk_ingest(string $deviceHex, array $events): array
             'page' => $page,
             'action' => $type === 2 ? $action : null,
             'at' => htk_time_string($event['at'] ?? null, $now),
+            'group' => htk_clean_group($event['group'] ?? ''),
         ];
     }
     if (!$rows) {
@@ -633,15 +664,16 @@ function htk_insert_rows(string $deviceHex, ?int $memberId, array $rows): array
     if (!$rows) {
         return [];
     }
-    $sql = 'INSERT IGNORE INTO app_tracking_events(device_id,member_id,event_type,page_code,action_code,event_key,occurred_at) VALUES ';
+    $sql = 'INSERT IGNORE INTO app_tracking_events(device_id,member_id,event_type,page_code,action_code,event_key,occurred_at,group_id) VALUES ';
     $marks = [];
     $args = [];
     $affected = [];
     $keys = [];
     $device = hex2bin($deviceHex);
     foreach ($rows as $row) {
-        $marks[] = '(?,?,?,?,?,?,?)';
-        array_push($args, $device, $memberId, $row['type'], $row['page'], $row['action'], hex2bin($row['key']), $row['at']);
+        $marks[] = '(?,?,?,?,?,?,?,?)';
+        $group = htk_clean_group($row['group'] ?? '');
+        array_push($args, $device, $memberId, $row['type'], $row['page'], $row['action'], hex2bin($row['key']), $row['at'], $group !== '' ? $group : null);
         $keys[] = $row['key'];
         $date = htk_stat_date($row['at']);
         $affected[$date . '|' . $row['type'] . '|' . $row['page'] . '|' . (string)$row['action']] = [$date, $row['type'], $row['page'], (string)$row['action']];
@@ -691,7 +723,7 @@ function htk_refresh_stat(string $date, int $type, string $page, string $action)
  * Ghi một event từ phía server cho thao tác loại 'order' (đặt hàng thành công) nếu admin có cấu hình.
  * Thiết bị lấy từ cookie htk_did do tracker.js đặt; không có thì suy ra từ session.
  */
-function htk_server_event(string $kind, ?int $memberId = null): void
+function htk_server_event(string $kind, ?int $memberId = null, string $groupId = ''): void
 {
     try {
         $rule = null;
@@ -717,6 +749,7 @@ function htk_server_event(string $kind, ?int $memberId = null): void
             'page' => $page,
             'action' => $action,
             'at' => htk_time_string(null, $now),
+            'group' => $groupId,
         ]]);
     } catch (Throwable $error) {
         // Tracking lỗi không được làm hỏng việc đặt hàng.
@@ -794,7 +827,7 @@ function htk_daily_series(string $fromDate, string $toDate): array
  * Mỗi bước trả về:
  *   events    số hành trình đã đi tới bước này (đơn vị chung cho cột biểu đồ, tỷ lệ thoát, chuyển đổi),
  *   raw       tổng số lượt thật của thao tác (bấm thêm nước 5 lần là 5), để biết khách bấm bao nhiêu lần,
- *   devices   số thiết bị khác nhau có hành trình đi tới bước này,
+ *   devices   số thiết bị khác nhau có hành trình đi tới bước này (phễu theo phòng: số phòng khác nhau),
  *   percent   devices so với bước đầu, conversion / missed: events so với bước trước.
  * Nên số ở bước sau không bao giờ lớn hơn bước trước.
  */
@@ -837,9 +870,12 @@ function htk_funnel(string $fromDate, string $toDate): array
                 $conditions[] = '(event_type=2 AND action_code IN (' . implode(',', array_fill(0, count($actions), '?')) . '))';
                 $args = array_merge($args, array_keys($actions));
             }
-            $st = db()->prepare('SELECT device_id,event_type,page_code,action_code,occurred_at FROM app_tracking_events
-                WHERE occurred_at>=? AND occurred_at<? AND (' . implode(' OR ', $conditions) . ')
-                ORDER BY device_id,occurred_at,id');
+            // Phễu theo phòng: chỉ lấy event có mã phòng (loại đơn thường) và gom hành trình theo phòng thay vì theo thiết bị.
+            $byGroup = ($funnel['by'] ?? 'device') === 'group';
+            $keyColumn = $byGroup ? 'group_id' : 'device_id';
+            $st = db()->prepare('SELECT ' . $keyColumn . ',event_type,page_code,action_code,occurred_at FROM app_tracking_events
+                WHERE occurred_at>=? AND occurred_at<? AND (' . implode(' OR ', $conditions) . ')' . ($byGroup ? ' AND group_id IS NOT NULL' : '') . '
+                ORDER BY ' . $keyColumn . ',occurred_at,id');
             $st->execute($args);
             $reach = array_fill(0, $count, 0);
             $raw = [];
@@ -918,13 +954,14 @@ function htk_funnel(string $fromDate, string $toDate): array
                     'raw' => $raw[$rawType . '|' . ($rawType === 1 ? $rule['url'] : $rule['code'])] ?? 0,
                     'devices' => $devices,
                     'events' => $reach[$index],
+                    'unit' => $byGroup ? 'group' : 'device',
                     'percent' => $first > 0 ? round($devices * 100 / $first, 1) : 0,
                     'conversion' => ($previous !== null && $previous > 0) ? round($reach[$index] * 100 / $previous, 1) : null,
                     'missed' => $previous !== null ? max(0, $previous - $reach[$index]) : null,
                 ];
             }
         }
-        $funnels[] = ['id' => $funnel['id'], 'name' => $funnel['name'], 'steps' => $steps];
+        $funnels[] = ['id' => $funnel['id'], 'name' => $funnel['name'], 'by' => $funnel['by'] ?? 'device', 'steps' => $steps];
     }
     return $funnels;
 }
@@ -979,6 +1016,7 @@ function htk_js_config(): array
         'view' => $view,
         'clicks' => $clicks,
         'minigame' => $minigame,
+        'group' => htk_current_group(),
     ];
 }
 
